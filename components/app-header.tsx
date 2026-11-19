@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+import Logo from "@/components/logo";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Search, Mic, X, UserCircle, History, Menu } from "lucide-react";
@@ -43,6 +43,14 @@ export default function AppHeader() {
       window.removeEventListener("auth-changed", checkAuth);
     };
   }, []);
+
+  // Keep the input in sync with ?q when landing on /search (e.g. via a link or reload)
+  useEffect(() => {
+    if (pathname !== "/search") return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads ?q from the browser URL after navigation
+    if (q) setDesktopSearchQuery(q);
+  }, [pathname]);
 
   const loadRecentSearches = () => {
     try {
@@ -102,23 +110,26 @@ export default function AppHeader() {
   };
 
   const toggleSidebar = () => {
-    if (typeof window !== "undefined" && (window as any).__sidebarToggle) {
-      (window as any).__sidebarToggle();
+    if (typeof window !== "undefined" && window.__sidebarToggle) {
+      window.__sidebarToggle();
     }
   };
 
-  const UserArea = () => (
+  // The sign-in page is a standalone screen with its own header (back, logo, language)
+  if (pathname === "/signin") return null;
+
+  const userArea = (
     <div className="flex items-center gap-1 flex-shrink-0 min-w-[36px] justify-center">
       {!authLoaded ? (
         <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
       ) : isLoggedIn ? (
         <AccountDropdown />
       ) : (
-        <Link href="/signin">
-          <Button variant="ghost" size="icon" className="rounded-full">
+        <Button asChild variant="ghost" size="icon" className="rounded-full">
+          <Link href="/signin" aria-label="Sign in">
             <UserCircle className="h-5 w-5" />
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
     </div>
   );
@@ -134,7 +145,7 @@ export default function AppHeader() {
       >
         <div className="flex items-center justify-between px-2 py-2 w-full h-14">
           <Link href="/" className="flex-shrink-0 pl-1">
-            <Image src="/DeeniTubeLogo.png" alt="Deeni.tube" width={90} height={24} className="h-6 w-auto" priority />
+            <Logo height={24} className="h-6 w-auto" />
           </Link>
 
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -143,12 +154,13 @@ export default function AppHeader() {
               variant="ghost"
               size="icon"
               className="rounded-full"
+              aria-label="Search"
               onClick={() => window.dispatchEvent(new CustomEvent("open-search-modal"))}
             >
               <Search className="h-5 w-5" />
             </Button>
             <NotificationDropdown />
-            <UserArea />
+            {userArea}
           </div>
         </div>
       </header>
@@ -171,7 +183,7 @@ export default function AppHeader() {
               <Menu className="h-5 w-5" />
             </button>
             <Link href="/">
-              <Image src="/DeeniTubeLogo.png" alt="Deeni.tube" width={120} height={30} className="h-7 w-auto" priority />
+              <Logo height={28} className="h-7 w-auto" />
             </Link>
           </div>
 
@@ -193,6 +205,7 @@ export default function AppHeader() {
                     onClick={() => setDesktopSearchQuery("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     type="button"
+                    aria-label="Clear search"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -202,26 +215,31 @@ export default function AppHeader() {
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-xl shadow-lg z-50 overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2 border-b">
                       <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
-                      <button onClick={clearRecent} className="text-xs text-primary hover:underline">Clear all</button>
+                      <button type="button" onClick={clearRecent} className="text-xs text-primary hover:underline">Clear all</button>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
                       {recentSearches.map(search => (
-                        <button
+                        <div
                           key={search}
-                          onClick={() => handleRecentClick(search)}
-                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted transition-colors"
+                          className="w-full flex items-center justify-between px-4 hover:bg-muted transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <History className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-left truncate">{search}</span>
-                          </div>
                           <button
-                            onClick={e => { e.stopPropagation(); removeRecent(search); }}
+                            type="button"
+                            onClick={() => handleRecentClick(search)}
+                            className="flex flex-1 min-w-0 items-center gap-3 py-2.5"
+                          >
+                            <History className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                            <span className="text-sm text-left truncate">{search}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeRecent(search)}
+                            aria-label={`Remove "${search}" from recent searches`}
                             className="p-1 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -232,10 +250,11 @@ export default function AppHeader() {
                 size="icon"
                 className="rounded-r-full h-10 border border-l-0 bg-muted hover:bg-muted/80 flex-shrink-0"
                 type="submit"
+                aria-label="Search"
               >
                 <Search className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full ml-2 bg-muted hover:bg-muted/80 flex-shrink-0">
+              <Button type="button" aria-label="Search with your voice" variant="ghost" size="icon" className="rounded-full ml-2 bg-muted hover:bg-muted/80 flex-shrink-0">
                 <Mic className="w-5 h-5" />
               </Button>
             </form>
@@ -249,12 +268,12 @@ export default function AppHeader() {
               ) : isLoggedIn ? (
                 <AccountDropdown />
               ) : (
-                <Link href="/signin">
-                  <Button variant="outline" className="rounded-full flex items-center gap-2 h-9 text-sm px-4 text-primary border-primary/50 hover:bg-primary/10">
+                <Button asChild variant="outline" className="rounded-full flex items-center gap-2 h-9 text-sm px-4 text-primary border-primary/50 hover:bg-primary/10">
+                  <Link href="/signin">
                     <UserCircle className="h-5 w-5" />
                     <span>Sign In</span>
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               )}
             </div>
           </div>

@@ -15,7 +15,8 @@ test.describe('Video detail page', () => {
   test('video page shows title', async ({ page }) => {
     await page.goto(videoUrl);
     // Video title rendered somewhere on the page
-    const title = page.locator('h1, h2, [data-testid="video-title"]').first();
+    // Mobile and desktop layouts each render a title; check the visible one
+    const title = page.locator('h1:visible, h2:visible, [data-testid="video-title"]:visible').first();
     await expect(title).toBeVisible({ timeout: 5000 });
   });
 
@@ -27,12 +28,8 @@ test.describe('Video detail page', () => {
     await expect(backBtn).toBeVisible({ timeout: 5000 });
   });
 
-  test('like/dislike buttons exist', async ({ page }) => {
+  test('video page shows the player and actions', async ({ page }) => {
     await page.goto(videoUrl);
-    // ThumbsUp/ThumbsDown buttons are in the video page content (not the header)
-    // Find a visible button (skip hidden mobile header buttons)
-    const visibleBtn = page.locator('button').filter({ has: page.locator('svg') }).filter({ hasNot: page.locator('.hidden') });
-    // Just verify at least some interactive buttons exist on the video page
     await expect(page.locator('iframe[src*="youtube.com"]').first()).toBeAttached({ timeout: 8000 });
     await expect(page.locator('body')).toBeVisible();
   });

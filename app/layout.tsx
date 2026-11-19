@@ -10,11 +10,15 @@ import MobileNav from "@/components/mobile-nav";
 import AppShell from "@/components/app-shell";
 import MobileSearchModal from "@/components/mobile-search-modal";
 import { HeaderProvider } from "@/app/contexts/header-context";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Deeni.tube - Authentic Islamic Videos",
+  title: {
+    default: "Deeni.tube - Authentic Islamic Videos",
+    template: "%s - Deeni.tube",
+  },
   description:
     "Watch authentic Islamic videos from trusted scholars. Browse channels, scholars, and categories for the best Islamic content.",
   generator: "v0.app",
@@ -35,7 +39,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="overflow-y-scroll">
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        {/* Apply the saved sidebar state before first paint (see globals.css) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("sidebar-collapsed")==="true")document.documentElement.dataset.sidebar="collapsed"}catch(e){}`,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <ThemeProvider
@@ -54,6 +63,8 @@ export default function RootLayout({
             <MobileNav />
             <MobileSearchModal />
           </HeaderProvider>
+          {/* Mobile offset clears the 56px bottom nav */}
+          <Toaster position="bottom-center" mobileOffset={{ bottom: 72 }} />
         </ThemeProvider>
       </body>
     </html>

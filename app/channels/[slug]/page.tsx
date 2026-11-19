@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -38,8 +38,11 @@ import { useWatchLater } from "@/hooks/useWatchLater";
 import { toast } from "sonner";
 import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
 
+import { useDontRecommend } from "@/hooks/useDontRecommend";
+import type { ChannelShort } from "@/lib/types";
+import { priorityForIndex } from "@/lib/image-priority";
 // Mock shorts data - combine from shorts-data.ts and add more
-const mockShortsByChannel: Record<string, any[]> = {
+const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
     { id: "sh1", videoId: "MBxDbbkk0gQ", title: "একমাত্র আল্লাহর রাজত্বই চিরস্থায়ী", views: "15K", timeAgo: "2 weeks ago", duration: "0:58" },
     { id: "sh2", videoId: "goHfO28fE-A", title: "যারা বলে আমাদের রব আল্লাহ", views: "25K", timeAgo: "3 days ago", duration: "0:45" },
@@ -60,19 +63,19 @@ const mockShortsByChannel: Record<string, any[]> = {
     { id: "sh11", videoId: "_zCnmnCd7CU", title: "আদমসুমারির খাতায় মুসলমান, বাস্তবে ইমানের খাতায় নাম নাই", views: "18K", timeAgo: "5 days ago", duration: "0:58" },
   ],
   "zakir-naik": [
-    { id: "sh12", videoId: "MBxDbbkk0gQ", title: "The Importance of Tawheed - Dr Zakir Naik", views: "45K", timeAgo: "1 week ago", duration: "0:55" },
+    { id: "sh12", videoId: "Wgk2Hw5-m7Y", title: "The Quran is the Most Untranslatable Book - Dr Zakir Naik", views: "8K", timeAgo: "3 weeks ago", duration: "0:58" },
+    { id: "sh19", videoId: "Qp4vZLEqizc", title: "Belief in Bad Omen is Shirk - Dr Zakir Naik", views: "4.6K", timeAgo: "2 weeks ago", duration: "1:13" },
   ],
   "mufti-menk": [
-    { id: "sh13", videoId: "0m1Mc6dX8XY", title: "Seek The Forgiveness of Allah #muftimenk", views: "95K", timeAgo: "2 days ago", duration: "0:45" },
-    { id: "sh14", videoId: "goHfO28fE-A", title: "Always Be Grateful - Mufti Menk", views: "78K", timeAgo: "5 days ago", duration: "0:52" },
+    { id: "sh13", videoId: "0m1Mc6dX8XY", title: "Seek The Forgiveness of Allah #muftimenk", views: "95K", timeAgo: "4 months ago", duration: "1:10" },
+    { id: "sh14", videoId: "HKRq0DE-GTo", title: "Just Don't Get Angry #muftimenk", views: "127K", timeAgo: "1 month ago", duration: "1:00" },
   ],
   "assim-al-hakeem": [
     { id: "sh15", videoId: "Tnb74r4VZaY", title: "Is it not permissible 2 get married in Muharram?", views: "32K", timeAgo: "3 days ago", duration: "0:48" },
     { id: "sh16", videoId: "yLMQmr7qjcM", title: "Read all duas of morning & evening adhkar?", views: "25K", timeAgo: "1 week ago", duration: "0:50" },
   ],
-  "saifullah-madani": [
-    { id: "sh17", videoId: "oEWnPbRvOrY", title: "তাওহীদের আলোকে জীবন", views: "8K", timeAgo: "2 weeks ago", duration: "0:55" },
-  ],
+  // Dr. Muhammad Saifullah's official channel has no Shorts
+  "saifullah-madani": [],
 };
 
 function ChannelSkeleton() {
@@ -118,30 +121,17 @@ function ChannelSkeleton() {
 
 export default function ChannelDetailPage() {
   const params = useParams();
+  const channel = channelData.find((ch) => ch.slug === (params.slug as string));
+  // The [slug] layout already returns a 404 for unknown channels; this is a safety net
+  if (!channel) notFound();
+  // Keyed so tabs and dialogs reset when moving between channels
+  return <ChannelView key={channel.id} channel={channel} />;
+}
+
+function ChannelView({ channel }: { channel: ChannelItem }) {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
-  const channelSlug = params.slug as string;
-
-  const channel: ChannelItem | undefined = channelData.find(
-    (ch) => ch.slug === channelSlug
-  );
-
-  if (!channel) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center mt-14 md:mt-16">
-        <div className="text-center px-3">
-          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <Play className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Channel not found</h2>
-          <p className="text-sm text-muted-foreground mb-4">The channel you're looking for doesn't exist.</p>
-          <Button onClick={() => router.push("/channels")} className="rounded-full">
-            Back to Channels
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const dontRecommend = useDontRecommend();
 
   const channelVideos: VideoItem[] = videoData.filter(
     (v) => v.channelId === channel.id
@@ -152,8 +142,9 @@ export default function ChannelDetailPage() {
   // Get playlists that contain videos from this channel
   const channelPlaylists = useMemo(() => {
     const channelVideoIds = channelVideos.map(v => v.id);
+    // Only public playlists belong on a channel page (never the user's Watch Later / Liked)
     return extendedPlaylists.filter((pl) =>
-      pl.videoIds.some(vid => channelVideoIds.includes(vid))
+      pl.isPublic && pl.videoIds.some(vid => channelVideoIds.includes(vid))
     ).slice(0, 4);
   }, [channelVideos]);
 
@@ -164,16 +155,17 @@ export default function ChannelDetailPage() {
   const [shareUrl, setShareUrl] = useState("");
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [shortDrawerOpen, setShortDrawerOpen] = useState(false);
-  const [selectedShort, setSelectedShort] = useState<any>(null);
+  const [selectedShort, setSelectedShort] = useState<ChannelShort | null>(null);
   const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
-    setShareUrl(typeof window !== "undefined" ? window.location.href : "");
     return () => clearTimeout(timer);
   }, [channel.id]);
 
+  // Share this channel page (other share buttons set their own link)
   const handleShare = () => {
+    setShareUrl(window.location.href);
     setShareModalOpen(true);
   };
 
@@ -224,23 +216,24 @@ export default function ChannelDetailPage() {
         </div>
       )}
 
-      {/* Mobile: original fcrop64 URL is a ~6:1 pre-cropped strip — natural height (~100px), no extra space */}
-      <div className="relative md:hidden">
-        <img
-          src={channel.banner || "/vibrant-health-cover.png"}
-          alt="Channel banner"
-          className="w-full h-auto block"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
-      </div>
-
-      {/* Desktop: fullBannerUrl (=w1920) loads reliably — fixed banner height with object-cover */}
-      <div className="relative hidden md:block h-52 xl:h-64">
-        <img
-          src={fullBannerUrl}
-          alt="Channel banner"
-          className="w-full h-full object-cover"
-        />
+      {/* One banner image per screen size: the browser downloads only the matching source.
+          Mobile uses the original fcrop64 strip (~6:1, natural height); desktop uses the full
+          =w1920 banner at a fixed height. Eager because it's at the top; not high priority because
+          on mobile the main image is the first video, and they would compete for bandwidth. */}
+      <div className="relative md:h-52 xl:h-64">
+        <picture>
+          <source media="(min-width: 768px)" srcSet={fullBannerUrl} />
+          <img
+            src={channel.banner || "/vibrant-health-cover.png"}
+            alt="Channel banner"
+            width={1707}
+            height={282}
+            referrerPolicy="no-referrer"
+            loading="eager"
+            decoding="async"
+            className="block w-full h-auto md:h-full md:object-cover"
+          />
+        </picture>
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
       </div>
 
@@ -289,7 +282,7 @@ export default function ChannelDetailPage() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
+                  <Button aria-label="More actions"
                     variant="ghost"
                     size="icon"
                     className="rounded-full"
@@ -306,9 +299,9 @@ export default function ChannelDetailPage() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="cursor-pointer"
-                    onClick={() => toast("Channel hidden")}
+                    onClick={() => dontRecommend(channel.id, channel.name)}
                   >
-                    <Ban className="h-4 w-4 mr-3" /> Don't recommend channel
+                    <Ban className="h-4 w-4 mr-3" /> Don&apos;t recommend channel
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -364,7 +357,7 @@ export default function ChannelDetailPage() {
           {channelVideos.length > 0 ? (
             <>
               <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-                {channelVideos.map((video) => (
+                {channelVideos.map((video, index) => (
                   <VideoCard
                     key={video.id}
                     videoId={video.videoId}
@@ -377,11 +370,12 @@ export default function ChannelDetailPage() {
                     duration={video.duration}
                     thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                     isHorizontal={false}
+                    imagePriority={priorityForIndex(index)}
                   />
                 ))}
               </div>
               <div className="flex flex-col md:hidden">
-                {channelVideos.map((video) => (
+                {channelVideos.map((video, index) => (
                   <VideoCard
                     key={video.id}
                     videoId={video.videoId}
@@ -394,6 +388,7 @@ export default function ChannelDetailPage() {
                     duration={video.duration}
                     thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                     isHorizontal={true}
+                    imagePriority={priorityForIndex(index)}
                   />
                 ))}
               </div>
@@ -404,7 +399,7 @@ export default function ChannelDetailPage() {
                 <Play className="h-7 w-7 text-muted-foreground" />
               </div>
               <h3 className="font-semibold mb-1">No videos yet</h3>
-              <p className="text-sm text-muted-foreground">This channel hasn't uploaded any videos.</p>
+              <p className="text-sm text-muted-foreground">This channel hasn&apos;t uploaded any videos.</p>
             </div>
           )}
         </>
@@ -447,7 +442,7 @@ export default function ChannelDetailPage() {
                       </p>
                     </div>
                     {isMobile ? (
-                      <button
+                      <button aria-label="More actions"
                         className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5"
                         onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }}
                       >
@@ -456,7 +451,7 @@ export default function ChannelDetailPage() {
                     ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
+                          <button aria-label="More actions" className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
                             <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
@@ -483,7 +478,7 @@ export default function ChannelDetailPage() {
                 <Play className="h-7 w-7 text-muted-foreground" />
               </div>
               <h3 className="font-semibold mb-1">No shorts yet</h3>
-              <p className="text-sm text-muted-foreground">This channel hasn't uploaded any shorts.</p>
+              <p className="text-sm text-muted-foreground">This channel hasn&apos;t uploaded any shorts.</p>
             </div>
           )}
 
@@ -576,7 +571,7 @@ export default function ChannelDetailPage() {
                         </h3>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button
+                            <button aria-label="More actions"
                               className="p-1 rounded-full hover:bg-muted transition-colors -mr-1 flex-shrink-0"
                               onClick={(e) => e.stopPropagation()}
                             >

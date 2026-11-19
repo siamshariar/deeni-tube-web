@@ -28,7 +28,6 @@ import {
   Flag,
   MoreHorizontal,
   EyeOff,
-  Heart,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -58,11 +57,17 @@ import { ShareModal } from "@/components/share-modal";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { videoData, VideoItem } from "@/lib/video-data";
-import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
+import { VideoItem } from "@/lib/video-data";
+import { extendedPlaylists } from "@/lib/playlist-data";
+import { usePlaylists, isSystemPlaylist } from "@/hooks/usePlaylists";
+import { useHydrated } from "@/lib/local-store";
+import { findVideo, youtubeThumb } from "@/lib/media-lookup";
+import { recordWatch } from "@/hooks/useWatchHistory";
+import { historyEntryForVideo } from "@/lib/history-entry";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+import type { CommentReply } from "@/lib/types";
 // ─── Mock comments ─────────────────────────────────
 const mockCommentsWithReplies = [
   {
@@ -137,10 +142,10 @@ function ReplyItem({
   isDisliked,
   depth = 0,
 }: {
-  reply: any;
+  reply: CommentReply;
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
-  onReply: (id: string) => void;
+  onReply: (id: string, text: string) => void;
   isLiked: boolean;
   isDisliked: boolean;
   depth?: number;
@@ -150,9 +155,9 @@ function ReplyItem({
 
   const handleReplySubmit = () => {
     if (!replyText.trim()) return;
+    onReply(reply.id, replyText.trim());
     setReplyText("");
     setShowReplyInput(false);
-    toast.success("Reply added (demo)");
   };
 
   const displayName = reply.isChannel ? (
@@ -195,7 +200,7 @@ function ReplyItem({
               />
               <span className="text-xs">{reply.likes}</span>
             </button>
-            <button
+            <button aria-label="Dislike"
               onClick={() => onDislike(reply.id)}
               className={`hover:bg-muted rounded-full p-1 transition-colors ${
                 isDisliked ? "text-destructive" : "text-muted-foreground"
@@ -227,14 +232,14 @@ function ReplyItem({
                   className="flex-1 bg-transparent border-b border-border pb-1 text-xs focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
                   autoFocus
                 />
-                <button
+                <button aria-label="Post comment"
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim()}
                   className="text-primary hover:text-primary/80 disabled:opacity-30"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>
-                <button
+                <button aria-label="Cancel reply"
                   onClick={() => setShowReplyInput(false)}
                   className="text-muted-foreground hover:text-foreground"
                 >
@@ -244,7 +249,7 @@ function ReplyItem({
             </div>
           )}
           {reply.replies &&
-            reply.replies.map((nestedReply: any) => (
+            reply.replies.map((nestedReply: CommentReply) => (
               <ReplyItem
                 key={nestedReply.id}
                 reply={nestedReply}
@@ -275,22 +280,74 @@ function VideoSkeleton() {
   );
 }
 
+
+// Reply box shown under a top-level comment
+function InlineReplyBox({ onSubmit, onCancel }: { onSubmit: (text: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState("");
+  const submit = () => {
+    if (text.trim()) onSubmit(text.trim());
+  };
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <input
+        type="text"
+        autoFocus
+        aria-label="Write a reply"
+        placeholder="Add a reply..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") onCancel();
+        }}
+        className="flex-1 bg-transparent border-b border-border pb-1 text-sm focus:outline-none placeholder:text-muted-foreground"
+      />
+      <button type="button" onClick={onCancel} className="text-xs font-medium hover:bg-muted rounded-full px-3 py-1.5">
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!text.trim()}
+        className="text-xs font-medium bg-foreground text-background rounded-full px-3 py-1.5 disabled:opacity-50"
+      >
+        Reply
+      </button>
+    </div>
+  );
+}
+
 export default function PlaylistDetailPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const playlistId = params.id as string;
   // When opened from a channel page, the playlist is read-only (channel-owned)
   const isChannelPlaylist = searchParams.get("source") === "channel";
 
-  const [playlist, setPlaylist] = useState<PlaylistItem | null>(null);
-  const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const hydrated = useHydrated();
+  const { getPlaylist, removeVideoFromPlaylist, reorderPlaylist, deletePlaylist } = usePlaylists();
+  // Channel playlists are read-only and always available, even if removed from the user's library
+  const playlist = hydrated
+    ? getPlaylist(playlistId) ?? (isChannelPlaylist ? extendedPlaylists.find((p) => p.id === playlistId) : undefined) ?? null
+    : null;
+  const savedVideos = useMemo(
+    () => (playlist?.videoIds ?? []).map((id) => findVideo(id)).filter((v): v is VideoItem => v !== undefined),
+    [playlist]
+  );
+  // Live order while dragging; persisted on drop
+  const [dragOrder, setDragOrder] = useState<VideoItem[] | null>(null);
+  const videos = dragOrder ?? savedVideos;
+  const videosRef = useRef(videos);
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = !hydrated;
   const [showShareModal, setShowShareModal] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
+  const shareUrl = playlist && typeof window !== "undefined" ? `${window.location.origin}/playlists/${playlist.slug}/${playlist.id}` : "";
   const [collapsed, setCollapsed] = useState(false);
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);   // ✅ added
 
@@ -305,7 +362,6 @@ export default function PlaylistDetailPage() {
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
 
-  const [isLoved, setIsLoved] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
   const mobileIframeRef = useRef<HTMLIFrameElement>(null);
   const desktopIframeRef = useRef<HTMLIFrameElement>(null);
@@ -325,9 +381,10 @@ export default function PlaylistDetailPage() {
         const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
         if (data?.event === "infoDelivery" && data?.info?.playerState === 0) {
           if (autoPlay) {
-            setCurrentVideoIndex((prev) => {
-              if (prev < videos.length - 1) return prev + 1;
-              return prev;
+            setCurrentVideoId((prevId) => {
+              const list = videosRef.current;
+              const i = Math.max(0, list.findIndex((v) => v.id === prevId));
+              return i < list.length - 1 ? list[i + 1].id : prevId;
             });
           }
         }
@@ -335,23 +392,7 @@ export default function PlaylistDetailPage() {
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [autoPlay, videos.length]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const found = extendedPlaylists.find((p) => p.id === playlistId);
-      if (found) {
-        setPlaylist(found);
-        const playlistVideos = found.videoIds
-          .map(id => videoData.find(v => v.id === id))
-          .filter(Boolean) as VideoItem[];
-        setVideos(playlistVideos.length > 0 ? playlistVideos : videoData);
-        setShareUrl(`${window.location.origin}/playlists/${found.slug}/${found.id}`);
-      }
-      setIsLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [playlistId]);
+  }, [autoPlay]);
 
   const filteredVideos = useMemo(() => {
     if (!searchQuery) return videos;
@@ -362,13 +403,40 @@ export default function PlaylistDetailPage() {
     );
   }, [videos, searchQuery]);
 
-  const currentVideo = videos[currentVideoIndex];
+  const currentVideo = videos.find((v) => v.id === currentVideoId) ?? videos[0];
 
-  const handleSelectVideo = (index: number) => {
-    setCurrentVideoIndex(index);
+  useEffect(() => {
+    if (currentVideo) recordWatch(historyEntryForVideo(currentVideo));
+  }, [currentVideo]);
+  const canEdit = !isChannelPlaylist && !!playlist;
+  // Reordering is only meaningful on the full, unfiltered list
+  const canReorder = canEdit && !searchQuery;
+
+  const handleSelectVideo = (video: VideoItem) => {
+    setCurrentVideoId(video.id);
   };
 
-  const handleDragStart = (index: number) => setDragItem(index);
+  const handleRemoveVideo = (video: VideoItem) => {
+    if (!playlist) return;
+    if (video.id === currentVideo?.id) {
+      const i = videos.findIndex((v) => v.id === video.id);
+      setCurrentVideoId((videos[i + 1] ?? videos[i - 1])?.id ?? null);
+    }
+    removeVideoFromPlaylist(playlist.id, video.id);
+    toast.success(`Removed from "${playlist.name}"`);
+  };
+
+  const handleDeletePlaylist = () => {
+    if (!playlist) return;
+    deletePlaylist(playlist.id);
+    toast.success("Playlist deleted");
+    router.push("/playlists");
+  };
+
+  const handleDragStart = (index: number) => {
+    setDragOrder(savedVideos);
+    setDragItem(index);
+  };
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (dragItem === null || dragItem === index) return;
@@ -376,10 +444,14 @@ export default function PlaylistDetailPage() {
     const draggedItem = items[dragItem];
     items.splice(dragItem, 1);
     items.splice(index, 0, draggedItem);
-    setVideos(items);
+    setDragOrder(items);
     setDragItem(index);
   };
-  const handleDragEnd = () => setDragItem(null);
+  const handleDragEnd = () => {
+    if (dragOrder && playlist) reorderPlaylist(playlist.id, dragOrder.map((v) => v.id));
+    setDragOrder(null);
+    setDragItem(null);
+  };
 
   const handleAddComment = () => {
     if (!commentText.trim()) return;
@@ -470,10 +542,24 @@ export default function PlaylistDetailPage() {
     );
   };
 
-  const handleReply = (commentId: string) => toast("Reply input opened (demo)");
-
-  const handleLove = () => {
-    setIsLoved(!isLoved);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  // Adds a reply to the thread containing `commentId` (a top-level comment or one of its replies)
+  const handleReply = (commentId: string, text: string) => {
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId || c.replies?.some((r) => r.id === commentId)
+          ? {
+              ...c,
+              replies: [
+                ...(c.replies ?? []),
+                { id: `r${Date.now()}`, user: "You", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "Just now", content: text, likes: 0, dislikes: 0, isChannel: false },
+              ],
+            }
+          : c
+      )
+    );
+    setReplyingTo(null);
+    toast.success("Reply added");
   };
 
   const handleShare = () => {
@@ -560,6 +646,30 @@ export default function PlaylistDetailPage() {
     );
   }
 
+  if (videos.length === 0) {
+    return (
+      <div className="min-h-screen bg-background pt-14">
+        <div className="max-w-md mx-auto text-center px-4 py-20">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <Play className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <h1 className="text-xl font-semibold">{playlist.name}</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            No videos in this playlist yet. Use &quot;Save to playlist&quot; on any video to add it here.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <Button variant="outline" className="rounded-full" onClick={() => router.push("/playlists")}>
+              All playlists
+            </Button>
+            <Button className="rounded-full" onClick={() => router.push("/")}>
+              Browse videos
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pt-14">
       {/* Mobile back button + title */}
@@ -583,7 +693,7 @@ export default function PlaylistDetailPage() {
           <div className="relative w-full aspect-video">
             <iframe
               ref={mobileIframeRef}
-              key={`mobile-${currentVideoIndex}`}
+              key={`mobile-${currentVideo?.id}`}
               src={`https://www.youtube.com/embed/${currentVideo?.videoId || "5qap5aO4i9A"}?autoplay=1&enablejsapi=1`}
               title={currentVideo?.title || "Video"}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -605,7 +715,7 @@ export default function PlaylistDetailPage() {
                   <div className="relative w-full aspect-video md:max-h-[75vh] md:mx-auto">
                     <iframe
                       ref={desktopIframeRef}
-                      key={`desktop-${currentVideoIndex}`}
+                      key={`desktop-${currentVideo?.id}`}
                       src={`https://www.youtube.com/embed/${currentVideo?.videoId || "5qap5aO4i9A"}?autoplay=1&enablejsapi=1`}
                       title={currentVideo?.title || "Video"}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -626,16 +736,16 @@ export default function PlaylistDetailPage() {
                       <AvatarFallback>{currentVideo.channel?.charAt(0) || "C"}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold leading-snug line-clamp-2">{currentVideo.title}</p>
+                      <h1 className="text-sm font-semibold leading-snug line-clamp-2">{currentVideo.title}</h1>
                       <p className="text-xs font-medium mt-1 leading-tight">{currentVideo.channel}</p>
                       <p className="text-xs text-muted-foreground leading-tight">780K subscribers</p>
                       <div className="flex items-center gap-0.5 mt-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowShareModal(true)}>
+                        <Button aria-label="Share" variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowShareModal(true)}>
                           <Share className="h-4 w-4" />
                         </Button>
                         <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
                           <DrawerTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                            <Button aria-label="More actions" variant="ghost" size="icon" className="h-8 w-8 rounded-full">
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DrawerTrigger>
@@ -643,7 +753,7 @@ export default function PlaylistDetailPage() {
                             <div className="mt-2 pb-6">
                               <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer"><Clock className="h-5 w-5" /> Save to Watch later</div>
                               <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowPlaylistDialog(true), 150); }}><Bookmark className="h-5 w-5" /> Save to playlist</div>
-                              <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-5 w-5" /> Don't recommend channel</div>
+                              <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</div>
                               <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</div>
                               <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-5 w-5" /> Report</div>
                             </div>
@@ -668,31 +778,19 @@ export default function PlaylistDetailPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Love/Heart button — commented out; uncomment to re-enable
-                        <button
-                          onClick={handleLove}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                            isLoved
-                              ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                              : "bg-muted hover:bg-muted/80"
-                          }`}
-                        >
-                          <Heart className={`h-5 w-5 ${isLoved ? "fill-current" : ""}`} />
-                        </button>
-                        */}
-                        <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowShareModal(true)}>
+                        <Button aria-label="Share" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowShareModal(true)}>
                           <Share className="h-5 w-5" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-full">
+                            <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
                               <MoreHorizontal className="h-5 w-5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-72">
                             <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer"><Clock className="h-5 w-5" /> Save to Watch later</DropdownMenuItem>
                             <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); }}><Bookmark className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
-                            <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don't recommend channel</DropdownMenuItem>
+                            <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
                             <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
                             <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -794,14 +892,17 @@ export default function PlaylistDetailPage() {
                                     <ThumbsUp className={`h-4 w-4 ${likedComments.has(comment.id) ? "fill-current" : ""}`} />
                                     <span className="text-xs">{comment.likes}</span>
                                   </button>
-                                  <button onClick={() => handleDislikeComment(comment.id)} className={`hover:bg-muted rounded-full p-1 transition-colors ${dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"}`}>
+                                  <button aria-label="Dislike" onClick={() => handleDislikeComment(comment.id)} className={`hover:bg-muted rounded-full p-1 transition-colors ${dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"}`}>
                                     <ThumbsDown className={`h-4 w-4 ${dislikedComments.has(comment.id) ? "fill-current" : ""}`} />
                                   </button>
-                                  <button onClick={() => handleReply(comment.id)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
+                                  <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
                                 </div>
+                                {replyingTo === comment.id && (
+                                  <InlineReplyBox onSubmit={(text) => handleReply(comment.id, text)} onCancel={() => setReplyingTo(null)} />
+                                )}
                                 {comment.replies && comment.replies.length > 0 && (
                                   <div className="mt-2">
-                                    {comment.replies.map((reply: any) => (
+                                    {comment.replies.map((reply: CommentReply) => (
                                       <ReplyItem
                                         key={reply.id}
                                         reply={reply}
@@ -826,7 +927,7 @@ export default function PlaylistDetailPage() {
                             <MessageCircle className="h-4 w-4" /> {comments.length} Comments
                         </Button>
                         </DrawerTrigger>
-                        <DrawerContent className="h-[80vh]">
+                        <DrawerContent accessibleTitle={null} className="h-[80vh]">
                           <DrawerHeader>
                             <DrawerTitle className="text-lg">Comments</DrawerTitle>
                           </DrawerHeader>
@@ -861,14 +962,17 @@ export default function PlaylistDetailPage() {
                                         <ThumbsUp className={`h-4 w-4 ${likedComments.has(comment.id) ? "fill-current" : ""}`} />
                                         <span className="text-xs">{comment.likes}</span>
                                       </button>
-                                      <button onClick={() => handleDislikeComment(comment.id)} className={`hover:bg-muted rounded-full p-1 transition-colors ${dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"}`}>
+                                      <button aria-label="Dislike" onClick={() => handleDislikeComment(comment.id)} className={`hover:bg-muted rounded-full p-1 transition-colors ${dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"}`}>
                                         <ThumbsDown className={`h-4 w-4 ${dislikedComments.has(comment.id) ? "fill-current" : ""}`} />
                                       </button>
-                                      <button onClick={() => handleReply(comment.id)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
+                                      <button onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
                                     </div>
+                                    {replyingTo === comment.id && (
+                                      <InlineReplyBox onSubmit={(text) => handleReply(comment.id, text)} onCancel={() => setReplyingTo(null)} />
+                                    )}
                                     {comment.replies && comment.replies.length > 0 && (
                                       <div className="mt-2">
-                                        {comment.replies.map((reply: any) => (
+                                        {comment.replies.map((reply: CommentReply) => (
                                           <ReplyItem
                                             key={reply.id}
                                             reply={reply}
@@ -921,7 +1025,7 @@ export default function PlaylistDetailPage() {
                       <span>{videos.length} videos</span>
                     </div>
                   </div>
-                  <button onClick={toggleCollapse} className="p-1 rounded-full hover:bg-muted">
+                  <button aria-label="Show or hide playlist" onClick={toggleCollapse} className="p-1 rounded-full hover:bg-muted">
                     <ChevronDown className={cn("h-5 w-5 transition-transform", collapsed ? "rotate-180" : "")} />
                   </button>
                 </div>
@@ -936,10 +1040,10 @@ export default function PlaylistDetailPage() {
                         <Repeat className="h-3.5 w-3.5" />
                         Autoplay
                       </button>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => {
+                      <Button aria-label="Shuffle" variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => {
                         if (videos.length) {
                           const random = videos[Math.floor(Math.random() * videos.length)];
-                          handleSelectVideo(videos.indexOf(random));
+                          handleSelectVideo(random);
                         }
                       }}>
                         <Shuffle className="h-4 w-4" />
@@ -948,7 +1052,7 @@ export default function PlaylistDetailPage() {
                     <div className="flex-1" />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="rounded-full">
+                        <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
                           <MoreVertical className="h-5 w-5" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -958,12 +1062,12 @@ export default function PlaylistDetailPage() {
                             <Share className="h-4 w-4 mr-2" /> Share
                           </DropdownMenuItem>
                         )}
-                        {!isChannelPlaylist && (
+                        {canEdit && !isSystemPlaylist(playlist.id) && (
                           <>
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => toast("Edit playlist (prototype)")}>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push("/playlists")}>
                               <Edit className="h-4 w-4 mr-2" /> Edit playlist
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-red-500 dark:text-red-400" onClick={() => toast("Delete playlist (prototype)")}>
+                            <DropdownMenuItem className="cursor-pointer text-red-500 dark:text-red-400" onClick={handleDeletePlaylist}>
                               <Trash2 className="h-4 w-4 mr-2" /> Delete playlist
                             </DropdownMenuItem>
                           </>
@@ -986,7 +1090,7 @@ export default function PlaylistDetailPage() {
                       className="w-full pl-9 pr-8 py-1.5 bg-muted/50 rounded-full text-sm outline-none focus:bg-muted transition-colors"
                     />
                     {searchQuery && (
-                      <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <button aria-label="Clear search" onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                         <X className="h-4 w-4" />
                       </button>
                     )}
@@ -1003,26 +1107,43 @@ export default function PlaylistDetailPage() {
                       : "max-h-[calc(100vh-10rem)] overflow-y-auto"
                   )}
                 >
-                  {filteredVideos.map((video, index) => (
-                    <button
+                  {filteredVideos.length === 0 && (
+                    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      {searchQuery ? "No videos match your search" : "No videos in this playlist yet"}
+                    </p>
+                  )}
+                  {filteredVideos.map((video) => {
+                    const index = videos.indexOf(video);
+                    const isCurrent = video.id === currentVideo?.id;
+                    return (
+                    <div
                       key={video.id}
-                      onClick={() => handleSelectVideo(index)}
+                      role="button"
+                      tabIndex={0}
+                      aria-current={isCurrent ? "true" : undefined}
+                      onClick={() => handleSelectVideo(video)}
+                      onKeyDown={(e) => {
+                        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleSelectVideo(video);
+                        }
+                      }}
                       className={cn(
-                        "w-full flex items-center gap-2 px-2 py-2.5 transition-colors group cursor-pointer",
-                        index === currentVideoIndex
+                        "w-full flex items-center gap-2 px-2 py-2.5 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+                        isCurrent
                           ? "bg-muted/60 hover:bg-muted/70"
                           : "hover:bg-muted/40"
                       )}
-                      draggable={!isChannelPlaylist}
-                      onDragStart={!isChannelPlaylist ? () => handleDragStart(index) : undefined}
-                      onDragOver={!isChannelPlaylist ? (e) => handleDragOver(e, index) : undefined}
-                      onDragEnd={!isChannelPlaylist ? handleDragEnd : undefined}
+                      draggable={canReorder}
+                      onDragStart={canReorder ? () => handleDragStart(index) : undefined}
+                      onDragOver={canReorder ? (e) => handleDragOver(e, index) : undefined}
+                      onDragEnd={canReorder ? handleDragEnd : undefined}
                     >
                       {/* Mobile indicator: ▶ for active, grip for others (user playlist only) */}
                       <div className="flex md:hidden items-center justify-center w-5 flex-shrink-0">
-                        {index === currentVideoIndex ? (
+                        {isCurrent ? (
                           <Play className="h-3 w-3 text-primary fill-primary flex-shrink-0" />
-                        ) : isChannelPlaylist ? (
+                        ) : !canReorder ? (
                           <span className="text-[10px] font-mono text-muted-foreground">{index + 1}</span>
                         ) : (
                           <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0 cursor-grab" />
@@ -1033,12 +1154,12 @@ export default function PlaylistDetailPage() {
                       <div className="hidden md:flex items-center justify-center w-5 flex-shrink-0 relative">
                         <span className={cn(
                           "text-[10px] font-mono leading-none transition-opacity",
-                          !isChannelPlaylist && "group-hover:opacity-0",
-                          index === currentVideoIndex ? "text-primary font-semibold" : "text-muted-foreground"
+                          canReorder && "group-hover:opacity-0",
+                          isCurrent ? "text-primary font-semibold" : "text-muted-foreground"
                         )}>
-                          {index === currentVideoIndex ? "▶" : index + 1}
+                          {isCurrent ? "▶" : index + 1}
                         </span>
-                        {!isChannelPlaylist && (
+                        {canReorder && (
                           <GripVertical className="absolute inset-0 m-auto h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
                         )}
                       </div>
@@ -1046,7 +1167,7 @@ export default function PlaylistDetailPage() {
                       {/* Thumbnail — 16:9, slightly larger on mobile: 106×60; sm: 120×68 */}
                       <div className="relative w-[106px] h-[60px] sm:w-[120px] sm:h-[68px] rounded-md overflow-hidden flex-shrink-0 bg-black">
                         <Image
-                          src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
+                          src={youtubeThumb(video.videoId, "small")}
                           alt={video.title}
                           fill
                           className="object-cover"
@@ -1054,7 +1175,7 @@ export default function PlaylistDetailPage() {
                         <div className="absolute bottom-0.5 right-0.5 bg-black/80 text-white text-[9px] px-1 py-px rounded font-medium leading-none">
                           {video.duration}
                         </div>
-                        {index === currentVideoIndex && (
+                        {isCurrent && (
                           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/30">
                             <div className="h-full bg-red-600" style={{ width: "60%" }} />
                           </div>
@@ -1080,25 +1201,30 @@ export default function PlaylistDetailPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                            type="button"
+                            aria-label={`More actions for ${video.title}`}
+                            className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
                             onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                          <DropdownMenuItem onClick={() => handleSelectVideo(index)}>
+                        {/* Menu is portaled, but React still bubbles its clicks to the row; stop that */}
+                        <DropdownMenuContent align="end" className="w-48 rounded-xl" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={() => handleSelectVideo(video)}>
                             <Play className="h-4 w-4 mr-2" /> Play now
                           </DropdownMenuItem>
-                          {!isChannelPlaylist && (
-                            <DropdownMenuItem className="text-red-500 dark:text-red-400" onClick={() => toast("Remove from playlist (demo)")}>
+                          {canEdit && (
+                            <DropdownMenuItem className="text-red-500 dark:text-red-400" onClick={() => handleRemoveVideo(video)}>
                               <Trash2 className="h-4 w-4 mr-2" /> Remove
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </button>
-                  ))}
+                    </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

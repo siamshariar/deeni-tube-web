@@ -157,3 +157,8 @@ export const channelData: ChannelItem[] = [
       "Islamic fatwa and Q&A.",
   },
 ];
+/** Route for a channel page, given a video's `channelId` (ids and slugs differ for some channels). */
+export function getChannelHref(channelId: string): string {
+  const channel = channelData.find((ch) => ch.id === channelId || ch.slug === channelId);
+  return `/channels/${channel?.slug ?? channelId}`;
+}

@@ -10,17 +10,11 @@ import { cn } from "@/lib/utils";
 import { videoData } from "@/lib/video-data";
 import { channelData, ChannelItem } from "@/lib/channel-data";
 import { scholarData } from "@/lib/scholar-data";
+import { SEARCH_LANGUAGES, getDefaultSearchLangs, isDefaultSearchLangs, parseSearchLangs } from "@/lib/search-languages";
 
 // ── Static options ────────────────────────────────────────────────────────────
 
-const LANGUAGES = [
-  { code: "bn", name: "Bangla" },
-  { code: "en", name: "English" },
-  { code: "ar", name: "Arabic" },
-  { code: "ur", name: "Urdu" },
-  { code: "hi", name: "Hindi" },
-  { code: "tr", name: "Turkish" },
-];
+const LANGUAGES = SEARCH_LANGUAGES;
 
 const categoryOptions = Array.from(new Set(videoData.map(v => v.category).filter(Boolean)));
 const scholarOptions  = scholarData.map(s => s.name);
@@ -157,7 +151,7 @@ export default function MobileSearchModal() {
 
   const [isOpen, setIsOpen]                     = useState(false);
   const [query, setQuery]                       = useState("");
-  const [activeLangs, setActiveLangs]           = useState<string[]>(["bn"]);
+  const [activeLangs, setActiveLangs]           = useState<string[]>(() => getDefaultSearchLangs());
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedScholars, setSelectedScholars] = useState<string[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
@@ -172,6 +166,7 @@ export default function MobileSearchModal() {
       const params = new URLSearchParams(window.location.search);
       const urlQ   = params.get("q") || "";
       if (urlQ) setQuery(urlQ);
+      setActiveLangs(parseSearchLangs(window.location.pathname === "/search" ? params.get("lang") : null));
 
       setRecentList(loadRecent());
       setIsOpen(true);
@@ -187,7 +182,7 @@ export default function MobileSearchModal() {
   const hasActiveFilters = selectedCategories.length > 0 || selectedScholars.length > 0 || selectedChannels.length > 0;
 
   const resetFilters = () => {
-    setActiveLangs(["bn"]);
+    setActiveLangs(getDefaultSearchLangs());
     setSelectedCategories([]);
     setSelectedScholars([]);
     setSelectedChannels([]);
@@ -221,8 +216,8 @@ export default function MobileSearchModal() {
     // Build URL with all active filters so /search page can apply them on mount
     const params = new URLSearchParams();
     if (term) params.set("q", term);
-    // Only include lang if it differs from the default single "bn"
-    if (!(activeLangs.length === 1 && activeLangs[0] === "bn"))
+    // Only include lang if it differs from the user's default languages
+    if (!isDefaultSearchLangs(activeLangs))
       params.set("lang", activeLangs.join(","));
     if (selectedCategories.length > 0) params.set("cat", selectedCategories.join(","));
     if (selectedScholars.length > 0)   params.set("scholar", selectedScholars.join(","));
@@ -238,7 +233,7 @@ export default function MobileSearchModal() {
     // Navigate immediately on recent tap (no extra filters assumed)
     const params = new URLSearchParams();
     params.set("q", s);
-    if (!(activeLangs.length === 1 && activeLangs[0] === "bn"))
+    if (!isDefaultSearchLangs(activeLangs))
       params.set("lang", activeLangs.join(","));
     router.push(`/search?${params.toString()}`);
     close();
@@ -251,14 +246,14 @@ export default function MobileSearchModal() {
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 h-14 border-b flex-shrink-0">
-        <button
+        <button aria-label="Close search"
           onClick={close}
           className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <span className="font-semibold flex-1">Search</span>
-        {(hasActiveFilters || activeLangs.length > 1) && (
+        {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
           <button onClick={resetFilters} className="text-sm text-primary hover:underline">
             Clear filters
           </button>
@@ -279,7 +274,7 @@ export default function MobileSearchModal() {
             className="w-full h-11 pl-10 pr-10 rounded-full bg-muted/60 text-sm focus:outline-none focus:bg-muted transition-colors"
           />
           {query && (
-            <button
+            <button aria-label="Clear search"
               onClick={() => setQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -312,7 +307,7 @@ export default function MobileSearchModal() {
               >
                 <History className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="flex-1 text-sm truncate">{s}</span>
-                <button
+                <button aria-label="Remove from recent searches"
                   onClick={e => { e.stopPropagation(); removeFromRecent(s); }}
                   className="p-1 text-muted-foreground hover:text-foreground"
                 >

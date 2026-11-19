@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Search, MoreVertical, Clock, Bookmark, Share, Play,
@@ -26,17 +26,11 @@ import { channelData, ChannelItem } from "@/lib/channel-data";
 import { scholarData } from "@/lib/scholar-data";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
+import { SEARCH_LANGUAGES, getDefaultSearchLangs, isDefaultSearchLangs, parseSearchLangs } from "@/lib/search-languages";
 
 // ── Static data ──────────────────────────────────────────────────────────────
 
-const LANGUAGES = [
-  { code: "bn", name: "Bangla" },
-  { code: "en", name: "English" },
-  { code: "ar", name: "Arabic" },
-  { code: "ur", name: "Urdu" },
-  { code: "hi", name: "Hindi" },
-  { code: "tr", name: "Turkish" },
-];
+const LANGUAGES = SEARCH_LANGUAGES;
 
 const categoryOptions = Array.from(new Set(videoData.map(v => v.category).filter(Boolean)));
 const scholarOptions  = scholarData.map(s => s.name);
@@ -44,6 +38,11 @@ const channelOptions  = channelData.map((c: ChannelItem) => c.name);
 
 const channelNameToId = new Map<string, string>();
 channelData.forEach((ch: ChannelItem) => channelNameToId.set(ch.name, ch.id));
+
+const scholarNameToChannelId = new Map<string, string>();
+scholarData.forEach((s) => scholarNameToChannelId.set(s.name, s.channelId));
+
+type SearchFilters = { langs: string[]; cats: string[]; scholars: string[]; channels: string[] };
 
 // ── Desktop-only MultiSelect ──────────────────────────────────────────────────
 
@@ -221,7 +220,7 @@ function ResultList({
 
               {/* Mobile: plain button → single Drawer below */}
               {isMobile ? (
-                <button
+                <button aria-label="More actions"
                   className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0"
                   onClick={(e) => { e.stopPropagation(); setDrawerVideo(video); setDrawerOpen(true); }}
                 >
@@ -230,7 +229,7 @@ function ResultList({
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+                    <button aria-label="More actions" className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
                       <MoreVertical className="h-4 w-4 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
@@ -284,19 +283,19 @@ function ResultList({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function SearchPage() {
+function SearchPageContent() {
   const searchParams = useSearchParams();
-  const isMobile     = useMediaQuery("(max-width: 768px)");
+  const isMobile     = useMediaQuery("(max-width: 767px)");
 
   // Read all filter params from URL (set by MobileSearchModal after search)
   const initialQuery     = searchParams?.get("q")      || "";
-  const initialLangs     = searchParams?.get("lang")?.split(",").filter(Boolean) || ["bn"];
+  const langParam        = searchParams?.get("lang") ?? null;
   const initialCats      = searchParams?.get("cat")?.split(",").filter(Boolean)  || [];
   const initialScholars  = searchParams?.get("scholar")?.split(",").filter(Boolean) || [];
   const initialChannels  = searchParams?.get("ch")?.split(",").filter(Boolean)   || [];
 
   // Search state — initialised from URL params
-  const [activeLangs, setActiveLangs]               = useState<string[]>(initialLangs);
+  const [activeLangs, setActiveLangs]               = useState<string[]>(() => parseSearchLangs(langParam));
   const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCats);
   const [selectedScholars, setSelectedScholars]     = useState<string[]>(initialScholars);
   const [selectedChannels, setSelectedChannels]     = useState<string[]>(initialChannels);
@@ -341,7 +340,7 @@ export default function SearchPage() {
 
   const hasActiveFilters  = selectedCategories.length > 0 || selectedScholars.length > 0 || selectedChannels.length > 0;
   const activeFilterCount =
-    (activeLangs.length > 1 ? 1 : 0) +
+    (isDefaultSearchLangs(activeLangs) ? 0 : 1) +
     (selectedCategories.length > 0 ? 1 : 0) +
     (selectedScholars.length   > 0 ? 1 : 0) +
     (selectedChannels.length   > 0 ? 1 : 0);
@@ -354,21 +353,32 @@ export default function SearchPage() {
     );
 
   const resetFilters = () => {
-    setActiveLangs(["bn"]);
+    setActiveLangs(getDefaultSearchLangs());
     setSelectedCategories([]);
     setSelectedScholars([]);
     setSelectedChannels([]);
   };
 
-  const performSearch = useCallback((overrideQuery?: string) => {
-    const term         = (overrideQuery ?? initialQuery).trim();
-    const filtersActive = selectedCategories.length > 0 || selectedScholars.length > 0 || selectedChannels.length > 0;
-    if (!term && !filtersActive) return;
+  // Each search gets a number so a slow, older search can't overwrite a newer one
+  const searchSeq = useRef(0);
 
+  const runSearch = useCallback((rawTerm: string, f: SearchFilters) => {
+    const term          = rawTerm.trim();
+    const filtersActive = f.cats.length > 0 || f.scholars.length > 0 || f.channels.length > 0;
+    if (!term && !filtersActive) {
+      searchSeq.current++;
+      setHasSearched(false);
+      setIsLoading(false);
+      setResults([]);
+      return;
+    }
+
+    const seq = ++searchSeq.current;
     setIsLoading(true);
     setHasSearched(true);
 
     setTimeout(() => {
+      if (seq !== searchSeq.current) return;
       let filtered = [...videoData];
 
       if (term) {
@@ -379,34 +389,48 @@ export default function SearchPage() {
           v.description.toLowerCase().includes(lower)
         );
       }
-      if (activeLangs.length > 0)
-        filtered = filtered.filter(v => activeLangs.includes(v.language));
-      if (selectedCategories.length > 0)
-        filtered = filtered.filter(v => selectedCategories.includes(v.category));
-      if (selectedScholars.length > 0)
-        filtered = filtered.filter(v =>
-          selectedScholars.some(s => v.channel.toLowerCase().includes(s.toLowerCase()))
-        );
-      if (selectedChannels.length > 0) {
-        const ids = selectedChannels.map(n => channelNameToId.get(n)).filter(Boolean) as string[];
+      if (f.langs.length > 0)
+        filtered = filtered.filter(v => f.langs.includes(v.language));
+      if (f.cats.length > 0)
+        filtered = filtered.filter(v => f.cats.includes(v.category));
+      if (f.scholars.length > 0) {
+        const ids = f.scholars.map(n => scholarNameToChannelId.get(n)).filter(Boolean) as string[];
+        filtered = filtered.filter(v => ids.includes(v.channelId));
+      }
+      if (f.channels.length > 0) {
+        const ids = f.channels.map(n => channelNameToId.get(n)).filter(Boolean) as string[];
         filtered = filtered.filter(v => ids.includes(v.channelId));
       }
 
       setResults(filtered);
       setIsLoading(false);
     }, 400);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialQuery, activeLangs, selectedCategories, selectedScholars, selectedChannels]);
-
-  performSearchRef.current = performSearch;
-
-  // Run search on mount from URL params
-  useEffect(() => {
-    if (initialQuery || initialCats.length > 0 || initialScholars.length > 0 || initialChannels.length > 0) {
-      performSearchRef.current?.(initialQuery);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const performSearch = useCallback((overrideQuery?: string) => {
+    runSearch(overrideQuery ?? initialQuery, {
+      langs: activeLangs, cats: selectedCategories, scholars: selectedScholars, channels: selectedChannels,
+    });
+  }, [runSearch, initialQuery, activeLangs, selectedCategories, selectedScholars, selectedChannels]);
+
+  useEffect(() => {
+    performSearchRef.current = performSearch;
+  }, [performSearch]);
+
+  // Run the search whenever the URL changes (header search, mobile modal, back/forward)
+  const urlKey = searchParams?.toString() ?? "";
+  useEffect(() => {
+    const f: SearchFilters = {
+      langs: parseSearchLangs(langParam), cats: initialCats, scholars: initialScholars, channels: initialChannels,
+    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- filters mirror the URL, and this effect also starts the search
+    setActiveLangs(f.langs);
+    setSelectedCategories(f.cats);
+    setSelectedScholars(f.scholars);
+    setSelectedChannels(f.channels);
+    runSearch(initialQuery, f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlKey]);
 
   // Desktop: auto-refresh results when filters change (after first search)
   const isFirstFilterRender = useRef(true);
@@ -429,6 +453,7 @@ export default function SearchPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background mt-14 md:mt-16">
+      <h1 className="sr-only">{initialQuery ? `Search results for "${initialQuery}"` : "Search"}</h1>
 
       {/* ══════════════════════════════════════════════════════════
           DESKTOP — inline search bar + collapsible filter panel
@@ -496,7 +521,7 @@ export default function SearchPage() {
                 <MultiSelect label="Scholars"   options={scholarOptions}  selected={selectedScholars}   onChange={setSelectedScholars}   searchable />
                 <MultiSelect label="Categories" options={categoryOptions} selected={selectedCategories} onChange={setSelectedCategories} searchable />
                 <MultiSelect label="Channels"   options={channelOptions}  selected={selectedChannels}   onChange={setSelectedChannels}   searchable />
-                {(hasActiveFilters || activeLangs.length > 1) && (
+                {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
                   <div className="flex justify-end border-t pt-2">
                     <button onClick={resetFilters} className="text-sm text-primary hover:underline">
                       Clear all filters
@@ -518,7 +543,7 @@ export default function SearchPage() {
                 </div>
                 <h3 className="text-lg font-semibold mb-1">No results found</h3>
                 <p className="text-muted-foreground text-sm mb-4">Try different keywords or adjust your filters</p>
-                {(hasActiveFilters || activeLangs.length > 1) && (
+                {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
                   <Button variant="outline" className="rounded-full" onClick={resetFilters}>Clear filters</Button>
                 )}
               </div>
@@ -598,5 +623,14 @@ export default function SearchPage() {
         />
       )}
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary so the page can be prerendered
+export default function SearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

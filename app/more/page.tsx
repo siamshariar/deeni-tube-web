@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   Star,
   MessageSquare,
@@ -11,7 +10,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Only truly orphan items — everything else has a proper home
 const menuItems = [
@@ -49,8 +47,6 @@ function MenuSkeleton() {
 }
 
 export default function MorePage() {
-  const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

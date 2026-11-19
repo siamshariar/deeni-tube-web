@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { videoData, VideoItem, categoryData } from "@/lib/video-data";
+import { getChannelHref } from "@/lib/channel-data";
 import { ShareModal } from "@/components/share-modal";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ReportDialog } from "@/components/report-dialog";
@@ -34,6 +35,7 @@ import { SortDropdown } from "@/components/sort-dropdown";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { toast } from "sonner";
 
+import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
 const SORT_OPTIONS = [
   { label: "Priority", value: "priority" },
   { label: "Latest", value: "latest" },
@@ -73,7 +75,7 @@ function VideoSkeletonHorizontal() {
 export default function CategoryVideosPage() {
   const router = useRouter();
   const params = useParams();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const slug = params.slug as string;
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,7 +90,6 @@ export default function CategoryVideosPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
-    setShareUrl(typeof window !== "undefined" ? window.location.href : "");
     return () => clearTimeout(timer);
   }, [slug]);
 
@@ -137,16 +138,12 @@ export default function CategoryVideosPage() {
       return 0;
     });
 
-  const handleShare = (video: VideoItem) => {
-    setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`);
-    setShareModalOpen(true);
-  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile header – sticky back button */}
       <div className="md:hidden flex items-center gap-2 px-4 py-2 border-b sticky top-[56px] bg-background z-10">
-        <button
+        <button aria-label="Go back"
           onClick={() => router.back()}
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1"
         >
@@ -208,7 +205,7 @@ export default function CategoryVideosPage() {
                     className="w-full pl-10 pr-10 h-10 text-sm rounded-full bg-muted/50 focus:bg-muted transition-colors"
                   />
                   {searchQuery && (
-                    <button
+                    <button aria-label="Clear search"
                       onClick={() => setSearchQuery("")}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
@@ -239,7 +236,7 @@ export default function CategoryVideosPage() {
               <>
                 {/* Desktop grid */}
                 <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredVideos.map((video) => (
+                  {filteredVideos.map((video, index) => (
                     <div key={video.id} className="flex flex-col group">
                       <Link
                         href={`/videos/${video.channel}/${video.videoId}`}
@@ -249,6 +246,7 @@ export default function CategoryVideosPage() {
                           src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                           alt={video.title}
                           fill
+                          {...imagePriorityProps(priorityForIndex(index))}
                           className="object-cover rounded-xl"
                         />
                         <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
@@ -261,7 +259,7 @@ export default function CategoryVideosPage() {
                         </div>
                       </Link>
                       <div className="flex mt-3 gap-2">
-                        <Link href={`/channel-new/${video.channelId}`}>
+                        <Link aria-label={video.channel} href={getChannelHref(video.channelId)}>
                           <Avatar className="h-9 w-9 flex-shrink-0">
                             <AvatarImage src={video.channelAvatar} />
                             <AvatarFallback>{video.channel.charAt(0)}</AvatarFallback>
@@ -276,7 +274,7 @@ export default function CategoryVideosPage() {
                             </Link>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+                                <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
                                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -310,7 +308,7 @@ export default function CategoryVideosPage() {
 
                 {/* Mobile list */}
                 <div className="flex flex-col md:hidden">
-                  {filteredVideos.map((video) => (
+                  {filteredVideos.map((video, index) => (
                     <div key={video.id} className="flex gap-3 py-2.5 hover:bg-muted/30 rounded-lg px-1 -mx-1 transition-colors group">
                       <Link
                         href={`/videos/${video.channel}/${video.videoId}`}
@@ -320,6 +318,7 @@ export default function CategoryVideosPage() {
                           src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                           alt={video.title}
                           fill
+                          {...imagePriorityProps(priorityForIndex(index))}
                           className="object-cover"
                         />
                         <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded font-medium">
@@ -335,7 +334,7 @@ export default function CategoryVideosPage() {
                           </Link>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </button>
                             </DropdownMenuTrigger>

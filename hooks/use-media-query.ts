@@ -1,25 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
+/** True when the media query matches. Always false during SSR and hydration. */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false)
-
-  useEffect(() => {
-    const media = window.matchMedia(query)
-
-    // Initial check
-    if (media.matches !== matches) {
-      setMatches(media.matches)
-    }
-
-    // Add listener for changes
-    const listener = () => setMatches(media.matches)
-    media.addEventListener("change", listener)
-
-    // Clean up
-    return () => media.removeEventListener("change", listener)
-  }, [matches, query])
-
-  return matches
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const media = window.matchMedia(query)
+      media.addEventListener("change", onChange)
+      return () => media.removeEventListener("change", onChange)
+    },
+    [query]
+  )
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false
+  )
 }

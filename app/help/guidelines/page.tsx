@@ -4,16 +4,14 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, HelpCircle, Heart, MessageSquare, Shield, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
 export default function GuidelinesPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
 
   return (
     <div className="min-h-screen bg-background">
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
+        <button aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="font-semibold text-lg">Community Guidelines</h1>

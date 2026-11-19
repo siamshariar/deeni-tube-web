@@ -2,18 +2,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, X, Users, Eye, EyeOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search, X, Users, Eye, EyeOff } from "lucide-react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { channelData, ChannelItem } from "@/lib/channel-data";
 import { toast } from "sonner";
 import { SortDropdown, SortOption } from "@/components/sort-dropdown";
 
+import { useFeedPreferences } from "@/hooks/useFeedPreferences";
 function ChannelSkeleton() {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -34,32 +33,16 @@ const sortOptions: SortOption[] = [
 ];
 
 export default function ChannelsPage() {
-  const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["bn", "en", "ar"]);
   const [sortValue, setSortValue] = useState("default");
-  const [followedChannels, setFollowedChannels] = useState<string[]>([]);
+  const { followedChannels, toggleFollowChannel } = useFeedPreferences();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
-    const saved = localStorage.getItem("feed-visible-channels");
-    if (saved) {
-      try {
-        setFollowedChannels(JSON.parse(saved));
-        return () => clearTimeout(timer);
-      } catch {}
-    }
-    const allIds = channelData.map((ch: ChannelItem) => ch.id);
-    setFollowedChannels(allIds);
     return () => clearTimeout(timer);
   }, []);
-
-  const persistVisibility = (newList: string[]) => {
-    localStorage.setItem("feed-visible-channels", JSON.stringify(newList));
-    setFollowedChannels(newList);
-  };
 
   const toggleLanguage = (code: string) => {
     setSelectedLanguages((prev) =>
@@ -72,21 +55,10 @@ export default function ChannelsPage() {
   };
 
   const toggleFollow = (channelId: string) => {
-    setFollowedChannels((prev) => {
-      const newList = prev.includes(channelId)
-        ? prev.filter((id) => id !== channelId)
-        : [...prev, channelId];
-      const channel = channelData.find((ch) => ch.id === channelId);
-      if (channel) {
-        toast.success(
-          newList.includes(channelId)
-            ? `Showing ${channel.name} in feed`
-            : `Hidden ${channel.name} from feed`
-        );
-      }
-      persistVisibility(newList);
-      return newList;
-    });
+    const nowVisible = !followedChannels.includes(channelId);
+    toggleFollowChannel(channelId);
+    const channel = channelData.find((ch) => ch.id === channelId);
+    if (channel) toast.success(nowVisible ? `Showing ${channel.name} in feed` : `Hidden ${channel.name} from feed`);
   };
 
   const sortChannels = (channels: ChannelItem[]) => {
@@ -140,7 +112,7 @@ export default function ChannelsPage() {
                 className="w-full pl-10 pr-10 py-2 bg-muted/50 rounded-full text-sm outline-none focus:bg-muted transition-colors"
               />
               {searchQuery && (
-                <button
+                <button aria-label="Clear search"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
@@ -201,7 +173,7 @@ export default function ChannelsPage() {
                   key={channel.id}
                   className="flex items-center gap-2 md:gap-3 px-2 py-3 hover:bg-muted/30 transition-colors group"
                 >
-                  <Link
+                  <Link aria-label={channel.name}
                     href={`/channels/${channel.slug}`}
                     className="flex-shrink-0"
                   >

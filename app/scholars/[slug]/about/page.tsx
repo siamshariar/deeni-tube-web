@@ -3,12 +3,13 @@
 
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, GraduationCap, Globe, Video } from "lucide-react";
+import { ArrowLeft, ExternalLink, GraduationCap, Video } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { scholarData } from "@/lib/scholar-data";
 import { videoData } from "@/lib/video-data";
 
+import Image from "next/image";
 const languageNames: Record<string, string> = {
   bn: "Bangla",
   en: "English",
@@ -125,10 +126,12 @@ export default function ScholarAboutPage() {
               {allVideos.slice(0, 3).map((video) => (
                 <Link key={video.id} href={`/videos/${video.channel}/${video.videoId}`} className="flex gap-3 group">
                   <div className="relative w-32 aspect-video flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-                    <img
+                    <Image
                       src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                       alt={video.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      sizes="128px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded">{video.duration}</div>
                   </div>

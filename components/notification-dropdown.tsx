@@ -126,7 +126,7 @@ const notifications: Notification[] = [
     message: "posted: একটি গুরুত্বপূর্ণ বার্তা",
     timeAgo: "6 days ago",
     thumbnail: undefined,
-    link: "/channel-new/abdullah",
+    link: "/channels/abdullah-jahangir",
     isUnread: false,
     type: "post",
   },
@@ -168,7 +168,7 @@ function NotificationSkeleton() {
 export default function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const router = useRouter();
 
   const handleOpen = (isOpen: boolean) => {
@@ -182,11 +182,16 @@ export default function NotificationDropdown() {
   return (
     <DropdownMenu open={open} onOpenChange={handleOpen} modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full relative"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        >
           <Bell className="h-5 w-5" />
           {/* Notification count badge */}
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -334,7 +339,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
       {/* Three-dot menu button — always visible */}
       <SubDropdownMenu>
         <SubDropdownTrigger asChild>
-          <button
+          <button aria-label="More actions"
             className="p-1.5 rounded-full hover:bg-muted/80 transition-colors flex-shrink-0"
             onClick={(e) => e.stopPropagation()}
           >

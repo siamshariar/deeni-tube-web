@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  MessageSquare,
   Lightbulb,
   Send,
   AlertCircle,
@@ -15,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { toast } from "sonner";
 
 function SuggestSkeleton() {
@@ -76,7 +74,6 @@ function SuggestSkeleton() {
 
 export default function SuggestPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [isLoading, setIsLoading] = useState(true);
   const [form, setForm] = useState({
     feature: "",
@@ -124,7 +121,7 @@ export default function SuggestPage() {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button
+        <button aria-label="Go back"
           onClick={() => router.back()}
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]"
         >
@@ -151,9 +148,9 @@ export default function SuggestPage() {
           <>
             {/* Intro */}
             <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-              We're always looking for ways to make Deeni.tube better. Whether
-              it's a new feature, a scholar you'd like to see, or a language
-              you'd like us to support — we want to hear from you. Every
+              We&apos;re always looking for ways to make Deeni.tube better. Whether
+              it&apos;s a new feature, a scholar you&apos;d like to see, or a language
+              you&apos;d like us to support — we want to hear from you. Every
               suggestion is read and considered by our team.
             </p>
 
@@ -240,14 +237,14 @@ export default function SuggestPage() {
         {!submitted && (
           <div className="mt-12 p-4 border rounded-xl bg-muted/10">
             <h2 className="font-semibold text-sm mb-2">
-              Ideas we'd love to hear
+              Ideas we&apos;d love to hear
             </h2>
             <ul className="text-xs text-muted-foreground space-y-1.5">
               <li>• New scholars or channels to add</li>
               <li>• Additional language support</li>
               <li>• Features that would help you learn better</li>
               <li>• Ways to improve the browsing experience</li>
-              <li>• Any bugs or issues you've encountered</li>
+              <li>• Any bugs or issues you&apos;ve encountered</li>
             </ul>
           </div>
         )}

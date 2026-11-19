@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -116,7 +115,6 @@ function DonateSkeleton() {
 
 export default function DonatePage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,13 +147,13 @@ export default function DonatePage() {
     <div className="min-h-screen bg-background">
       {/* Mobile back button */}
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button
+        <button aria-label="Go back"
           onClick={() => router.back()}
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="font-semibold text-lg">Donate</h1>
+        <p className="font-semibold text-lg">Donate</p>
       </div>
 
       <div className="px-3 md:px-6 py-4 md:py-8 mt-14 md:mt-16 max-w-2xl mx-auto">

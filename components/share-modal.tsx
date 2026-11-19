@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { X, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { openShareIntent } from "@/lib/share"
 
 const sharePlatforms = [
   {
@@ -97,7 +98,7 @@ export function ShareModal({ isOpen, onClose, videoUrl }: ShareModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-foreground text-lg font-semibold">Share</h2>
-          <button
+          <button aria-label="Close"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-muted transition-colors"
           >
@@ -108,7 +109,7 @@ export function ShareModal({ isOpen, onClose, videoUrl }: ShareModalProps) {
         {/* Share platform icons */}
         <div className="relative px-3 py-4">
           {showLeftArrow && (
-            <button
+            <button aria-label="Scroll left"
               onClick={() => shareContainerRef.current?.scrollBy({ left: -250, behavior: "smooth" })}
               className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow-md"
             >
@@ -116,7 +117,7 @@ export function ShareModal({ isOpen, onClose, videoUrl }: ShareModalProps) {
             </button>
           )}
           {showRightArrow && (
-            <button
+            <button aria-label="Scroll right"
               onClick={() => shareContainerRef.current?.scrollBy({ left: 250, behavior: "smooth" })}
               className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow-md"
             >
@@ -129,7 +130,10 @@ export function ShareModal({ isOpen, onClose, videoUrl }: ShareModalProps) {
           >
             {sharePlatforms.map((p) => (
               <button
+                type="button"
                 key={p.name}
+                onClick={() => openShareIntent(p.name, videoUrl)}
+                aria-label={`Share on ${p.name}`}
                 className="flex flex-col items-center gap-2 flex-shrink-0 w-[68px] group"
               >
                 <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-110 transition-transform duration-200">

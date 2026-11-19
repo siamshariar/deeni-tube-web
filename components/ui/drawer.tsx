@@ -33,12 +33,16 @@ DrawerOverlay.displayName = "DrawerOverlay"
 
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    /** Screen-reader name for the sheet. Pass null when the drawer renders its own DrawerTitle. */
+    accessibleTitle?: string | null
+  }
+>(({ className, children, accessibleTitle = "Options", ...props }, ref) => (
   <DrawerPortal>
     <DrawerOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-describedby={undefined}
       className={cn(
         "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
@@ -46,6 +50,7 @@ const DrawerContent = React.forwardRef<
       )}
       {...props}
     >
+      {accessibleTitle !== null && <DialogPrimitive.Title className="sr-only">{accessibleTitle}</DialogPrimitive.Title>}
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
       {children}
     </DialogPrimitive.Content>

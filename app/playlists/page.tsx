@@ -36,15 +36,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { toast } from "sonner";
-import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
+import { PlaylistItem } from "@/lib/playlist-data";
+import { usePlaylists, playlistAgeMs, isSystemPlaylist } from "@/hooks/usePlaylists";
+import { useHydrated } from "@/lib/local-store";
 import { videoData } from "@/lib/video-data";
 import Image from "next/image";
 
+import { imagePriorityProps } from "@/lib/image-priority";
+import { youtubeThumb } from "@/lib/media-lookup";
 export default function PlaylistsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"recent" | "asc" | "desc">("recent");
-  const [playlists, setPlaylists] = useState<PlaylistItem[]>(extendedPlaylists);
+  const hydrated = useHydrated();
+  const { playlists, createPlaylist, updatePlaylist, deletePlaylist } = usePlaylists();
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -66,21 +71,17 @@ export default function PlaylistsPage() {
       .slice(0, 4)
       .map((id) => {
         const v = videoData.find((v) => v.id === id);
-        return v ? `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg` : null;
+        return v ? v.videoId : null;
       })
       .filter(Boolean) as string[];
   };
 
   const filteredPlaylists = useMemo(() => {
-    let list = playlists.filter((pl) =>
+    const list = playlists.filter((pl) =>
       pl.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
     if (sortOrder === "recent") {
-      list.sort((a, b) => {
-        if (a.updatedAt === "Just now") return -1;
-        if (b.updatedAt === "Just now") return 1;
-        return b.updatedAt.localeCompare(a.updatedAt);
-      });
+      list.sort((a, b) => playlistAgeMs(a) - playlistAgeMs(b));
     } else if (sortOrder === "asc") {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortOrder === "desc") {
@@ -94,17 +95,7 @@ export default function PlaylistsPage() {
       toast.error("Please enter a playlist name");
       return;
     }
-    const newPlaylist: PlaylistItem = {
-      id: Date.now().toString(),
-      slug: newPlaylistName.trim().toLowerCase().replace(/\s+/g, "-"),
-      name: newPlaylistName.trim(),
-      videoIds: [],
-      updatedAt: "Just now",
-      isPublic: newPlaylistPublic,
-      type: "playlist",
-      thumbnailColor: "#" + Math.floor(Math.random() * 16777215).toString(16).padEnd(6, "0"),
-    };
-    setPlaylists((prev) => [newPlaylist, ...prev]);
+    createPlaylist(newPlaylistName.trim(), newPlaylistPublic);
     resetCreateDialog();
     setShowCreateDialog(false);
     toast.success("Playlist created!");
@@ -112,13 +103,7 @@ export default function PlaylistsPage() {
 
   const handleEditPlaylist = () => {
     if (!editName.trim() || !editingPlaylist) return;
-    setPlaylists((prev) =>
-      prev.map((p) =>
-        p.id === editingPlaylist.id
-          ? { ...p, name: editName.trim(), isPublic: editPublic, updatedAt: "Just now" }
-          : p
-      )
-    );
+    updatePlaylist(editingPlaylist.id, { name: editName.trim(), isPublic: editPublic });
     setShowEditDialog(false);
     setEditingPlaylist(null);
     toast.success("Playlist updated!");
@@ -126,7 +111,7 @@ export default function PlaylistsPage() {
 
   const handleDeletePlaylist = () => {
     if (!deletingPlaylist) return;
-    setPlaylists((prev) => prev.filter((p) => p.id !== deletingPlaylist.id));
+    deletePlaylist(deletingPlaylist.id);
     setShowDeleteDialog(false);
     setDeletingPlaylist(null);
     toast.success("Playlist deleted!");
@@ -167,6 +152,8 @@ export default function PlaylistsPage() {
               />
               {searchQuery && (
                 <button
+                  type="button"
+                  aria-label="Clear search"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
@@ -190,14 +177,14 @@ export default function PlaylistsPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-muted hover:bg-muted/80 text-foreground transition-colors">
-                {sortOrder === "recent" && "Recently added"}
+                {sortOrder === "recent" && "Recently updated"}
                 {sortOrder === "asc" && "A-Z"}
                 {sortOrder === "desc" && "Z-A"}
                 <ChevronDown className="h-4 w-4 opacity-70" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-40 rounded-xl">
-              <DropdownMenuItem onClick={() => setSortOrder("recent")}>Recently added</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortOrder("recent")}>Recently updated</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSortOrder("asc")}>A-Z</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSortOrder("desc")}>Z-A</DropdownMenuItem>
             </DropdownMenuContent>
@@ -205,7 +192,7 @@ export default function PlaylistsPage() {
         </div>
 
         {/* Playlist grid */}
-        {filteredPlaylists.length === 0 ? (
+        {!hydrated ? null : filteredPlaylists.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
               <ListVideo className="h-8 w-8 text-muted-foreground" />
@@ -229,14 +216,24 @@ export default function PlaylistsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredPlaylists.map((playlist) => {
+            {filteredPlaylists.map((playlist, cardIndex) => {
               const videoCount = playlist.videoIds?.length ?? 0;
+              // Video ids; tiles in the 2×2 mosaic are ~150px wide, a single cover is the full card
               const thumbs = getPlaylistThumbs(playlist);
               return (
                 <div
                   key={playlist.id}
-                  className="group cursor-pointer border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-card"
+                  role="link"
+                  tabIndex={0}
+                  aria-label={playlist.name}
+                  className="group cursor-pointer border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   onClick={() => router.push(`/playlists/${playlist.slug}/${playlist.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      router.push(`/playlists/${playlist.slug}/${playlist.id}`);
+                    }
+                  }}
                 >
                   {/* Multi-thumbnail or solid color fallback */}
                   <div className="relative aspect-video w-full bg-muted overflow-hidden">
@@ -245,7 +242,7 @@ export default function PlaylistsPage() {
                         {[0, 1, 2, 3].map((i) => (
                           <div key={i} className="relative bg-muted overflow-hidden">
                             {thumbs[i] ? (
-                              <Image src={thumbs[i]} alt="" fill className="object-cover" />
+                              <Image src={youtubeThumb(thumbs[i], "small")} alt="" fill {...imagePriorityProps(cardIndex === 0 && i === 0 ? "lcp" : undefined)} className="object-cover" />
                             ) : (
                               <div className="absolute inset-0" style={{ backgroundColor: playlist.thumbnailColor, opacity: 0.4 }} />
                             )}
@@ -253,7 +250,7 @@ export default function PlaylistsPage() {
                         ))}
                       </div>
                     ) : thumbs.length === 1 ? (
-                      <Image src={thumbs[0]} alt={playlist.name} fill className="object-cover" />
+                      <Image src={youtubeThumb(thumbs[0])} alt={playlist.name} fill {...imagePriorityProps(cardIndex === 0 ? "lcp" : undefined)} className="object-cover" />
                     ) : (
                       <>
                         <div className="absolute inset-0 opacity-30" style={{ backgroundColor: playlist.thumbnailColor }} />
@@ -282,8 +279,11 @@ export default function PlaylistsPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
+                            type="button"
+                            aria-label={`More actions for ${playlist.name}`}
                             className="p-1 rounded-full hover:bg-muted transition-colors -mr-1 flex-shrink-0"
                             onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </button>
@@ -292,20 +292,24 @@ export default function PlaylistsPage() {
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/playlists/${playlist.slug}/${playlist.id}`); }}>
                             <Play className="h-4 w-4 mr-2" /> Play all
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(playlist); }}>
-                            <Edit className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
+                          {!isSystemPlaylist(playlist.id) && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(playlist); }}>
+                              <Edit className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                          )}
                           {playlist.isPublic && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleShare(playlist); }}>
                               <Share className="h-4 w-4 mr-2" /> Share
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem
-                            className="text-red-600 dark:text-red-400"
-                            onClick={(e) => { e.stopPropagation(); openDeleteDialog(playlist); }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
+                          {!isSystemPlaylist(playlist.id) && (
+                            <DropdownMenuItem
+                              className="text-red-600 dark:text-red-400"
+                              onClick={(e) => { e.stopPropagation(); openDeleteDialog(playlist); }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

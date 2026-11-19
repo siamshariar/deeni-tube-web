@@ -1,138 +1,222 @@
+// hooks/usePlaylists.ts
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { createLocalStore, useLocalStore } from "@/lib/local-store";
+import { canonicalVideoId, findVideo } from "@/lib/media-lookup";
+import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
+import { useWatchLater } from "@/hooks/useWatchLater";
+import { useLikedVideos } from "@/hooks/useLikedVideos";
+import { demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
 
-const PLAYLISTS_KEY = "deeni-playlists-list";
-const getVideosKey = (playlistId: string) => `playlist_videos_${playlistId}`;
+export type Playlist = PlaylistItem;
 
-export interface PlaylistVideo {
-  id: string;
-  title: string;
-  channel: string;
-  channelAvatar?: string;
-  thumbnail?: string;
-  views?: string;
-  timeAgo?: string;
-  duration?: string;
-  addedAt?: string;
-}
+export const WATCH_LATER_PLAYLIST_ID = "pl-watch-later";
+export const LIKED_PLAYLIST_ID = "pl-liked-videos";
 
-export interface Playlist {
-  id: string;
-  slug: string;
-  name: string;
-  videoIds: string[];
-  updatedAt: string;
-  isPublic: boolean;
-}
+const STORAGE_KEY = "deeni-playlists";
+// Playlists created before the shared store existed
+const LEGACY_KEY = "deeni-playlists-list";
+const EMPTY: PlaylistItem[] = [];
+const palette = ["#5A7A8C", "#8C6B5A", "#7A8C5A", "#6A5A8C", "#4A6A8C", "#8C4A6A", "#6A8C4A", "#5A8C7A"];
 
-function loadPlaylists(): Playlist[] {
-  if (typeof window === "undefined") return [];
+function readLegacy(): PlaylistItem[] {
   try {
-    const raw = localStorage.getItem(PLAYLISTS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {}
-  return [];
+    const raw = localStorage.getItem(LEGACY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((p: Partial<PlaylistItem> & { id: string; name: string }, i: number) => ({
+      id: p.id,
+      slug: p.slug ?? slugify(p.name),
+      name: p.name,
+      videoIds: [...new Set((p.videoIds ?? []).map(canonicalVideoId))],
+      updatedAt: p.updatedAt ?? "Just now",
+      updatedAtMs: Date.now(),
+      isPublic: p.isPublic ?? false,
+      type: "playlist",
+      thumbnailColor: p.thumbnailColor ?? palette[i % palette.length],
+    }));
+  } catch {
+    return [];
+  }
 }
 
-function savePlaylists(playlists: Playlist[]) {
-  if (typeof window !== "undefined")
-    localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
+// First visit: the static demo playlists (Watch Later comes from its own store)
+function seed(): PlaylistItem[] {
+  const statics = extendedPlaylists
+    .filter((p) => !isSystemPlaylist(p.id))
+    .map((p) => ({ ...p, videoIds: p.videoIds.filter((id) => findVideo(id)) }));
+  return [...(typeof window === "undefined" ? [] : readLegacy()), ...statics];
 }
 
-function loadVideos(playlistId: string): PlaylistVideo[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(getVideosKey(playlistId));
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {}
-  return [];
+const playlistStore = createLocalStore<PlaylistItem[]>(STORAGE_KEY, seed);
+
+function slugify(name: string) {
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "playlist"
+  );
 }
 
-function saveVideos(playlistId: string, videos: PlaylistVideo[]) {
-  if (typeof window !== "undefined")
-    localStorage.setItem(getVideosKey(playlistId), JSON.stringify(videos));
+const touch = (p: PlaylistItem, changes: Partial<PlaylistItem>): PlaylistItem => ({
+  ...p,
+  ...changes,
+  updatedAt: "Just now",
+  updatedAtMs: Date.now(),
+});
+
+const UNIT_SECONDS: Record<string, number> = {
+  minute: 60,
+  hour: 3_600,
+  day: 86_400,
+  week: 604_800,
+  month: 2_592_000,
+  year: 31_536_000,
+};
+
+/** Milliseconds since the playlist was last updated (for "Recently updated" sorting). */
+export function playlistAgeMs(p: PlaylistItem): number {
+  if (p.updatedAtMs) return Date.now() - p.updatedAtMs;
+  const text = p.updatedAt.toLowerCase();
+  if (text === "just now") return 0;
+  if (text === "yesterday") return UNIT_SECONDS.day * 1000;
+  const match = text.match(/(\d+)\s*(minute|hour|day|week|month|year)/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return Number(match[1]) * UNIT_SECONDS[match[2]] * 1000;
+}
+
+export function isSystemPlaylist(id: string) {
+  return id === WATCH_LATER_PLAYLIST_ID || id === LIKED_PLAYLIST_ID;
 }
 
 export function usePlaylists() {
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const stored = useLocalStore(playlistStore, EMPTY);
+  const { videos: watchLater, addToWatchLater, removeFromWatchLater, setWatchLater } = useWatchLater();
+  const { likedVideos, like, unlike, setLikedVideos } = useLikedVideos();
 
-  useEffect(() => {
-    setPlaylists(loadPlaylists());
-    setLoaded(true);
-  }, []);
+  // Watch Later and Liked videos appear as playlists but are backed by their own stores
+  const playlists = useMemo<PlaylistItem[]>(() => {
+    const fromList = (id: string, list: SavedVideo[]): PlaylistItem => {
+      const base = extendedPlaylists.find((p) => p.id === id)!;
+      const latest = list.reduce((max, v) => Math.max(max, v.addedAt), 0);
+      return {
+        ...base,
+        videoIds: list.filter((v) => v.type !== "short" && findVideo(v.id)).map((v) => v.id),
+        ...(latest ? { updatedAtMs: latest } : {}),
+      };
+    };
+    return [
+      fromList(WATCH_LATER_PLAYLIST_ID, watchLater),
+      fromList(LIKED_PLAYLIST_ID, likedVideos),
+      // Older stored copies of the system playlists are ignored
+      ...stored.filter((p) => !isSystemPlaylist(p.id)),
+    ];
+  }, [stored, watchLater, likedVideos]);
 
-  useEffect(() => {
-    if (loaded) savePlaylists(playlists);
-  }, [playlists, loaded]);
+  // The store behind a system playlist (Watch Later / Liked videos), or null for normal playlists
+  const listFor = useCallback(
+    (playlistId: string) =>
+      playlistId === WATCH_LATER_PLAYLIST_ID
+        ? { items: watchLater, add: addToWatchLater, remove: removeFromWatchLater, replace: setWatchLater }
+        : playlistId === LIKED_PLAYLIST_ID
+          ? { items: likedVideos, add: like, remove: unlike, replace: setLikedVideos }
+          : null,
+    [watchLater, addToWatchLater, removeFromWatchLater, setWatchLater, likedVideos, like, unlike, setLikedVideos]
+  );
 
   const createPlaylist = useCallback((name: string, isPublic: boolean): string => {
     const id = Date.now().toString();
-    const slug = name.toLowerCase().replace(/\s+/g, "-");
-    const newPlaylist: Playlist = {
-      id,
-      slug,
-      name,
-      videoIds: [],
-      updatedAt: "Just now",
-      isPublic,
-    };
-    setPlaylists(prev => [newPlaylist, ...prev]);
-    saveVideos(id, []); // initialise empty video list
+    playlistStore.set((prev) => [
+      {
+        id,
+        slug: slugify(name),
+        name: name.trim(),
+        videoIds: [],
+        updatedAt: "Just now",
+        updatedAtMs: Date.now(),
+        isPublic,
+        type: "playlist",
+        thumbnailColor: palette[prev.length % palette.length],
+      },
+      ...prev,
+    ]);
     return id;
   }, []);
 
-  const addVideoToPlaylist = useCallback((playlistId: string, video: PlaylistVideo) => {
-    // Update videos array
-    const videos = loadVideos(playlistId);
-    if (videos.some(v => v.id === video.id)) {
-      // Video already in playlist – do nothing (or show toast)
-      return;
-    }
-    const updatedVideos = [{ ...video, addedAt: new Date().toISOString() }, ...videos];
-    saveVideos(playlistId, updatedVideos);
-
-    // Update playlist videoIds and updatedAt
-    setPlaylists(prev =>
-      prev.map(p =>
+  const updatePlaylist = useCallback((playlistId: string, changes: { name?: string; isPublic?: boolean }) => {
+    playlistStore.set((prev) =>
+      prev.map((p) =>
         p.id === playlistId
-          ? { ...p, videoIds: [video.id, ...p.videoIds], updatedAt: "Just now" }
+          ? touch(p, { ...changes, ...(changes.name ? { name: changes.name.trim(), slug: slugify(changes.name) } : {}) })
           : p
       )
     );
   }, []);
 
-  const removeVideoFromPlaylist = useCallback((playlistId: string, videoId: string) => {
-    const videos = loadVideos(playlistId);
-    const updatedVideos = videos.filter(v => v.id !== videoId);
-    saveVideos(playlistId, updatedVideos);
-
-    setPlaylists(prev =>
-      prev.map(p =>
-        p.id === playlistId
-          ? { ...p, videoIds: p.videoIds.filter(id => id !== videoId), updatedAt: "Just now" }
-          : p
-      )
-    );
+  const deletePlaylist = useCallback((playlistId: string) => {
+    playlistStore.set((prev) => prev.filter((p) => p.id !== playlistId));
   }, []);
 
-  const getPlaylist = useCallback((playlistId: string) => playlists.find(p => p.id === playlistId), [playlists]);
+  /** Returns false if the video was already in the playlist. */
+  const addVideoToPlaylist = useCallback(
+    (playlistId: string, video: { id: string }): boolean => {
+      const id = canonicalVideoId(video.id);
+      const list = listFor(playlistId);
+      if (list) {
+        const item = demoSavedItem(id, Date.now());
+        if (!item || list.items.some((w) => w.id === id)) return false;
+        list.add(item);
+        return true;
+      }
+      const target = playlistStore.get().find((p) => p.id === playlistId);
+      if (!target || target.videoIds.includes(id)) return false;
+      playlistStore.set((prev) =>
+        prev.map((p) => (p.id === playlistId ? touch(p, { videoIds: [...p.videoIds, id] }) : p))
+      );
+      return true;
+    },
+    [listFor]
+  );
 
-  const getPlaylistVideos = useCallback((playlistId: string) => loadVideos(playlistId), []);
+  const removeVideoFromPlaylist = useCallback(
+    (playlistId: string, videoId: string) => {
+      const id = canonicalVideoId(videoId);
+      const list = listFor(playlistId);
+      if (list) return list.remove(id);
+      playlistStore.set((prev) =>
+        prev.map((p) => (p.id === playlistId ? touch(p, { videoIds: p.videoIds.filter((v) => v !== id) }) : p))
+      );
+    },
+    [listFor]
+  );
+
+  const reorderPlaylist = useCallback(
+    (playlistId: string, videoIds: string[]) => {
+      const list = listFor(playlistId);
+      if (list) {
+        const byId = new Map(list.items.map((v) => [v.id, v]));
+        const ordered = videoIds.map((id) => byId.get(id)).filter((v): v is SavedVideo => v !== undefined);
+        const rest = list.items.filter((v) => !videoIds.includes(v.id));
+        return list.replace([...ordered, ...rest]);
+      }
+      playlistStore.set((prev) => prev.map((p) => (p.id === playlistId ? touch(p, { videoIds }) : p)));
+    },
+    [listFor]
+  );
+
+  const getPlaylist = useCallback((playlistId: string) => playlists.find((p) => p.id === playlistId), [playlists]);
 
   return {
     playlists,
     createPlaylist,
+    updatePlaylist,
+    deletePlaylist,
     addVideoToPlaylist,
     removeVideoFromPlaylist,
+    reorderPlaylist,
     getPlaylist,
-    getPlaylistVideos,
   };
 }

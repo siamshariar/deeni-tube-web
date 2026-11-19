@@ -19,7 +19,7 @@ import {
   // Clock,    // Watch Later — hidden, keep for easy re-enable
   // ThumbsUp, // Liked Videos — hidden, keep for easy re-enable
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, isActivePath } from "@/lib/utils";
 
 // ─── SidebarItem ─────────────────────────────────────────────────────────────
 
@@ -87,13 +87,13 @@ export interface SidebarExpandedContentProps {
 export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpandedContentProps) {
   return (
     <>
-      <SidebarItem href="/" icon={<Home className="h-5 w-5 flex-shrink-0" />} label="Home" active={pathname === "/"} collapsed={false} onClick={onLinkClick} />
-      <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={pathname === "/shorts"} collapsed={false} onClick={onLinkClick} />
+      <SidebarItem href="/" icon={<Home className="h-5 w-5 flex-shrink-0" />} label="Home" active={isActivePath(pathname, "/")} collapsed={false} onClick={onLinkClick} />
+      <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={isActivePath(pathname, "/shorts")} collapsed={false} onClick={onLinkClick} />
 
       {/* Browse */}
       <div className="border-t pt-2 mt-2">
-        <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={pathname === "/channels"} collapsed={false} onClick={onLinkClick} />
-        <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={pathname === "/scholars"} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={isActivePath(pathname, "/channels")} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={isActivePath(pathname, "/scholars")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* You */}
@@ -101,13 +101,13 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
         <div className="px-4 mb-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">You</h3>
         </div>
-        <SidebarItem href="/you" icon={<UserIcon className="h-5 w-5 flex-shrink-0" />} label="Your account" active={pathname === "/you"} collapsed={false} onClick={onLinkClick} />
-        <SidebarItem href="/history" icon={<History className="h-5 w-5 flex-shrink-0" />} label="History" active={pathname === "/history"} collapsed={false} onClick={onLinkClick} />
-        <SidebarItem href="/playlists" icon={<BookMarked className="h-5 w-5 flex-shrink-0" />} label="Playlists" active={pathname === "/playlists"} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/you" icon={<UserIcon className="h-5 w-5 flex-shrink-0" />} label="Your account" active={isActivePath(pathname, "/you")} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/history" icon={<History className="h-5 w-5 flex-shrink-0" />} label="History" active={isActivePath(pathname, "/history")} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/playlists" icon={<BookMarked className="h-5 w-5 flex-shrink-0" />} label="Playlists" active={isActivePath(pathname, "/playlists")} collapsed={false} onClick={onLinkClick} />
         {/* Watch Later — hidden; uncomment to re-enable */}
-        {/* <SidebarItem href="/watch-later" icon={<Clock className="h-5 w-5 flex-shrink-0" />} label="Watch Later" active={pathname === "/watch-later"} collapsed={false} onClick={onLinkClick} /> */}
+        {/* <SidebarItem href="/watch-later" icon={<Clock className="h-5 w-5 flex-shrink-0" />} label="Watch Later" active={isActivePath(pathname, "/watch-later")} collapsed={false} onClick={onLinkClick} /> */}
         {/* Liked Videos — hidden; uncomment to re-enable */}
-        {/* <SidebarItem href="/liked-videos" icon={<ThumbsUp className="h-5 w-5 flex-shrink-0" />} label="Liked Videos" active={pathname === "/liked-videos"} collapsed={false} onClick={onLinkClick} /> */}
+        {/* <SidebarItem href="/liked-videos" icon={<ThumbsUp className="h-5 w-5 flex-shrink-0" />} label="Liked Videos" active={isActivePath(pathname, "/liked-videos")} collapsed={false} onClick={onLinkClick} /> */}
       </div>
 
       {/* Explore */}
@@ -115,7 +115,7 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
         <div className="px-4 mb-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Explore</h3>
         </div>
-        <SidebarItem href="/categories" icon={<FolderOpen className="h-5 w-5 flex-shrink-0" />} label="Categories" active={pathname === "/categories"} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/categories" icon={<FolderOpen className="h-5 w-5 flex-shrink-0" />} label="Categories" active={isActivePath(pathname, "/categories")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* More from Deeni.tube */}
@@ -123,13 +123,13 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
         <div className="px-4 mb-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">More from Deeni.tube</h3>
         </div>
-        <SidebarItem href="/more" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="More" active={pathname === "/more"} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/more" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="More" active={isActivePath(pathname, "/more")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Settings */}
       <div className="border-t py-2 mt-2">
-        <SidebarItem href="/settings" icon={<Settings className="h-5 w-5 flex-shrink-0" />} label="Settings" collapsed={false} onClick={onLinkClick} />
-        <SidebarItem href="/help" icon={<HelpCircle className="h-5 w-5 flex-shrink-0" />} label="Help" collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/settings" icon={<Settings className="h-5 w-5 flex-shrink-0" />} label="Settings" active={isActivePath(pathname, "/settings")} collapsed={false} onClick={onLinkClick} />
+        <SidebarItem href="/help" icon={<HelpCircle className="h-5 w-5 flex-shrink-0" />} label="Help" active={isActivePath(pathname, "/help")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Footer — mt-auto pins copyright to the very bottom of the sidebar */}

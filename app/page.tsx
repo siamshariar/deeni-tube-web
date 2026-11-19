@@ -3,15 +3,16 @@
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import VideoCard from "@/components/video-card";
 import LanguagePrompt from "@/components/language-prompt";
 import { videoData, VideoItem } from "@/lib/video-data";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { useHeader } from "@/app/contexts/header-context";
+import { useFeedPreferences } from "@/hooks/useFeedPreferences";
+import { priorityForIndex } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const { headerVisible, setHeaderVisible } = useHeader();
   const prevScrollPosRef = useRef(0);
   const [activeChip, setActiveChip] = useState("All");
@@ -23,7 +24,7 @@ export default function Home() {
   const [isGuest, setIsGuest] = useState(true);
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
-  const [visibleChannelIds, setVisibleChannelIds] = useState<string[]>([]);
+  const { followedChannels: visibleChannelIds } = useFeedPreferences();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const allCategories: string[] = videoData
@@ -47,7 +48,8 @@ export default function Home() {
     "Spirituality",
     "Health",
   ];
-  const chipItems: string[] = ["All", ...uniqueCategories, ...extraCategories];
+  // Set removes categories that appear in both lists (e.g. "Quran")
+  const chipItems: string[] = Array.from(new Set(["All", ...uniqueCategories, ...extraCategories]));
 
   // Listen for sidebar class changes using MutationObserver
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function Home() {
   useLayoutEffect(() => {
     const hasSelectedPref = localStorage.getItem("deeni-lang-prefs");
     if (!hasSelectedPref) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
       setIsFirstTime(true);
       setShowLanguagePrompt(true);
     } else {
@@ -95,15 +98,6 @@ export default function Home() {
 
   useEffect(() => {
     const timer = setTimeout(() => setInitialLoading(false), 800);
-    const savedVisible = localStorage.getItem("feed-visible-channels");
-    if (savedVisible) {
-      try {
-        setVisibleChannelIds(JSON.parse(savedVisible));
-      } catch {}
-    } else {
-      const allIds = videoData.map((v: VideoItem) => v.channelId);
-      setVisibleChannelIds(Array.from(new Set(allIds)));
-    }
     return () => clearTimeout(timer);
   }, []);
 
@@ -165,12 +159,14 @@ export default function Home() {
   const chipBarWidth = sidebarCollapsed ? "md:w-[calc(100%-72px)]" : "md:w-[calc(100%-240px)]";
 
   // Dynamic grid columns based on sidebar state
-  const gridColumns = sidebarCollapsed 
-    ? "md:grid-cols-1 lg:grid-cols-3 xl:grid-cols-4" 
+  // A collapsed sidebar frees up width, so it should never give fewer columns
+  const gridColumns = sidebarCollapsed
+    ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
     : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <h1 className="sr-only">Deeni.tube home</h1>
       <LanguagePrompt
         open={showLanguagePrompt}
         canDismiss={!isFirstTime}
@@ -183,7 +179,7 @@ export default function Home() {
       {/* Category chip bar — hidden until first-time language selection is done */}
       <div
         className={cn(
-          "fixed z-20 h-12 border-b bg-background w-full transition-all duration-300",
+          "sidebar-offset fixed z-20 h-12 border-b bg-background w-full transition-all duration-300",
           chipBarLeft,
           chipBarWidth,
           chipBarTop,
@@ -262,13 +258,29 @@ export default function Home() {
               ))}
             </div>
           </>
+        ) : displayedVideos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center px-6 py-24">
+            <h2 className="text-lg font-semibold mb-1">
+              {activeChip === "All" ? "No videos to show" : `No ${activeChip} videos yet`}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+              {activeChip === "All"
+                ? "Try adding more languages or channels to your feed."
+                : "Nothing in this category matches your languages yet. Check back soon."}
+            </p>
+            {activeChip !== "All" && (
+              <Button variant="outline" className="rounded-full" onClick={() => setActiveChip("All")}>
+                Show all videos
+              </Button>
+            )}
+          </div>
         ) : (
           <>
             <div className={cn(
               "hidden md:grid gap-4 p-4 transition-all duration-300",
               gridColumns
             )}>
-              {displayedVideos.map((video: VideoItem) => (
+              {displayedVideos.map((video: VideoItem, index: number) => (
                 <VideoCard
                   key={video.id}
                   videoId={video.videoId}
@@ -281,11 +293,12 @@ export default function Home() {
                   duration={video.duration}
                   thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                   isHorizontal={false}
+                  imagePriority={priorityForIndex(index)}
                 />
               ))}
             </div>
             <div className="grid grid-cols-1 gap-4 p-2 md:hidden">
-              {displayedVideos.map((video: VideoItem) => (
+              {displayedVideos.map((video: VideoItem, index: number) => (
                 <VideoCard
                   key={video.id}
                   videoId={video.videoId}
@@ -298,6 +311,7 @@ export default function Home() {
                   duration={video.duration}
                   thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
                   isHorizontal={false}
+                  imagePriority={priorityForIndex(index)}
                 />
               ))}
             </div>

@@ -1,11 +1,10 @@
 // app/settings/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  Settings,
   Globe,
   Bell,
   Shield,
@@ -32,21 +31,20 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { toast } from "sonner";
+import { readLanguagePrefs, updateLanguagePrefs } from "@/lib/language-prefs";
+import { useHydrated } from "@/lib/local-store";
+import { mockLanguages } from "@/lib/mock-data";
 
-const mockLanguages = [
-  { code: "en", label: "English" },
-  { code: "ar", label: "Arabic" },
-  { code: "hi", label: "Hindi" },
-  { code: "bn", label: "Bengali" },
-  { code: "ur", label: "Urdu" },
-];
+// Same list as the language prompt (lib/mock-data), so Turkish is included here too
+const settingsLanguages = mockLanguages.map((l) => ({ code: l.code, label: l.name }));
 
 export default function SettingsPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
-  const { theme, setTheme } = useTheme();
+  const { theme: rawTheme, setTheme } = useTheme();
+  // next-themes only knows the theme on the client; render the server's default until hydrated
+  const hydrated = useHydrated();
+  const theme = hydrated ? rawTheme : undefined;
 
   const [notifications, setNotifications] = useState({
     all: true,
@@ -55,7 +53,20 @@ export default function SettingsPage() {
   });
 
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
+  // Saved choice (shown in the row) vs. the draft being edited in the dialog
+  const [savedLanguages, setSavedLanguages] = useState<string[]>(["en"]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["en"]);
+
+  useEffect(() => {
+    const langs = readLanguagePrefs().languages;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
+    if (langs?.length) setSavedLanguages(langs);
+    try {
+      const stored = JSON.parse(localStorage.getItem("deeni-notification-prefs") || "null");
+      if (stored) setNotifications((prev) => ({ ...prev, ...stored }));
+    } catch {}
+  }, []);
+
 
   const getThemeLabel = () => {
     switch (theme) {
@@ -79,14 +90,18 @@ export default function SettingsPage() {
   };
 
   const handleLanguageSave = (langs: string[]) => {
-    setSelectedLanguages(langs);
-    localStorage.setItem("deeni-lang-prefs", JSON.stringify({ languages: langs, hasSelected: true, isGuest: false }));
+    setSavedLanguages(langs);
+    updateLanguagePrefs({ languages: langs });
     toast.success("Language preferences updated");
     setShowLanguagePrompt(false);
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({ ...prev, [key]: !prev[key] }));
+    setNotifications(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem("deeni-notification-prefs", JSON.stringify(next)); } catch {}
+      return next;
+    });
     toast.success(`${key} notifications ${!notifications[key] ? "enabled" : "disabled"}`);
   };
 
@@ -149,8 +164,8 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm font-medium">Language</p>
                   <p className="text-xs text-muted-foreground">
-                    {selectedLanguages.length > 0
-                      ? selectedLanguages.map(l => mockLanguages.find(la => la.code === l)?.label).join(", ")
+                    {savedLanguages.length > 0
+                      ? savedLanguages.map(l => settingsLanguages.find(la => la.code === l)?.label ?? l).join(", ")
                       : "English"}
                   </p>
                 </div>
@@ -159,7 +174,7 @@ export default function SettingsPage() {
                 variant="ghost"
                 size="sm"
                 className="bg-muted/50 hover:bg-muted/80 rounded-full text-sm font-medium px-4 py-1.5 transition-colors"
-                onClick={() => setShowLanguagePrompt(true)}
+                onClick={() => { setSelectedLanguages(savedLanguages); setShowLanguagePrompt(true); }}
               >
                 Change
               </Button>
@@ -180,7 +195,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Receive all types of notifications</p>
                   </div>
                 </div>
-                <Switch checked={notifications.all} onCheckedChange={() => toggleNotification("all")} />
+                <Switch aria-label="All notifications" checked={notifications.all} onCheckedChange={() => toggleNotification("all")} />
               </div>
               <div className="flex items-center justify-between py-3 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
                 <div className="flex items-center gap-3">
@@ -190,7 +205,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Get updates via email</p>
                   </div>
                 </div>
-                <Switch checked={notifications.email} onCheckedChange={() => toggleNotification("email")} />
+                <Switch aria-label="Email notifications" checked={notifications.email} onCheckedChange={() => toggleNotification("email")} />
               </div>
               <div className="flex items-center justify-between py-3 px-2 -mx-2 rounded-lg hover:bg-muted/20 transition-colors">
                 <div className="flex items-center gap-3">
@@ -200,7 +215,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Receive push notifications on device</p>
                   </div>
                 </div>
-                <Switch checked={notifications.push} onCheckedChange={() => toggleNotification("push")} />
+                <Switch aria-label="Push notifications" checked={notifications.push} onCheckedChange={() => toggleNotification("push")} />
               </div>
             </div>
           </div>
@@ -285,7 +300,7 @@ export default function SettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
-            {mockLanguages.map((lang) => (
+            {settingsLanguages.map((lang) => (
               <div
                 key={lang.code}
                 className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${

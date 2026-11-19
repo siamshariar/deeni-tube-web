@@ -1,74 +1,33 @@
 // hooks/useFeedPreferences.ts
-import { useState, useEffect, useCallback } from 'react';
-import { getAllChannelIds } from '@/lib/channels';
+// Which channels appear in the home feed. Shared by the home feed, /channels,
+// video cards and the channel/scholar pages ("Don't recommend channel").
+"use client";
 
-const STORAGE_KEY = 'deeni-feed-preferences';
-const UPDATE_EVENT = 'feed-preferences-updated';
+import { useCallback } from "react";
+import { createLocalStore, useLocalStore } from "@/lib/local-store";
+import { channelData } from "@/lib/channel-data";
+import { videoData } from "@/lib/video-data";
 
-const loadFromStorage = (): string[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {}
-  }
-  // First time: all channels ON
-  const allIds = getAllChannelIds();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(allIds));
-  return allIds;
-};
+const ALL_CHANNEL_IDS = Array.from(new Set([...channelData.map((c) => c.id), ...videoData.map((v) => v.channelId)]));
+
+const feedStore = createLocalStore<string[]>("feed-visible-channels", () => ALL_CHANNEL_IDS);
 
 export const useFeedPreferences = () => {
-  const [followedChannels, setFollowedChannels] = useState<string[]>(loadFromStorage);
+  const followedChannels = useLocalStore(feedStore, ALL_CHANNEL_IDS);
 
-  // Re‑sync when another component changes the preferences
-  useEffect(() => {
-    const handleUpdate = () => setFollowedChannels(loadFromStorage());
-    window.addEventListener(UPDATE_EVENT, handleUpdate);
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) setFollowedChannels(loadFromStorage());
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => {
-      window.removeEventListener(UPDATE_EVENT, handleUpdate);
-      window.removeEventListener('storage', handleStorage);
-    };
+  const setChannelFeed = useCallback((channelId: string, on: boolean) => {
+    feedStore.set((prev) => {
+      const isOn = prev.includes(channelId);
+      if (on === isOn) return prev;
+      return on ? [...prev, channelId] : prev.filter((id) => id !== channelId);
+    });
   }, []);
-
-  const persist = (ids: string[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-    setFollowedChannels(ids);
-    window.dispatchEvent(new Event(UPDATE_EVENT));
-  };
 
   const toggleFollowChannel = useCallback((channelId: string) => {
-    setFollowedChannels(prev => {
-      const newList = prev.includes(channelId)
-        ? prev.filter(id => id !== channelId)
-        : [...prev, channelId];
-      persist(newList);
-      return newList;
-    });
-  }, []);
-
-  // New: directly set a channel ON or OFF
-  const setChannelFeed = useCallback((channelId: string, on: boolean) => {
-    setFollowedChannels(prev => {
-      const alreadyOn = prev.includes(channelId);
-      if (on === alreadyOn) return prev;  // no change
-      const newList = on ? [...prev, channelId] : prev.filter(id => id !== channelId);
-      persist(newList);
-      return newList;
-    });
+    feedStore.set((prev) => (prev.includes(channelId) ? prev.filter((id) => id !== channelId) : [...prev, channelId]));
   }, []);
 
   const isFollowed = useCallback((channelId: string) => followedChannels.includes(channelId), [followedChannels]);
 
-  return {
-    followedChannels,
-    toggleFollowChannel,
-    setChannelFeed,   
-    isFollowed,
-  };
+  return { followedChannels, toggleFollowChannel, setChannelFeed, isFollowed };
 };

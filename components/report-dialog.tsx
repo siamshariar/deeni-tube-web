@@ -22,7 +22,7 @@ interface ReportDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-export function ReportDialog({ videoTitle, videoId, children, open: externalOpen, onOpenChange }: ReportDialogProps) {
+export function ReportDialog({ videoTitle, children, open: externalOpen, onOpenChange }: ReportDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;

@@ -4,16 +4,14 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Scale, AlertTriangle, Globe, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
 export default function TermsPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
 
   return (
     <div className="min-h-screen bg-background">
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
+        <button aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="font-semibold text-lg">Terms of Service</h1>
@@ -49,7 +47,7 @@ export default function TermsPage() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               Deeni.tube aggregates publicly available Islamic educational content from trusted scholars.
               All video content remains the property of the respective content creators and is displayed
-              through YouTube's embed services. We respect intellectual property rights and comply with
+              through YouTube&apos;s embed services. We respect intellectual property rights and comply with
               all applicable laws.
             </p>
           </section>
@@ -70,7 +68,7 @@ export default function TermsPage() {
               <AlertTriangle className="h-5 w-5 text-primary flex-shrink-0" /> Disclaimer
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Deeni.tube is provided "as is" without warranties of any kind. We strive to provide
+              Deeni.tube is provided &quot;as is&quot; without warranties of any kind. We strive to provide
               authentic and beneficial Islamic content, but we do not guarantee the accuracy, completeness,
               or suitability of any content for any particular purpose. Users are encouraged to verify
               information with qualified scholars.

@@ -1,7 +1,7 @@
 // app/videos/[slug]/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,13 +19,10 @@ import {
   MessageCircle,
   EyeOff,
   Send,
-  Reply,
   X,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,9 +47,13 @@ import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
+import { recordWatch } from "@/hooks/useWatchHistory";
+import { historyEntryForVideo } from "@/lib/history-entry";
 import { toast } from "sonner";
 import { videoData, VideoItem } from "@/lib/video-data"; // ✅ shared data
 
+import type { CommentReply } from "@/lib/types";
+import { youtubeThumb } from "@/lib/media-lookup";
 // ─── Mock comments (unchanged) ─────────────────────────────────────
 const mockCommentsWithReplies = [
   {
@@ -118,19 +119,6 @@ const mockCommentsWithReplies = [
 ];
 
 // ─── Skeletons ─────────────────────────────────────────────────────
-function CommentSkeleton() {
-  return (
-    <div className="flex gap-3 py-3">
-      <Skeleton className="h-8 w-8 rounded-full" />
-      <div className="flex-1 space-y-2">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    </div>
-  );
-}
-
 function ReplyItem({
   reply,
   onLike,
@@ -140,10 +128,10 @@ function ReplyItem({
   isDisliked,
   depth = 0,
 }: {
-  reply: any;
+  reply: CommentReply;
   onLike: (id: string) => void;
   onDislike: (id: string) => void;
-  onReply: (id: string) => void;
+  onReply: (id: string, text: string) => void;
   isLiked: boolean;
   isDisliked: boolean;
   depth?: number;
@@ -153,9 +141,9 @@ function ReplyItem({
 
   const handleReplySubmit = () => {
     if (!replyText.trim()) return;
+    onReply(reply.id, replyText.trim());
     setReplyText("");
     setShowReplyInput(false);
-    toast.success("Reply added (demo)");
   };
 
   const displayName = reply.isChannel ? (
@@ -198,7 +186,7 @@ function ReplyItem({
               />
               <span className="text-xs">{reply.likes}</span>
             </button>
-            <button
+            <button aria-label="Dislike"
               onClick={() => onDislike(reply.id)}
               className={`hover:bg-muted rounded-full p-1 transition-colors ${
                 isDisliked ? "text-destructive" : "text-muted-foreground"
@@ -230,14 +218,14 @@ function ReplyItem({
                   className="flex-1 bg-transparent border-b border-border pb-1 text-xs focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
                   autoFocus
                 />
-                <button
+                <button aria-label="Post comment"
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim()}
                   className="text-primary hover:text-primary/80 disabled:opacity-30"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>
-                <button
+                <button aria-label="Cancel reply"
                   onClick={() => setShowReplyInput(false)}
                   className="text-muted-foreground hover:text-foreground"
                 >
@@ -247,7 +235,7 @@ function ReplyItem({
             </div>
           )}
           {reply.replies &&
-            reply.replies.map((nestedReply: any) => (
+            reply.replies.map((nestedReply: CommentReply) => (
               <ReplyItem
                 key={nestedReply.id}
                 reply={nestedReply}
@@ -283,20 +271,87 @@ function XIcon({ className }: { className?: string }) {
 }
 
 // ─── Main Component ─────────────────────────────────────────────────
+
+// Reply box shown under a top-level comment
+function InlineReplyBox({ onSubmit, onCancel }: { onSubmit: (text: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState("");
+  const submit = () => {
+    if (text.trim()) onSubmit(text.trim());
+  };
+  return (
+    <div className="flex items-center gap-2 mt-2">
+      <input
+        type="text"
+        autoFocus
+        aria-label="Write a reply"
+        placeholder="Add a reply..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") onCancel();
+        }}
+        className="flex-1 bg-transparent border-b border-border pb-1 text-sm focus:outline-none placeholder:text-muted-foreground"
+      />
+      <button type="button" onClick={onCancel} className="text-xs font-medium hover:bg-muted rounded-full px-3 py-1.5">
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!text.trim()}
+        className="text-xs font-medium bg-foreground text-background rounded-full px-3 py-1.5 disabled:opacity-50"
+      >
+        Reply
+      </button>
+    </div>
+  );
+}
+
 export default function VideoPlayPage() {
   const router = useRouter();
   const params = useParams();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const routeId = decodeURIComponent((params?.id as string) ?? "");
+  // Match the YouTube id used in links, or the internal id
+  const video = videoData.find((v) => v.videoId === routeId) ?? videoData.find((v) => v.id === routeId);
 
-  const [mainVideo, setMainVideo] = useState<VideoItem>(videoData[0]);
-  const [relatedVideos, setRelatedVideos] = useState<VideoItem[]>(videoData.slice(1));
+  if (!video) {
+    return (
+      <div className="min-h-screen bg-background pt-14 flex items-center justify-center px-4">
+        <div className="text-center py-16 max-w-sm">
+          <h1 className="text-xl font-semibold">Video not found</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            This video may have been removed, or the link is incorrect.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <Button variant="outline" className="rounded-full" onClick={() => router.back()}>
+              Go back
+            </Button>
+            <Button className="rounded-full" onClick={() => router.push("/")}>
+              Home
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Keyed by video so likes, comments and the description reset on navigation
+  return <VideoPlayView key={video.id} mainVideo={video} />;
+}
+
+function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
+  const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 767px)");
+
+  const relatedVideos = useMemo(() => videoData.filter((v) => v.id !== mainVideo.id), [mainVideo.id]);
+
+  useEffect(() => {
+    recordWatch(historyEntryForVideo(mainVideo));
+  }, [mainVideo]);
 
   const [comments, setComments] = useState(mockCommentsWithReplies);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
-  const [isLoved, setIsLoved] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
   const [commentsDrawerOpen, setCommentsDrawerOpen] = useState(false);
@@ -310,38 +365,6 @@ export default function VideoPlayPage() {
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Switch main video when route changes
-  useEffect(() => {
-    const slug = params?.slug as string;
-    const videoId = params?.id as string;
-    const found = videoData.find(
-      (v) => v.videoId === videoId || (slug && v.channel.toLowerCase().includes(slug.toLowerCase()))
-    );
-    if (found) {
-      setMainVideo(found);
-      setRelatedVideos(videoData.filter((v) => v.id !== found.id));
-      setShowFullDescription(false);
-    }
-  }, [params]);
-
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    if (isDisliked) setIsDisliked(false);
-  };
-
-  const handleDislike = () => {
-    setIsDisliked(!isDisliked);
-    if (isLiked) setIsLiked(false);
-  };
-
-  const handleLove = () => {
-    setIsLoved(!isLoved);
-  };
 
   const handleAddComment = () => {
     if (!commentText.trim()) return;
@@ -432,8 +455,24 @@ export default function VideoPlayPage() {
     );
   };
 
-  const handleReply = (commentId: string) => {
-    toast("Reply input opened (demo)");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  // Adds a reply to the thread containing `commentId` (a top-level comment or one of its replies)
+  const handleReply = (commentId: string, text: string) => {
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === commentId || c.replies?.some((r) => r.id === commentId)
+          ? {
+              ...c,
+              replies: [
+                ...(c.replies ?? []),
+                { id: `r${Date.now()}`, user: "You", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "Just now", content: text, likes: 0, dislikes: 0, isChannel: false },
+              ],
+            }
+          : c
+      )
+    );
+    setReplyingTo(null);
+    toast.success("Reply added");
   };
 
   // Auto-play URL – standard YouTube controls visible
@@ -501,22 +540,22 @@ export default function VideoPlayPage() {
                     <AvatarFallback>{mainVideo.channel.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold leading-snug line-clamp-2">{mainVideo.title}</p>
+                    <h1 className="text-sm font-semibold leading-snug line-clamp-2">{mainVideo.title}</h1>
                     <p className="text-xs text-muted-foreground mt-0.5">{mainVideo.channel} • 780K subscribers</p>
                   </div>
                   <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowShareModal(true)}>
+                    <Button aria-label="Share" variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowShareModal(true)}>
                       <Share className="h-4 w-4" />
                     </Button>
                     <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
                       <DrawerTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                        <Button aria-label="More actions" variant="ghost" size="icon" className="h-8 w-8 rounded-full">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DrawerTrigger>
                       <DrawerContent className="px-0 max-h-[70vh]">
                         <div className="mt-2 pb-6">
-                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-5 w-5" /> Don't recommend channel</div>
+                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</div>
                           <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</div>
                           <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-5 w-5" /> Report</div>
                         </div>
@@ -540,50 +579,17 @@ export default function VideoPlayPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center bg-muted rounded-full overflow-hidden">
-                        {/* <button
-                          onClick={handleLike}
-                          className={`flex items-center gap-2 px-4 py-2 hover:bg-muted/80 transition-colors border-r border-border ${
-                            isLiked ? "text-foreground" : ""
-                          }`}
-                        >
-                          <ThumbsUp className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
-                          <span className="text-sm font-medium">15K</span>
-                        </button> */}
-                        {/* <button
-                          onClick={handleDislike}
-                          className={`px-4 py-2 hover:bg-muted/80 transition-colors ${
-                            isDisliked ? "text-foreground" : ""
-                          }`}
-                        >
-                          <ThumbsDown className={`h-5 w-5 ${isDisliked ? "fill-current" : ""}`} />
-                        </button> */}
-                      </div>
-                      {/* Love/Heart button — commented out; uncomment to re-enable
-                      <button
-                        onClick={handleLove}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                          isLoved
-                            ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                            : "bg-muted hover:bg-muted/80"
-                        }`}
-                      >
-                        <Heart
-                          className={`h-5 w-5 ${isLoved ? "fill-current" : ""}`}
-                        />
-                      </button>
-                      */}
-                      <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowShareModal(true)}>
+                      <Button aria-label="Share" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowShareModal(true)}>
                         <Share className="h-5 w-5" />
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="rounded-full">
+                          <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
                             <MoreHorizontal className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-72">
-                          <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don't recommend channel</DropdownMenuItem>
+                          <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
                           <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
                           <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -725,7 +731,7 @@ export default function VideoPlayPage() {
                                   <ThumbsUp className={`h-4 w-4 ${likedComments.has(comment.id) ? "fill-current" : ""}`} />
                                   <span className="text-xs">{comment.likes}</span>
                                 </button>
-                                <button
+                                <button aria-label="Dislike"
                                   onClick={() => handleDislikeComment(comment.id)}
                                   className={`hover:bg-muted rounded-full p-1 transition-colors ${
                                     dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"
@@ -734,15 +740,18 @@ export default function VideoPlayPage() {
                                   <ThumbsDown className={`h-4 w-4 ${dislikedComments.has(comment.id) ? "fill-current" : ""}`} />
                                 </button>
                                 <button
-                                  onClick={() => handleReply(comment.id)}
+                                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                                   className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors"
                                 >
                                   Reply
                                 </button>
                               </div>
+                              {replyingTo === comment.id && (
+                                <InlineReplyBox onSubmit={(text) => handleReply(comment.id, text)} onCancel={() => setReplyingTo(null)} />
+                              )}
                               {comment.replies?.length > 0 && (
                                 <div className="mt-2">
-                                  {comment.replies.map((reply: any) => (
+                                  {comment.replies.map((reply: CommentReply) => (
                                     <ReplyItem
                                       key={reply.id}
                                       reply={reply}
@@ -767,7 +776,7 @@ export default function VideoPlayPage() {
                           <MessageCircle className="h-4 w-4" /> {comments.length} Comments
                         </Button>
                       </DrawerTrigger>
-                      <DrawerContent className="h-[80vh]">
+                      <DrawerContent accessibleTitle={null} className="h-[80vh]">
                         <DrawerHeader>
                           <DrawerTitle className="text-lg">Comments</DrawerTitle>
                         </DrawerHeader>
@@ -822,7 +831,7 @@ export default function VideoPlayPage() {
                                       <ThumbsUp className={`h-4 w-4 ${likedComments.has(comment.id) ? "fill-current" : ""}`} />
                                       <span className="text-xs">{comment.likes}</span>
                                     </button>
-                                    <button
+                                    <button aria-label="Dislike"
                                       onClick={() => handleDislikeComment(comment.id)}
                                       className={`hover:bg-muted rounded-full p-1 transition-colors ${
                                         dislikedComments.has(comment.id) ? "text-destructive" : "text-muted-foreground"
@@ -831,15 +840,18 @@ export default function VideoPlayPage() {
                                       <ThumbsDown className={`h-4 w-4 ${dislikedComments.has(comment.id) ? "fill-current" : ""}`} />
                                     </button>
                                     <button
-                                      onClick={() => handleReply(comment.id)}
+                                      onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                                       className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors"
                                     >
                                       Reply
                                     </button>
                                   </div>
+                                  {replyingTo === comment.id && (
+                                    <InlineReplyBox onSubmit={(text) => handleReply(comment.id, text)} onCancel={() => setReplyingTo(null)} />
+                                  )}
                                   {comment.replies?.length > 0 && (
                                     <div className="mt-2">
-                                      {comment.replies.map((reply: any) => (
+                                      {comment.replies.map((reply: CommentReply) => (
                                         <ReplyItem
                                           key={reply.id}
                                           reply={reply}
@@ -873,7 +885,7 @@ export default function VideoPlayPage() {
                   {relatedVideos.map((v) => (
                     <div key={v.id} className="flex gap-2 group hover:bg-muted/30 rounded-lg p-1 transition-colors">
                       <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-[168px] h-[94px] flex-shrink-0">
-                        <Image src={`https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`} alt={v.title} fill className="object-cover rounded-lg" />
+                        <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover rounded-lg" />
                         <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1 py-0.5 rounded font-medium">{v.duration}</div>
                       </Link>
                       <div className="flex-1 min-w-0 py-1">
@@ -883,7 +895,7 @@ export default function VideoPlayPage() {
                           </Link>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </button>
                             </DropdownMenuTrigger>
@@ -891,7 +903,7 @@ export default function VideoPlayPage() {
                               <DropdownMenuItem className="cursor-pointer" onSelect={() => { if (isInWatchLater(v.id)) { removeFromWatchLater(v.id); toast.success("Removed from Watch Later"); } else { addToWatchLater({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`, views: v.views, timeAgo: v.timeAgo, duration: v.duration, addedAt: Date.now() }); toast.success("Saved to Watch Later"); } }}><Clock className="h-4 w-4 mr-2" /> {isInWatchLater(v.id) ? "Saved to Watch Later" : "Save to Watch Later"}</DropdownMenuItem>
                               <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); setSelectedRelatedVideo(v); }}><Bookmark className="h-4 w-4 mr-2" /> Save to playlist</DropdownMenuItem>
                               <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); setSelectedRelatedVideo(v); }}><Flag className="h-4 w-4 mr-2" /> Report</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShowShareModal(true); }}><Share className="h-4 w-4 mr-2" /> Share</DropdownMenuItem>
+                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><Share className="h-4 w-4 mr-2" /> Share</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -914,7 +926,8 @@ export default function VideoPlayPage() {
               {relatedVideos.map((v) => (
                 <div key={v.id} className="flex gap-3 group py-2 border-b last:border-0">
                   <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-40 aspect-video flex-shrink-0">
-                    <Image src={`https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`} alt={v.title} fill className="object-cover rounded-lg" />
+                    {/* Lazy on purpose: preloading the first one measured worse (it competes with the YouTube player) */}
+                    <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover rounded-lg" />
                     <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded font-medium">{v.duration}</div>
                   </Link>
                   <div className="flex-1 min-w-0">
@@ -922,7 +935,7 @@ export default function VideoPlayPage() {
                       <Link href={`/videos/${v.channel}/${v.videoId}`} className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary">{v.title}</h4>
                       </Link>
-                      <button className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); }}>
+                      <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); }}>
                         <MoreVertical className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>
@@ -950,8 +963,14 @@ export default function VideoPlayPage() {
       {/* Share Modal */}
       <ShareModal
         isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        videoUrl={typeof window !== "undefined" ? window.location.href : ""}
+        onClose={() => { setShowShareModal(false); setSelectedRelatedVideo(null); }}
+        videoUrl={
+          typeof window === "undefined"
+            ? ""
+            : selectedRelatedVideo
+              ? `${window.location.origin}/videos/${encodeURIComponent(selectedRelatedVideo.channel)}/${selectedRelatedVideo.videoId}`
+              : window.location.href
+        }
       />
       <AddToPlaylistDialog
         video={selectedRelatedVideo ? { id: selectedRelatedVideo.id, title: selectedRelatedVideo.title, channel: selectedRelatedVideo.channel } : { id: mainVideo.id, title: mainVideo.title, channel: mainVideo.channel }}

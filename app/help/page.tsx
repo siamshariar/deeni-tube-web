@@ -25,7 +25,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { toast } from "sonner";
 
 const helpTopics = [
@@ -57,7 +56,6 @@ const helpTopics = [
 
 export default function HelpPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [isLoading, setIsLoading] = useState(true);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [supportForm, setSupportForm] = useState({
@@ -196,7 +194,7 @@ export default function HelpPage() {
               <MessageCircle className="h-5 w-5 text-blue-500" /> Contact Support
             </DialogTitle>
             <DialogDescription>
-              Fill out the form and we'll get back to you within 24-48 hours.
+              Fill out the form and we&apos;ll get back to you within 24-48 hours.
             </DialogDescription>
           </DialogHeader>
           {isSubmitted ? (
@@ -205,7 +203,7 @@ export default function HelpPage() {
                 <Check className="h-8 w-8 text-green-500" />
               </div>
               <h3 className="text-lg font-semibold mb-1">Message Sent!</h3>
-              <p className="text-sm text-muted-foreground">We'll get back to you soon.</p>
+              <p className="text-sm text-muted-foreground">We&apos;ll get back to you soon.</p>
             </div>
           ) : (
             <div className="space-y-4 py-4">

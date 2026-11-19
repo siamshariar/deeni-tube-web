@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev      # start dev server (localhost:3000)
 npm run build    # production build
-npm run lint     # ESLint
+npm run lint     # ESLint (must pass with 0 problems)
 npm run start    # serve production build
 ```
 
@@ -20,11 +20,13 @@ npx playwright test e2e/navigation.spec.ts --project=chromium  # single file
 
 Tests live in `e2e/` covering navigation, Shorts player, video detail, and responsive layouts. The `playwright.config.ts` at project root auto-starts the dev server via `webServer` config with `reuseExistingServer: true`.
 
-TypeScript build errors are suppressed (`typescript.ignoreBuildErrors: true` in `next.config.mjs`). `components/ui/calendar.tsx` has known TS errors due to a `react-day-picker` version mismatch; the component is unused and can be ignored. ESLint is not installed locally (`npm run lint` will fail without `eslint` in node_modules).
+TypeScript build errors are suppressed (`typescript.ignoreBuildErrors: true` in `next.config.mjs`), so run `npx tsc --noEmit` to type-check (it should report 0 errors). `npm run lint` runs ESLint 9 with `eslint-config-next` (flat config in `eslint.config.mjs`; Next 16 removed `next lint`) and should pass with 0 problems. Generated shadcn code in `components/ui/` is excluded. The few `eslint-disable` comments each say why: mostly effects that read localStorage or the URL after hydration.
 
 ## Stack
 
-- **Next.js 14** (App Router), **TypeScript**, **Tailwind CSS v3**
+- **Next.js 16** (App Router, Turbopack for `dev` and `build`), **React 19**, **TypeScript**, **Tailwind CSS v3**
+- Server `layout.tsx` files must `await params` (Next 16 removed synchronous access); client pages use `useParams()`/`useSearchParams()`
+- `next/image`: use the `preload` prop (`priority` is deprecated in Next 16)
 - **shadcn/ui** (Radix UI primitives) — components live in `components/ui/`
 - **lucide-react** for icons, **next-themes** for dark/light mode, **sonner** for toasts
 - No backend, no API routes, no database — all data is static mock data
@@ -53,7 +55,7 @@ The desktop sidebar exposes two globals set in a `useEffect`:
 - `window.__sidebarToggle()` — toggles collapsed state; called only by the hamburger in `AppHeader`
 - `window.__sidebarGetState()` — returns current `isCollapsed` boolean
 
-Sidebar state is persisted to `localStorage` key `'sidebar-collapsed'`. The sidebar reads this on mount to restore state across navigations. The header hamburger button toggles the desktop sidebar on pages that have one, and opens the mobile sidebar overlay on pages that don't (`/videos/*`, `/playlists/*`, `/signin`).
+Sidebar state is persisted to `localStorage` key `'sidebar-collapsed'`. The sidebar reads this on mount to restore state across navigations. The header hamburger button toggles the desktop sidebar on pages that have one. On `/videos/*` and `/playlists/*`, `DesktopSidebar` switches to overlay mode, so the hamburger slides the sidebar in over the content. `/signin` has no global header, sidebar or bottom nav. A script in `app/layout.tsx` applies the saved collapsed state before first paint (see the "Sidebar first paint" block in `app/globals.css`).
 
 ### Data layer
 
@@ -79,10 +81,14 @@ All user-generated state is persisted directly to `localStorage`:
 | `'sidebar-collapsed'` | Desktop sidebar state |
 | `'deeni-lang-prefs'` | Auth/guest status (`{ isGuest: boolean }`) |
 | `'recentSearches'` | Search history array |
-| `'deeni-playlists-list'` | User playlist metadata |
-| `'playlist_videos_{id}'` | Per-playlist video items |
+| `'deeni-watch-later'` | Watch Later items (seeded with demo items on first visit) |
+| `'deeni-liked-videos'` | Liked videos and shorts (seeded on first visit) |
+| `'deeni-watch-history'` | Watch history, recorded by the video page, playlist player and Shorts (seeded from `lib/history-data.ts`) |
+| `'deeni-playlists'` | All library playlists (seeded from `extendedPlaylists` on first visit; `videoIds` use internal ids like `"v3"`) |
+| `'deeni-notification-prefs'` | Settings page notification toggles |
+| `'feed-visible-channels'` | Channels shown in the home feed (`hooks/useFeedPreferences.ts`; "Don't recommend channel" removes one) |
 
-The `hooks/usePlaylists.ts`, `hooks/useLikedVideos.ts`, and `hooks/useWatchLater.ts` hooks encapsulate the localStorage read/write pattern.
+`hooks/useWatchLater.ts`, `hooks/useLikedVideos.ts` (both via `hooks/useSavedList.ts`), `hooks/useWatchHistory.ts` and `hooks/usePlaylists.ts` are built on `lib/local-store.ts` (`createLocalStore` + `useSyncExternalStore`), so every component shares one copy of the data and writes never use stale state. Use these hooks rather than reading/writing these keys directly. The "Watch Later" (`pl-watch-later`) and "Liked Videos" (`pl-liked-videos`) playlists are derived from their stores, not stored separately. Pages refer to the same video by internal id (`"v3"`) or YouTube id; `lib/media-lookup.ts` resolves both, and the hooks store canonical ids. `lib/language-prefs.ts` merges into `deeni-lang-prefs` without changing `isGuest`.
 
 ### Shorts page (`app/shorts/page.tsx`)
 
@@ -138,3 +144,7 @@ The grid card uses Tailwind named groups: `group/card` for the outer container a
 - `/you`, `/history`, `/liked-videos`, `/watch-later` — account/activity pages
 - `/more`, `/settings`, `/help` — utility pages (each has sub-pages under the same prefix)
 - `/donate`, `/search`, `/playlists` — standalone pages
+
+### Page titles and 404s
+
+Pages are client components, so they can't export `metadata`. Each route has a small server `layout.tsx` that sets the title (the root layout adds the `"%s - Deeni.tube"` template). The `[slug]`/`[id]` layouts for channels, scholars, categories and videos also call `notFound()` for unknown ids, which renders `app/not-found.tsx`. Unknown ids return a real 404. Don't add an `app/loading.tsx` (or a `loading.tsx` above these layouts): it starts streaming before the check, which turns the 404 into a 200. `/search` and `/shorts` wrap their content in `<Suspense>` because they call `useSearchParams()`. The favicon is `app/icon.png` (cropped from the logo).

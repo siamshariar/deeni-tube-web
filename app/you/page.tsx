@@ -4,26 +4,34 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Globe, Tv, LogOut, Check, ChevronRight,
-  History, ThumbsUp, Clock, ListVideo,
-  Settings, HelpCircle, MoreHorizontal, Heart,
+  Globe,
+  Tv,
+  LogOut,
+  Check,
+  ChevronRight,
+  History,
+  ListVideo,
+  Settings,
+  HelpCircle,
+  MoreHorizontal,
+  Heart,
+  User as UserIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { mockLanguages } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 
 const preferredLanguageOptions = mockLanguages.filter((l) => l.code !== "en");
 
 export default function YouPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [userName, setUserName] = useState("User Name");
   const [userEmail, setUserEmail] = useState("user@example.com");
   const [userInitials, setUserInitials] = useState("UN");
@@ -32,6 +40,7 @@ export default function YouPage() {
   const [preferredLanguages, setPreferredLanguages] = useState<string[]>(["ar", "bn", "hi"]);
   const [isLoading, setIsLoading] = useState(true);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -43,6 +52,7 @@ export default function YouPage() {
     if (userData) {
       try {
         const parsed = JSON.parse(userData);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
         setUserName(parsed.name || "User Name");
         setUserEmail(parsed.email || "user@example.com");
         setUserInitials(parsed.initials || "UN");
@@ -53,6 +63,7 @@ export default function YouPage() {
     if (prefs) {
       try {
         const parsed = JSON.parse(prefs);
+        setIsGuest(parsed.isGuest !== false);
         if (parsed.languages) setPreferredLanguages(parsed.languages);
         if (parsed.default) setDefaultLanguage(parsed.default);
       } catch {}
@@ -61,15 +72,7 @@ export default function YouPage() {
 
   const [prefSaved, setPrefSaved] = useState(false);
   const savePreferences = () => {
-    localStorage.setItem(
-      "deeni-lang-prefs",
-      JSON.stringify({
-        languages: preferredLanguages,
-        default: defaultLanguage,
-        hasSelected: true,
-        isGuest: false,
-      })
-    );
+    updateLanguagePrefs({ languages: preferredLanguages, default: defaultLanguage });
     setPrefSaved(true);
     setTimeout(() => setPrefSaved(false), 2500);
     toast.success("Preferences saved successfully!");
@@ -84,9 +87,7 @@ export default function YouPage() {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem("deeni-user-data");
-    localStorage.removeItem("deeni-lang-prefs");
-    window.dispatchEvent(new Event("auth-changed"));
+    signOutKeepingLanguages();
     router.push("/signin");
   };
 
@@ -157,6 +158,7 @@ export default function YouPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16 max-w-3xl mx-auto">
+        <h1 className="sr-only md:hidden">You</h1>
         {/* Desktop title */}
         <div className="hidden md:block mb-6">
           <h1 className="text-2xl font-bold">You</h1>
@@ -169,24 +171,38 @@ export default function YouPage() {
         <div className="mb-6 rounded-xl border shadow-sm overflow-hidden">
           <div className="p-4 md:p-5 flex items-center gap-4">
             <Avatar className="h-14 w-14 md:h-16 md:w-16 ring-2 ring-primary/10 flex-shrink-0">
-              {userAvatar ? (
+              {userAvatar && !isGuest ? (
                 <AvatarImage src={userAvatar} alt={userName} />
               ) : (
                 <AvatarFallback className="text-lg font-semibold bg-primary/10 text-primary">
-                  {userInitials}
+                  {isGuest ? <UserIcon className="h-6 w-6" /> : userInitials}
                 </AvatarFallback>
               )}
             </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-base truncate">{userName}</p>
-              <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
-              <button
-                onClick={() => setShowSignOutDialog(true)}
-                className="mt-1.5 flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors font-medium"
-              >
-                <LogOut className="h-4 w-4" /> Sign out
-              </button>
-            </div>
+            {isGuest ? (
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-base">You&apos;re browsing as a guest</p>
+                <p className="text-sm text-muted-foreground">Sign in to sync your playlists and preferences.</p>
+                <Link
+                  href="/signin"
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                >
+                  Sign in
+                </Link>
+              </div>
+            ) : (
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-base truncate">{userName}</p>
+                <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutDialog(true)}
+                  className="mt-1.5 flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors font-medium"
+                >
+                  <LogOut className="h-4 w-4" /> Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

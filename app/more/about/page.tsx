@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
 function AboutSkeleton() {
   return (
@@ -66,7 +65,6 @@ function AboutSkeleton() {
 
 export default function AboutPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -82,7 +80,7 @@ export default function AboutPage() {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button
+        <button aria-label="Go back"
           onClick={() => router.back()}
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]"
         >
@@ -126,11 +124,11 @@ export default function AboutPage() {
               <Users className="h-5 w-5 text-primary flex-shrink-0" /> Who We Serve
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Whether you're a student of knowledge, a busy professional
+              Whether you&apos;re a student of knowledge, a busy professional
               seeking spiritual reminders, or someone exploring Islam for the
               first time — Deeni.tube is built for you. Our platform serves a
               global audience with content carefully selected from verified
-              scholars known for their authenticity and adherence to the Qur'an
+              scholars known for their authenticity and adherence to the Qur&apos;an
               and Sunnah.
             </p>
           </section>
@@ -157,7 +155,7 @@ export default function AboutPage() {
               Deeni.tube is developed and maintained by Deeni Info Tech, a
               small team passionate about using technology to serve the Ummah.
               Every feature — from the multilingual search to the curated
-              scholar pages — is designed with the user's spiritual growth in
+              scholar pages — is designed with the user&apos;s spiritual growth in
               mind. We rely on community support to keep the platform running
               and improving.
             </p>

@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Globe, Check } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { mockLanguages } from "@/lib/mock-data";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -25,8 +25,17 @@ export default function LanguagePrompt({
   canDismiss = false,
   initialSelected = ["en"],
 }: LanguagePromptProps) {
-  const [selected, setSelected] = useState<string[]>(initialSelected);
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const fallback = initialSelected.length > 0 ? initialSelected : ["en"];
+  const [selected, setSelected] = useState<string[]>(fallback);
+  const isMobile = useMediaQuery("(max-width: 767px)");
+
+  // Start from the caller's current choice every time the prompt opens
+  const initialKey = fallback.join(",");
+  const [synced, setSynced] = useState({ open, initialKey });
+  if (open !== synced.open || initialKey !== synced.initialKey) {
+    setSynced({ open, initialKey });
+    if (open) setSelected(initialKey.split(","));
+  }
 
   const toggle = (code: string) => {
     setSelected((prev) =>

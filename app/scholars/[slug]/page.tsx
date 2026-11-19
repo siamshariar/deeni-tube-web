@@ -36,9 +36,12 @@ import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ReportDialog } from "@/components/report-dialog";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
-const mockShortsByChannel: Record<string, any[]> = {
+
+import { useDontRecommend } from "@/hooks/useDontRecommend";
+import type { ChannelShort } from "@/lib/types";
+import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
+const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
     { id: "sh1", videoId: "MBxDbbkk0gQ", title: "একমাত্র আল্লাহর রাজত্বই চিরস্থায়ী", views: "15K", timeAgo: "2 weeks ago", duration: "0:58" },
     { id: "sh2", videoId: "goHfO28fE-A", title: "যারা বলে আমাদের রব আল্লাহ", views: "25K", timeAgo: "3 days ago", duration: "0:45" },
@@ -53,20 +56,20 @@ const mockShortsByChannel: Record<string, any[]> = {
     { id: "sh10", videoId: "ihdO_G6Yk0E", title: "দুনিয়াতেই জান্নাত আছে আপনি কি জানেন? ✨", views: "28K", timeAgo: "3 days ago", duration: "0:50" },
   ],
   "zakir-naik": [
-    { id: "sh12", videoId: "MBxDbbkk0gQ", title: "The Importance of Tawheed - Dr Zakir Naik", views: "45K", timeAgo: "1 week ago", duration: "0:55" },
+    { id: "sh12", videoId: "Wgk2Hw5-m7Y", title: "The Quran is the Most Untranslatable Book - Dr Zakir Naik", views: "8K", timeAgo: "3 weeks ago", duration: "0:58" },
+    { id: "sh19", videoId: "Qp4vZLEqizc", title: "Belief in Bad Omen is Shirk - Dr Zakir Naik", views: "4.6K", timeAgo: "2 weeks ago", duration: "1:13" },
   ],
   "mufti-menk": [
-    { id: "sh13", videoId: "0m1Mc6dX8XY", title: "Seek The Forgiveness of Allah #muftimenk", views: "95K", timeAgo: "2 days ago", duration: "0:45" },
-    { id: "sh14", videoId: "goHfO28fE-A", title: "Always Be Grateful - Mufti Menk", views: "78K", timeAgo: "5 days ago", duration: "0:52" },
+    { id: "sh13", videoId: "0m1Mc6dX8XY", title: "Seek The Forgiveness of Allah #muftimenk", views: "95K", timeAgo: "4 months ago", duration: "1:10" },
+    { id: "sh14", videoId: "HKRq0DE-GTo", title: "Just Don't Get Angry #muftimenk", views: "127K", timeAgo: "1 month ago", duration: "1:00" },
   ],
   "assim-al-hakeem": [
     { id: "sh15", videoId: "Tnb74r4VZaY", title: "Is it not permissible 2 get married in Muharram?", views: "32K", timeAgo: "3 days ago", duration: "0:48" },
     { id: "sh16", videoId: "yLMQmr7qjcM", title: "Read all duas of morning & evening adhkar?", views: "25K", timeAgo: "1 week ago", duration: "0:50" },
   ],
-  "saifullah-madani": [
-    { id: "sh17", videoId: "oEWnPbRvOrY", title: "তাওহীদের আলোকে জীবন", views: "8K", timeAgo: "2 weeks ago", duration: "0:55" },
-  ],
-  "tafseerul-quran": [
+  // Dr. Muhammad Saifullah's official channel has no Shorts
+  "saifullah-madani": [],
+  "imam-hossain": [
     { id: "sh18", videoId: "_zCnmnCd7CU", title: "কুরআনের আলোকে জীবন গড়ুন", views: "18K", timeAgo: "5 days ago", duration: "0:58" },
   ],
 };
@@ -105,7 +108,8 @@ function ScholarSkeleton() {
 export default function ScholarDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const dontRecommend = useDontRecommend();
   const slug = params.slug as string;
 
   const scholar: ScholarItem | undefined = scholarData.find((s) => s.slug === slug);
@@ -117,14 +121,13 @@ export default function ScholarDetailPage() {
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
-  const [selectedShort, setSelectedShort] = useState<any>(null);
+  const [selectedShort, setSelectedShort] = useState<ChannelShort | null>(null);
   const [shortDrawerOpen, setShortDrawerOpen] = useState(false);
   const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
   const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
-    setShareUrl(typeof window !== "undefined" ? window.location.href : "");
     return () => clearTimeout(timer);
   }, [slug]);
 
@@ -144,7 +147,7 @@ export default function ScholarDetailPage() {
   const allVideos: VideoItem[] = videoData.filter((v) => v.channelId === scholar.channelId);
   const shorts = mockShortsByChannel[scholar.channelId] || [];
   const playlists = extendedPlaylists.filter((pl) =>
-    pl.videoIds.some((vid) => allVideos.some((v) => v.id === vid))
+    pl.isPublic && pl.videoIds.some((vid) => allVideos.some((v) => v.id === vid))
   );
 
   if (isLoading) return <ScholarSkeleton />;
@@ -176,18 +179,18 @@ export default function ScholarDetailPage() {
             </p>
 
             <div className="flex items-center gap-2 mt-3">
-              <Button variant="outline" className="rounded-full h-9" onClick={() => setShareModalOpen(true)}>
+              <Button variant="outline" className="rounded-full h-9" onClick={() => { setShareUrl(window.location.href); setShareModalOpen(true); }}>
                 <Share className="h-4 w-4 mr-2" /> Share
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
+                  <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-xl">
                   <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-4 w-4 mr-3" /> Report</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toast("Hidden")}><Ban className="h-4 w-4 mr-3" /> Don't recommend</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => dontRecommend(scholar.channelId, scholar.name)}><Ban className="h-4 w-4 mr-3" /> Don&apos;t recommend</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -230,10 +233,10 @@ export default function ScholarDetailPage() {
               <>
                 {/* Desktop grid */}
                 <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {allVideos.map((video) => (
+                  {allVideos.map((video, index) => (
                     <div key={video.id} className="flex flex-col group">
                       <Link href={`/videos/${video.channel}/${video.videoId}`} className="relative aspect-video w-full rounded-xl overflow-hidden">
-                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill className="object-cover" />
+                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill {...imagePriorityProps(priorityForIndex(index))} className="object-cover" />
                         <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">{video.duration}</div>
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
                           <div className="bg-black/60 rounded-full p-2"><Play className="h-5 w-5 text-white fill-white" /></div>
@@ -251,7 +254,7 @@ export default function ScholarDetailPage() {
                             </Link>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -274,10 +277,10 @@ export default function ScholarDetailPage() {
                 </div>
                 {/* Mobile list */}
                 <div className="flex flex-col md:hidden">
-                  {allVideos.map((video) => (
+                  {allVideos.map((video, index) => (
                     <div key={video.id} className="flex gap-3 py-2.5 group">
                       <Link href={`/videos/${video.channel}/${video.videoId}`} className="relative w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden">
-                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill className="object-cover" />
+                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill {...imagePriorityProps(priorityForIndex(index))} className="object-cover" />
                         <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded">{video.duration}</div>
                       </Link>
                       <div className="flex-1 min-w-0">
@@ -287,7 +290,7 @@ export default function ScholarDetailPage() {
                           </Link>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="p-1 rounded-full hover:bg-muted flex-shrink-0"><MoreVertical className="h-4 w-4 text-muted-foreground" /></button>
+                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0"><MoreVertical className="h-4 w-4 text-muted-foreground" /></button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 rounded-xl">
                               <DropdownMenuItem className="cursor-pointer" onSelect={() => {
@@ -323,7 +326,7 @@ export default function ScholarDetailPage() {
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {shorts.map((short: any) => (
+                  {shorts.map((short: ChannelShort) => (
                     <div key={short.id} className="group">
                       <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted">
                         <Link href={`/shorts?v=${short.videoId}`} className="block w-full h-full">
@@ -339,7 +342,7 @@ export default function ScholarDetailPage() {
                           <p className="text-[10px] text-muted-foreground mt-0.5">{short.views} · {short.timeAgo}</p>
                         </Link>
                         {isMobile ? (
-                          <button
+                          <button aria-label="More actions"
                             className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5"
                             onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }}
                           >
@@ -348,7 +351,7 @@ export default function ScholarDetailPage() {
                         ) : (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
+                              <button aria-label="More actions" className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
                                 <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
                               </button>
                             </DropdownMenuTrigger>
@@ -461,7 +464,7 @@ export default function ScholarDetailPage() {
                           <h3 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors flex-1 min-w-0">{pl.name}</h3>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button
+                              <button aria-label="More actions"
                                 className="p-1 rounded-full hover:bg-muted transition-colors -mr-1 flex-shrink-0"
                                 onClick={(e) => e.stopPropagation()}
                               >

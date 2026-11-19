@@ -12,8 +12,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const syncSidebarWidth = () => {
       if (typeof window === "undefined") return;
       const isCollapsed =
-        typeof (window as any).__sidebarGetState === "function"
-          ? (window as any).__sidebarGetState()
+        typeof window.__sidebarGetState === "function"
+          ? window.__sidebarGetState()
           : false;
       setDesktopSidebarWidth(isCollapsed ? 72 : 240);
     };
@@ -37,6 +37,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <main
+      data-has-sidebar={hasDesktopSidebar}
       className={
         !hasDesktopSidebar
           ? "flex-1 md:pl-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-none"

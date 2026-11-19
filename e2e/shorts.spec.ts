@@ -35,7 +35,7 @@ test.describe('Shorts page', () => {
     await page.waitForTimeout(500);
     // The top controls overlay play/pause button is always in the DOM
     // (opacity controlled by hover/active state)
-    const playBtn = page.locator('button[style*="rgba(0,0,0,0.4)"]').first();
+    const playBtn = page.getByRole('button', { name: /^(Play|Pause)$/ }).first();
     await expect(playBtn).toBeAttached({ timeout: 5000 });
     // Hover over the video to make controls visible, then click
     const videoSection = page.locator('section.snap-start').first();

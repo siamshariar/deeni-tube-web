@@ -4,16 +4,14 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Shield, Lock, Eye, UserCheck, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMediaQuery } from "@/hooks/use-media-query";
 
 export default function PrivacyPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 768px)");
 
   return (
     <div className="min-h-screen bg-background">
       <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b sticky top-[56px] bg-background z-10">
-        <button onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
+        <button aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted flex-shrink-0 -ml-1 min-h-[44px] min-w-[44px]">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="font-semibold text-lg">Privacy & Safety</h1>
@@ -47,7 +45,7 @@ export default function PrivacyPage() {
               <Lock className="h-5 w-5 text-primary flex-shrink-0" /> Data Security
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your preferences and watch history are stored securely in your browser's local storage.
+              Your preferences and watch history are stored securely in your browser&apos;s local storage.
               No data is transmitted to external servers without your explicit permission. You can clear
               your data at any time from the Settings page or by clearing your browser data.
             </p>

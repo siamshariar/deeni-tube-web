@@ -1,58 +1,31 @@
-import { useState, useEffect, useCallback } from "react";
+// hooks/useLikedVideos.ts
+"use client";
 
-export interface LikedVideo {
-  id: string;
-  title: string;
-  channel: string;
-  channelAvatar: string;
-  thumbnail: string;
-  views: string;
-  timeAgo: string;
-  duration: string;
-  likedAt: number;
+import { createSavedList, demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
+import { extendedPlaylists } from "@/lib/playlist-data";
+import { shortsVideos } from "@/lib/shorts-data";
+
+export type LikedVideo = SavedVideo;
+
+// First-visit demo content: the static Liked Videos playlist plus a few shorts
+function seed(): SavedVideo[] {
+  const now = Date.now();
+  const videoIds = extendedPlaylists.find((p) => p.id === "pl-liked-videos")?.videoIds ?? [];
+  const ids = [...videoIds, ...shortsVideos.slice(2, 6).map((s) => s.id)];
+  return ids
+    .map((id, i) => demoSavedItem(id, now - i * 3_600_000))
+    .filter((v): v is SavedVideo => v !== undefined);
 }
 
-const STORAGE_KEY = "deeni-liked-videos";
+const useLikedList = createSavedList("deeni-liked-videos", seed);
 
 export function useLikedVideos() {
-  const [videos, setVideos] = useState<LikedVideo[]>([]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          setVideos(JSON.parse(stored));
-        } catch {}
-      }
-    }
-  }, []);
-
-  const persist = (updated: LikedVideo[]) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    }
-    setVideos(updated);
+  const { items, add, remove, replace, has } = useLikedList();
+  return {
+    likedVideos: items,
+    like: add,
+    unlike: remove,
+    setLikedVideos: replace,
+    isLiked: has,
   };
-
-  const addLike = useCallback((video: LikedVideo) => {
-    setVideos(prev => {
-      if (prev.some(v => v.id === video.id)) return prev;
-      const updated = [video, ...prev];
-      persist(updated);
-      return updated;
-    });
-  }, []);
-
-  const removeLike = useCallback((videoId: string) => {
-    setVideos(prev => {
-      const updated = prev.filter(v => v.id !== videoId);
-      persist(updated);
-      return updated;
-    });
-  }, []);
-
-  const isLiked = useCallback((videoId: string) => videos.some(v => v.id === videoId), [videos]);
-
-  return { videos, addLike, removeLike, isLiked };
 }

@@ -5,7 +5,8 @@ import { useState, useEffect } from "react"
 export const LANGUAGES = ["en", "ar", "bn", "hi", "ur", "tr", "es", "fr"] as const
 export type Language = (typeof LANGUAGES)[number]
 
-const STORAGE_KEY = "deeni-language-prefs"
+// Same key the language prompt, sign-in and settings pages write
+const STORAGE_KEY = "deeni-lang-prefs"
 
 export function useLanguage() {
   const [preferredLanguages, setPreferredLanguages] = useState<Language[]>([])
@@ -13,14 +14,21 @@ export function useLanguage() {
   const [isGuest, setIsGuest] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
+    const load = () => {
       try {
-        const parsed = JSON.parse(stored)
-        setPreferredLanguages(parsed.languages || [])
-        setHasSelected(parsed.hasSelected || false)
-        setIsGuest(parsed.isGuest !== false)
+        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")
+        setPreferredLanguages(parsed?.languages || [])
+        setHasSelected(parsed?.hasSelected || false)
+        setIsGuest(parsed?.isGuest !== false)
       } catch {}
+    }
+    load()
+    // Sign-in / sign-out dispatch "auth-changed"
+    window.addEventListener("auth-changed", load)
+    window.addEventListener("storage", load)
+    return () => {
+      window.removeEventListener("auth-changed", load)
+      window.removeEventListener("storage", load)
     }
   }, [])
 

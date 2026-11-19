@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { Globe, ChevronLeft, Eye, EyeOff, Mail, Check, AlertCircle, Loader2 } from "lucide-react";
+import Logo from "@/components/logo";
+import Link from "next/link";
+import { Globe, ChevronLeft, Eye, EyeOff, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguagePrompt from "@/components/language-prompt";
@@ -26,6 +27,7 @@ export default function SignInPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
         if (parsed.languages) setSelectedLanguages(parsed.languages);
       } catch {}
     }
@@ -94,9 +96,9 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10">
-        <button onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
-        <Image src="/DeeniTubeLogo.png" alt="Deeni.tube" width={120} height={32} className="h-7 w-auto object-contain" />
-        <button onClick={() => setShowLanguagePopup(true)} className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Language</span></button>
+        <button type="button" aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
+        <Link href="/" aria-label="Deeni.tube home"><Logo height={28} className="h-7 w-auto object-contain" /></Link>
+        <button type="button" aria-label="Language" onClick={() => setShowLanguagePopup(true)} className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Language</span></button>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
@@ -135,13 +137,13 @@ export default function SignInPage() {
               <Input type="email" placeholder="Email address *" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-full" required />
               <div className="relative">
                 <Input type={showPassword ? "text" : "password"} placeholder="Password (optional)" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 rounded-full pr-12" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}</button>
+                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}</button>
               </div>
               <Button type="submit" className="w-full h-12 rounded-full font-medium" disabled={isLoading}>{isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}{isLoading ? "Signing in..." : "Sign In"}</Button>
             </form>
           )}
 
-          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <button className="text-primary hover:underline">Terms of Service</button> and <button className="text-primary hover:underline">Privacy Policy</button></p>
+          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <Link href="/help/terms" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/help/privacy" className="text-primary hover:underline">Privacy Policy</Link></p>
         </div>
       </main>
 

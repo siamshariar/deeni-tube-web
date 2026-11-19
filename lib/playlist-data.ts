@@ -7,6 +7,8 @@ export interface PlaylistItem {
   name: string;
   videoIds: string[];
   updatedAt: string;
+  /** Set when the user changes a playlist; preferred over `updatedAt` for sorting */
+  updatedAtMs?: number;
   isPublic: boolean;
   type: "playlist";
   thumbnailColor: string;
@@ -21,7 +23,7 @@ export const extendedPlaylists: PlaylistItem[] = [
     id: "pl-watch-later",
     slug: "watch-later",
     name: "Watch Later",
-    videoIds: ["v3", "v7", "v11", "v18", "v22", "v27", "v30", "v34"],
+    videoIds: ["v3", "v11", "v18", "v22", "v27", "v30", "v34"],
     updatedAt: "2 hours ago",
     isPublic: false,
     type: "playlist",
@@ -53,7 +55,7 @@ export const extendedPlaylists: PlaylistItem[] = [
     id: "pl-islamic-2",
     slug: "abdullah-lectures",
     name: "Dr. Abdullah Jahangir Lectures",
-    videoIds: videoData.filter(v => v.channelId === "abdullah").map(v => v.id),
+    videoIds: videoData.filter(v => v.channelId === "abdullah-jahangir").map(v => v.id),
     updatedAt: "1 month ago",
     isPublic: true,
     type: "playlist",
@@ -63,7 +65,7 @@ export const extendedPlaylists: PlaylistItem[] = [
     id: "pl-zakir-naik",
     slug: "zakir-naik-lectures",
     name: "Dr. Zakir Naik — Q&A Sessions",
-    videoIds: videoData.filter(v => v.channelId === "zakir").map(v => v.id),
+    videoIds: videoData.filter(v => v.channelId === "zakir-naik").map(v => v.id),
     updatedAt: "3 weeks ago",
     isPublic: true,
     type: "playlist",
@@ -155,7 +157,7 @@ export const extendedPlaylists: PlaylistItem[] = [
     id: "pl-aqeedah",
     slug: "aqeedah-fundamentals",
     name: "Aqeedah Fundamentals",
-    videoIds: ["v7", "v12", "v17", "v22", "v27"],
+    videoIds: ["v12", "v17", "v22", "v27"],
     updatedAt: "1 month ago",
     isPublic: true,
     type: "playlist",

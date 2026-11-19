@@ -5,6 +5,8 @@ import Link from "next/link"
 import { Home, PlaySquare, Users, LayoutGrid, GraduationCap, User } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { useHeader } from "@/app/contexts/header-context"
+import { isActivePath } from "@/lib/utils"
 
 const navItems = [
   { href: "/",          icon: Home,          label: "Home" },
@@ -17,7 +19,8 @@ const navItems = [
 
 export default function MobileNav() {
   const pathname = usePathname()
-  const isMobile = useMediaQuery("(max-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 767px)")
+  const { headerVisible } = useHeader()
 
   if (!isMobile) return null
 
@@ -36,13 +39,16 @@ export default function MobileNav() {
   const listPages = ["/channels", "/scholars", "/categories", "/playlists", "/you", "/shorts"]
 
   // Hide on detail pages, show on list pages
-  if (detailPatterns.some(prefix => pathname?.startsWith(prefix) && !listPages.includes(pathname))) {
+  // The sign-in page is a standalone screen
+  if (pathname === "/signin" || detailPatterns.some(prefix => pathname?.startsWith(prefix) && !listPages.includes(pathname))) {
     return null
   }
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border"
+      className={`fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border transition-transform duration-300 ease-in-out ${
+        !headerVisible ? "translate-y-full" : "translate-y-0"
+      }`}
       style={{
         height: "calc(56px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -53,7 +59,7 @@ export default function MobileNav() {
     >
       <div className="flex items-stretch justify-around w-full h-14">
         {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href
+          const isActive = isActivePath(pathname, href)
           return (
             <Link
               key={href}

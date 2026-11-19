@@ -50,7 +50,7 @@ export const scholarData: ScholarItem[] = [
     avatar: "https://yt3.googleusercontent.com/SJog0xycDSsFDAzbDqA3x2MIfNFLxMPjYrFLCltK1ZsvAPHRI_U8MvNUaEVo8NrOG3GuZUS6OA=s160-c-k-c0x00ffffff-no-rj",
     designation: "Quranic Tafsir and Islamic Lectures",
     language: "bn",
-    channelId: "tafseerul-quran",
+    channelId: "imam-hossain",
     description:
       "Quran tafsir and Islamic lectures"
   },

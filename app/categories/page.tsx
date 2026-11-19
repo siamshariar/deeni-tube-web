@@ -4,10 +4,9 @@
 import { useState, useEffect } from "react";
 import { Search, X, FolderOpen } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { videoData, categoryData } from "@/lib/video-data";
+import { categoryData } from "@/lib/video-data";
 import { SortDropdown, SortOption } from "@/components/sort-dropdown";
 
 function CategorySkeleton() {
@@ -41,7 +40,6 @@ const languageOptions = [
 ];
 
 export default function CategoriesPage() {
-  const isMobile = useMediaQuery("(max-width: 768px)");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["bn"]);
@@ -111,7 +109,7 @@ export default function CategoriesPage() {
                 className="w-full pl-10 pr-10 py-2 bg-muted/50 rounded-full text-sm outline-none focus:bg-muted transition-colors"
               />
               {searchQuery && (
-                <button
+                <button aria-label="Clear search"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >

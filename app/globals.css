@@ -162,3 +162,29 @@ body {
 .share-modal-dialog {
   animation: share-fade-in 0.2s ease-out forwards;
 }
+/* ── Sidebar first paint ───────────────────────────────────────────────────
+   The server always renders the sidebar expanded. A script in <head> sets
+   html[data-sidebar="collapsed"] from localStorage before first paint, and
+   DesktopSidebar sets html[data-sidebar-ready] once React has synced. Until
+   then, size things from the saved state and disable transitions so a
+   collapsed sidebar doesn't animate closed on every page load. */
+html:not([data-sidebar-ready]) .desktop-sidebar,
+html:not([data-sidebar-ready]) .sidebar-offset,
+html:not([data-sidebar-ready]) main[data-has-sidebar] {
+  transition: none !important;
+}
+@media (min-width: 768px) {
+  html[data-sidebar="collapsed"]:not([data-sidebar-ready]) .desktop-sidebar {
+    width: 72px !important;
+  }
+  html[data-sidebar="collapsed"]:not([data-sidebar-ready]) .desktop-sidebar > * {
+    visibility: hidden;
+  }
+  html[data-sidebar="collapsed"]:not([data-sidebar-ready]) main[data-has-sidebar="true"] {
+    padding-left: 72px !important;
+  }
+  html[data-sidebar="collapsed"]:not([data-sidebar-ready]) .sidebar-offset {
+    left: 72px !important;
+    width: calc(100% - 72px) !important;
+  }
+}

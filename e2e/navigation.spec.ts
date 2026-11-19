@@ -2,12 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Page navigation', () => {
   test('home page loads with video cards', async ({ page }) => {
+    // Skip the first-visit language prompt
+    await page.addInitScript(() => {
+      localStorage.setItem('deeni-lang-prefs', JSON.stringify({ languages: ['bn', 'en'], hasSelected: true, isGuest: true }));
+    });
     await page.goto('/');
     await expect(page).toHaveTitle(/Deeni\.tube/);
-    // Desktop logo is in the second header (hidden md:flex); use last() since mobile logo is md:hidden
-    await expect(page.locator('img[alt="Deeni.tube"]').last()).toBeVisible({ timeout: 5000 });
+    // Mobile/desktop headers and light/dark logos are all in the DOM; only one is visible
+    await expect(page.locator('img[alt="Deeni.tube"]:visible').first()).toBeVisible({ timeout: 5000 });
     // At least one video card appears
-    const cards = page.locator('a[href^="/videos/"]');
+    const cards = page.locator('a[href^="/videos/"]:visible');
     await expect(cards.first()).toBeVisible({ timeout: 5000 });
   });
 

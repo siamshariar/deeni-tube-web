@@ -1,14 +1,34 @@
 // app/shorts/page.tsx
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import {
-  ChevronUp, ChevronDown, Heart, MessageCircle, Share2, Bookmark, Flag,
-  Volume2, VolumeX, Pause, Play, List, Ban, MessageSquare, X,
-  ThumbsUp, ThumbsDown, MoreVertical, Send, Eye, Clock, Copy, Check,
-  ChevronLeft, ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Heart,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  Flag,
+  Volume2,
+  VolumeX,
+  Pause,
+  Play,
+  List,
+  MessageSquare,
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  MoreVertical,
+  Send,
+  Eye,
+  Clock,
+  Copy,
+  Check,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -16,11 +36,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
+
 import { cn } from "@/lib/utils"
 import { ReportDialog } from "@/components/report-dialog"
 import { toast } from "sonner"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { openShareIntent } from "@/lib/share"
+import { recordWatch } from "@/hooks/useWatchHistory"
+import { useLikedVideos } from "@/hooks/useLikedVideos"
+import { useWatchLater } from "@/hooks/useWatchLater"
 
+import type { CommentReply, VideoComment } from "@/lib/types"
 // ============ SHORTS DATA ============
 const shortsData = [
   {
@@ -236,6 +262,38 @@ Dr. Khandaker Abdullah Jahangir Rh Official
     hashtags: ["#imamhossain", "#iman", "#islamicreminder"]
   },
   {
+    id: "s12",
+    videoId: "Wgk2Hw5-m7Y",
+    title: "The Quran is the Most Untranslatable Book - Dr Zakir Naik",
+    channel: "Dr. Zakir Naik",
+    channelId: "zakir-naik",
+    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s160-c-k-c0x00ffffff-no-rj",
+    thumbnail: "https://img.youtube.com/vi/Wgk2Hw5-m7Y/hqdefault.jpg",
+    likes: "322",
+    comments: "24",
+    isSubscribed: false,
+    description: "The Quran is the Most Untranslatable Book - Dr Zakir Naik\n\n#drzakirnaik #Quran",
+    views: "7,959",
+    timeAgo: "3 weeks ago",
+    hashtags: ["#drzakirnaik", "#Quran"]
+  },
+  {
+    id: "s17",
+    videoId: "Qp4vZLEqizc",
+    title: "Belief in Bad Omen is Shirk - Dr Zakir Naik",
+    channel: "Dr. Zakir Naik",
+    channelId: "zakir-naik",
+    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s160-c-k-c0x00ffffff-no-rj",
+    thumbnail: "https://img.youtube.com/vi/Qp4vZLEqizc/hqdefault.jpg",
+    likes: "276",
+    comments: "18",
+    isSubscribed: false,
+    description: "Belief in Bad Omen is Shirk - Dr Zakir Naik\n\n#drzakirnaik #BadOmen #Shirk",
+    views: "4,630",
+    timeAgo: "2 weeks ago",
+    hashtags: ["#drzakirnaik", "#BadOmen", "#Shirk"]
+  },
+  {
     id: "s13",
     videoId: "0m1Mc6dX8XY",
     title: "Seek The Forgiveness of Allah #muftimenk",
@@ -243,13 +301,29 @@ Dr. Khandaker Abdullah Jahangir Rh Official
     channelId: "mufti-menk",
     channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nFND09H6Vvk_P8L4djMdBusHPU8nIT6XuiRjL8M59hJsw=s160-c-k-c0x00ffffff-no-rj",
     thumbnail: "https://img.youtube.com/vi/0m1Mc6dX8XY/hqdefault.jpg",
-    likes: "95K",
+    likes: "7.3K",
     comments: "3.2K",
     isSubscribed: false,
     description: "Seek The Forgiveness of Allah #muftimenk #motivation #dua #clean #faith",
-    views: "95,678",
-    timeAgo: "2 days ago",
+    views: "94,721",
+    timeAgo: "4 months ago",
     hashtags: ["#muftimenk", "#forgiveness", "#dua"]
+  },
+  {
+    id: "s14",
+    videoId: "HKRq0DE-GTo",
+    title: "Just Don't Get Angry #muftimenk",
+    channel: "Mufti Menk",
+    channelId: "mufti-menk",
+    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nFND09H6Vvk_P8L4djMdBusHPU8nIT6XuiRjL8M59hJsw=s160-c-k-c0x00ffffff-no-rj",
+    thumbnail: "https://img.youtube.com/vi/HKRq0DE-GTo/hqdefault.jpg",
+    likes: "6.3K",
+    comments: "1.1K",
+    isSubscribed: false,
+    description: "Just Don't Get Angry #muftimenk #motivation #respect #love #hadith #prophet #advice",
+    views: "126,540",
+    timeAgo: "1 month ago",
+    hashtags: ["#muftimenk", "#anger", "#hadith"]
   },
   {
     id: "s15",
@@ -286,7 +360,7 @@ Dr. Khandaker Abdullah Jahangir Rh Official
 ]
 
 // ============ COMMENTS DATA ============
-const initialCommentsByVideo: Record<string, any[]> = {
+const initialCommentsByVideo: Record<string, VideoComment[]> = {
   s1: [
     { id: "s1c1", user: "Ahmad Khan", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "2 hours ago", content: "MashaAllah, beautiful reminder! May Allah bless you.", likes: 245, dislikes: 12, replies: [] },
     { id: "s1c2", user: "Fatima Hassan", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "5 hours ago", content: "SubhanAllah! This is so true.", likes: 567, dislikes: 23, replies: [] },
@@ -323,7 +397,7 @@ const STORAGE_COMMENTS = 'shorts_comments'
 const STORAGE_LIKED = 'shorts_liked_ids'
 const STORAGE_DISLIKED = 'shorts_disliked_ids'
 
-function loadComments(): Record<string, any[]> {
+function loadComments(): Record<string, VideoComment[]> {
   if (typeof window === 'undefined') return JSON.parse(JSON.stringify(initialCommentsByVideo))
   try {
     const raw = localStorage.getItem(STORAGE_COMMENTS)
@@ -334,7 +408,7 @@ function loadComments(): Record<string, any[]> {
   return def
 }
 
-function saveComments(data: Record<string, any[]>) {
+function saveComments(data: Record<string, VideoComment[]>) {
   if (typeof window === 'undefined') return
   localStorage.setItem(STORAGE_COMMENTS, JSON.stringify(data))
 }
@@ -349,7 +423,7 @@ function saveIds(key: string, ids: string[]) {
   localStorage.setItem(key, JSON.stringify(ids))
 }
 
-let commentsByVideo = loadComments()
+const commentsByVideo = loadComments()
 
 // ============ ICON COMPONENTS ============
 
@@ -435,7 +509,7 @@ function DescriptionSkeleton() {
 // ============ REPLY ITEM ============
 
 function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
-  reply: any
+  reply: CommentReply
   onLike: (commentId: string, replyId: string) => void
   onDislike: (commentId: string, replyId: string) => void
   onReplyNested: (commentId: string, replyId: string, text: string) => void
@@ -468,13 +542,13 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
               <ThumbsUp className={cn("h-4 w-4", isLiked && "fill-current")} />
               <span className="text-xs">{formatCount(reply.likes)}</span>
             </button>
-            <button onClick={() => onDislike(reply.parentId || '', reply.id)} className={cn("hover:bg-muted rounded-full p-1 transition-colors", isDisliked ? "text-destructive" : "text-muted-foreground")}>
+            <button aria-label="Dislike" onClick={() => onDislike(reply.parentId || '', reply.id)} className={cn("hover:bg-muted rounded-full p-1 transition-colors", isDisliked ? "text-destructive" : "text-muted-foreground")}>
               <ThumbsDown className={cn("h-4 w-4", isDisliked && "fill-current")} />
             </button>
             <button onClick={() => setShowReplyInput(!showReplyInput)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="hover:bg-muted rounded-full p-1 transition-colors text-muted-foreground ml-auto">
+                <button aria-label="More actions" className="hover:bg-muted rounded-full p-1 transition-colors text-muted-foreground ml-auto">
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
@@ -498,10 +572,10 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
                   className="flex-1 bg-transparent border-b border-border pb-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                   autoFocus
                 />
-                <button onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
+                <button aria-label="Post comment" onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
                   <Send className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => setShowReplyInput(false)} className="text-muted-foreground hover:text-foreground">
+                <button aria-label="Cancel reply" onClick={() => setShowReplyInput(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -516,7 +590,7 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
 // ============ COMMENT ITEM ============
 
 function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment, onLikeReply, onDislikeReply, onReplyNested }: {
-  comment: any
+  comment: VideoComment
   onLikeComment: (id: string) => void
   onDislikeComment: (id: string) => void
   onReplyComment: (id: string, text: string) => void
@@ -537,7 +611,7 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
   }
 
   const formatCount = (n: number) => n > 999 ? `${(n/1000).toFixed(1)}K` : String(n)
-  const repliesWithParent = (comment.replies || []).map((r: any) => ({ ...r, parentId: comment.id }))
+  const repliesWithParent = (comment.replies || []).map((r: CommentReply) => ({ ...r, parentId: comment.id }))
 
   return (
     <div className="py-3">
@@ -554,13 +628,13 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
               <ThumbsUp className={cn("h-5 w-5", isLiked && "fill-current")} />
               <span className="text-xs">{formatCount(comment.likes)}</span>
             </button>
-            <button onClick={() => onDislikeComment(comment.id)} className={cn("hover:bg-muted rounded-full p-1.5 transition-colors", isDisliked ? "text-destructive" : "text-muted-foreground")}>
+            <button aria-label="Dislike" onClick={() => onDislikeComment(comment.id)} className={cn("hover:bg-muted rounded-full p-1.5 transition-colors", isDisliked ? "text-destructive" : "text-muted-foreground")}>
               <ThumbsDown className={cn("h-5 w-5", isDisliked && "fill-current")} />
             </button>
             <button onClick={() => setShowReplyInput(!showReplyInput)} className="text-xs text-muted-foreground hover:bg-muted rounded-full px-3 py-1.5 transition-colors">Reply</button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="hover:bg-muted rounded-full p-1.5 transition-colors text-muted-foreground ml-auto">
+                <button aria-label="More actions" className="hover:bg-muted rounded-full p-1.5 transition-colors text-muted-foreground ml-auto">
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
@@ -584,10 +658,10 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
                   className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                   autoFocus
                 />
-                <button onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
+                <button aria-label="Post comment" onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
                   <Send className="h-4 w-4" />
                 </button>
-                <button onClick={() => setShowReplyInput(false)} className="text-muted-foreground hover:text-foreground">
+                <button aria-label="Cancel reply" onClick={() => setShowReplyInput(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -601,7 +675,7 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
           )}
         </div>
       </div>
-      {showReplies && repliesWithParent.map((r: any) => (
+      {showReplies && repliesWithParent.map((r: CommentReply) => (
         <ReplyItem key={r.id} reply={r} onLike={onLikeReply} onDislike={onDislikeReply} onReplyNested={onReplyNested} />
       ))}
     </div>
@@ -616,12 +690,11 @@ const sharePlatforms = [
   { name: "X", icon: (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><path fill="#000" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z"/><path fill="#fff" d="M13 14h7.5l5.6 8 8.9-8h3.5l-10.3 9.3L38 34h-7.5l-6.3-9-9.2 9H11l10.8-9.8L13 14zm5 2.5h3l13 15h-3l-13-15z"/></svg>) },
 ]
 
-function ShareModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function ShareModal({ isOpen, onClose, videoUrl }: { isOpen: boolean; onClose: () => void; videoUrl: string }) {
   const [copied, setCopied] = useState(false)
   const shareContainerRef = useRef<HTMLDivElement>(null)
   const [showLeftArrow, setShowLeftArrow] = useState(false)
   const [showRightArrow, setShowRightArrow] = useState(true)
-  const videoUrl = typeof window !== 'undefined' ? window.location.href : "https://youtube.com/shorts/example"
   const handleCopy = () => { navigator.clipboard.writeText(videoUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }
   const checkScroll = () => { const el = shareContainerRef.current; if (!el) return; setShowLeftArrow(el.scrollLeft > 10); setShowRightArrow(el.scrollLeft < el.scrollWidth - el.clientWidth - 10) }
   useEffect(() => { const el = shareContainerRef.current; if (el) { el.addEventListener('scroll', checkScroll); checkScroll(); return () => el.removeEventListener('scroll', checkScroll) } }, [isOpen])
@@ -631,12 +704,12 @@ function ShareModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative bg-card rounded-2xl w-[90vw] max-w-[540px] max-h-[85vh] overflow-hidden shadow-2xl animate-fade-in-left">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><h2 className="text-foreground text-lg font-semibold">Share</h2><button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted"><X className="h-5 w-5" /></button></div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><h2 className="text-foreground text-lg font-semibold">Share</h2><button aria-label="Close" onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted"><X className="h-5 w-5" /></button></div>
         <div className="relative px-5 py-5">
-          {showLeftArrow && <button onClick={() => scrollShare('left')} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronLeft className="h-5 w-5" /></button>}
-          {showRightArrow && <button onClick={() => scrollShare('right')} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronRight className="h-5 w-5" /></button>}
+          {showLeftArrow && <button aria-label="Scroll left" onClick={() => scrollShare('left')} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronLeft className="h-5 w-5" /></button>}
+          {showRightArrow && <button aria-label="Scroll right" onClick={() => scrollShare('right')} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronRight className="h-5 w-5" /></button>}
           <div ref={shareContainerRef} className="flex gap-4 overflow-x-auto scrollbar-none py-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {sharePlatforms.map((p) => (<button key={p.name} className="flex flex-col items-center gap-2 flex-shrink-0 w-[72px] group"><div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-110 transition-transform duration-200">{p.icon}</div><span className="text-xs text-muted-foreground group-hover:text-foreground text-center leading-tight truncate w-full">{p.name}</span></button>))}
+            {sharePlatforms.map((p) => (<button type="button" key={p.name} onClick={() => openShareIntent(p.name, videoUrl)} aria-label={`Share on ${p.name}`} className="flex flex-col items-center gap-2 flex-shrink-0 w-[72px] group"><div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-110 transition-transform duration-200">{p.icon}</div><span className="text-xs text-muted-foreground group-hover:text-foreground text-center leading-tight truncate w-full">{p.name}</span></button>))}
           </div>
         </div>
         <div className="px-5 pb-5"><div className="flex items-center gap-3 bg-muted rounded-xl p-3 border border-border"><input type="text" value={videoUrl} readOnly className="flex-1 bg-transparent text-sm text-foreground outline-none truncate" /><button onClick={handleCopy} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all ${copied ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? 'Copied' : 'Copy'}</button></div></div>
@@ -647,25 +720,29 @@ function ShareModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
 
 // ============ MAIN COMPONENT ============
 
-export default function ShortsPage() {
+function ShortsPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
+  // Media queries (not window.innerWidth) so server and first client render match
+  const isDesktopViewport = useMediaQuery("(min-width: 768px)")
+  const isWideViewport = useMediaQuery("(min-width: 1440px)")
   const [isMuted, setIsMuted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
-  const [isLiked, setIsLiked] = useState<Record<string, boolean>>({})
+  const { isLiked: isLikedShort, like, unlike } = useLikedVideos()
+  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater()
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [volume, setVolume] = useState(75)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [, setIsFullscreen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const [captionsEnabled, setCaptionsEnabled] = useState(false)
   const [activePanel, setActivePanel] = useState<PanelType>(null)
   const [commentText, setCommentText] = useState("")
-  const [comments, setComments] = useState<any[]>([])
+  const [comments, setComments] = useState<VideoComment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [descLoading, setDescLoading] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
@@ -681,13 +758,16 @@ export default function ShortsPage() {
   const [videoCurrentTime, setVideoCurrentTime] = useState(0)
   const [videoDuration, setVideoDuration] = useState(0)
   const videoDurationRef = useRef(0)
-  const [isProgressTouch, setIsProgressTouch] = useState(false)
+  const [, setIsProgressTouch] = useState(false)
   const [isProgressHovered, setIsProgressHovered] = useState(false)
   const [showPlayFeedback, setShowPlayFeedback] = useState(false)
   const playFeedbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isSeekingRef = useRef(false)
+  // Mirrors isSeekingRef for rendering (refs must not be read during render)
+  const [isSeeking, setIsSeeking] = useState(false)
   const isMutedRef = useRef(isMuted)
   const volumeRef = useRef(volume)
+  const captionsRef = useRef(false)
 
   // Feedback dialog state
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
@@ -697,8 +777,8 @@ export default function ShortsPage() {
   useEffect(() => {
     const syncSidebarWidth = () => {
       if (typeof window === "undefined") return
-      const isCollapsed = typeof (window as any).__sidebarGetState === "function"
-        ? (window as any).__sidebarGetState()
+      const isCollapsed = typeof window.__sidebarGetState === "function"
+        ? window.__sidebarGetState()
         : false
       setDesktopSidebarWidth(isCollapsed ? 72 : 240)
     }
@@ -714,6 +794,16 @@ export default function ShortsPage() {
   }, [])
 
   const currentShort = shortsData[currentIndex]
+
+  useEffect(() => {
+    if (!currentShort) return
+    const s = currentShort
+    const timer = setTimeout(() => recordWatch({
+      id: s.id, type: "short", videoId: s.videoId, title: s.title, channel: s.channel, channelId: s.channelId,
+      channelAvatar: s.channelAvatar, thumbnail: s.thumbnail, duration: "", views: s.views, timeAgo: s.timeAgo,
+    }), 1500)
+    return () => clearTimeout(timer)
+  }, [currentShort])
 
   // Sync liked/disliked to localStorage
   useEffect(() => { saveIds(STORAGE_LIKED, likedIds) }, [likedIds])
@@ -747,11 +837,11 @@ export default function ShortsPage() {
     if (commentsTimerRef.current) clearTimeout(commentsTimerRef.current)
     commentsTimerRef.current = setTimeout(() => {
       const src = commentsByVideo[currentShort?.id] || []
-      const loaded = src.map((c: any) => ({
+      const loaded = src.map((c: VideoComment) => ({
         ...c,
         _isLiked: likedIds.includes(c.id),
         _isDisliked: dislikedIds.includes(c.id),
-        replies: (c.replies || []).map((r: any) => ({
+        replies: (c.replies || []).map((r: CommentReply) => ({
           ...r,
           _isLiked: likedIds.includes(r.id),
           _isDisliked: dislikedIds.includes(r.id),
@@ -768,6 +858,8 @@ export default function ShortsPage() {
     descTimerRef.current = setTimeout(() => setDescLoading(false), 400)
   }
 
+  // Reload the open panel only when the short changes (opening a panel loads it already)
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { if (activePanel === "comments") loadCommentsForCurrentShort(); else if (activePanel === "description") loadDescriptionForCurrentShort() }, [currentIndex])
 
   // Handle scroll to update current index and control video playback
@@ -847,7 +939,7 @@ export default function ShortsPage() {
           }
           if (typeof d.info.playerState === 'number') {
             if (d.info.playerState === 1) setIsPlaying(true)
-            else if (d.info.playerState === 2 || d.info.playerState === 0) setIsPlaying(false)
+            else if ([-1, 0, 2, 5].includes(d.info.playerState)) setIsPlaying(false)
           }
         }
       } catch {}
@@ -858,6 +950,7 @@ export default function ShortsPage() {
 
   // Reset progress and register YouTube listener when active video changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets player state for the new short; the same effect talks to the YouTube iframe
     setVideoCurrentTime(0)
     setVideoDuration(0)
     videoDurationRef.current = 0
@@ -869,6 +962,7 @@ export default function ShortsPage() {
         iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: activeShort.id }), 'https://www.youtube.com')
         iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: isMutedRef.current ? 'mute' : 'unMute', args: [] }), 'https://www.youtube.com')
         iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volumeRef.current] }), 'https://www.youtube.com')
+        if (captionsRef.current) iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'loadModule', args: ['captions'] }), 'https://www.youtube.com')
       }
     }, 1000)
     return () => clearTimeout(id)
@@ -876,6 +970,7 @@ export default function ShortsPage() {
 
   // Keep muted ref in sync and send postMessage when mute changes
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted])
+  useEffect(() => { captionsRef.current = captionsEnabled }, [captionsEnabled])
   useEffect(() => {
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
@@ -884,6 +979,8 @@ export default function ShortsPage() {
       JSON.stringify({ event: 'command', func: isMuted ? 'mute' : 'unMute', args: [] }),
       'https://www.youtube.com'
     )
+  // Only reacts to this setting; switching shorts re-applies it in the currentIndex effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMuted])
 
   // Keep volume ref in sync and send postMessage when volume changes
@@ -897,6 +994,8 @@ export default function ShortsPage() {
       JSON.stringify({ event: 'command', func: 'setVolume', args: [volume] }),
       'https://www.youtube.com'
     )
+  // Only reacts to this setting; switching shorts re-applies it in the currentIndex effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume])
 
   const scrollToVideo = (i: number) => {
@@ -908,7 +1007,10 @@ export default function ShortsPage() {
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      const typing = !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
       if (activePanel && e.key === "Escape") { setActivePanel(null); return }
+      if (typing) return
       if (showShareModal && e.key === "Escape") { setShowShareModal(false); return }
       if (activePanel || showShareModal) return
       if (e.key === "ArrowDown") { e.preventDefault(); scrollToVideo(currentIndex + 1) }
@@ -917,8 +1019,63 @@ export default function ShortsPage() {
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h)
   }, [currentIndex, activePanel, showShareModal])
 
-  const toggleLike = (id: string) => setIsLiked(p => ({ ...p, [id]: !p[id] }))
-  const toggleFullscreen = () => { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); setIsFullscreen(true) } else { document.exitFullscreen().catch(() => {}); setIsFullscreen(false) } }
+  // Likes are stored by YouTube id so they match the Liked videos list
+  const toggleLike = (id: string) => {
+    const s = shortsData.find((x) => x.id === id)
+    if (!s) return
+    if (isLikedShort(s.videoId)) { unlike(s.videoId); return }
+    like({
+      id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
+      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "", addedAt: Date.now(),
+    })
+    toast.success("Added to Liked videos")
+  }
+  const toggleFullscreen = () => {
+    const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void }
+    const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
+    const isFull = !!(document.fullscreenElement || doc.webkitFullscreenElement)
+    try {
+      if (!isFull) {
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => {})
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
+        else { toast("Full screen isn't supported in this browser"); return }
+        setIsFullscreen(true)
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {})
+        else doc.webkitExitFullscreen?.()
+        setIsFullscreen(false)
+      }
+    } catch {
+      toast("Full screen isn't supported in this browser")
+    }
+  }
+
+  // Captions are toggled through the YouTube player's captions module
+  const sendToActivePlayer = (func: string, args: unknown[] = []) => {
+    const activeShort = shortsData[currentIndex]
+    const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
+    iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com')
+  }
+  const toggleCaptions = () => {
+    const next = !captionsEnabled
+    setCaptionsEnabled(next)
+    sendToActivePlayer(next ? 'loadModule' : 'unloadModule', ['captions'])
+  }
+
+  // Save = Watch Later (it holds both videos and shorts)
+  const isShortSaved = (s: (typeof shortsData)[number]) => isInWatchLater(s.videoId)
+  const toggleSaveShort = (s: (typeof shortsData)[number]) => {
+    if (isShortSaved(s)) {
+      removeFromWatchLater(s.videoId)
+      toast.success("Removed from Watch Later")
+      return
+    }
+    addToWatchLater({
+      id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
+      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "", addedAt: Date.now(),
+    })
+    toast.success("Saved to Watch Later")
+  }
   const handleTogglePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
     const newPlaying = !isPlaying
@@ -944,7 +1101,7 @@ export default function ShortsPage() {
   }
 
   const handleLikeComment = (commentId: string) => {
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (!src) return
     const wasLiked = likedIds.includes(commentId)
     const wasDisliked = dislikedIds.includes(commentId)
@@ -960,7 +1117,7 @@ export default function ShortsPage() {
   }
 
   const handleDislikeComment = (commentId: string) => {
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (!src) return
     const wasDisliked = dislikedIds.includes(commentId)
     const wasLiked = likedIds.includes(commentId)
@@ -978,14 +1135,14 @@ export default function ShortsPage() {
   const handleReplyComment = (commentId: string, text: string) => {
     const nr = { id: `r${Date.now()}`, user: "You", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "Just now", content: text, likes: 0, dislikes: 0, replies: [], parentId: commentId }
     setComments(p => p.map(c => c.id === commentId ? { ...c, replies: [...(c.replies || []), nr] } : c))
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (src) { if (!src.replies) src.replies = []; src.replies.push(nr); persistComments() }
   }
 
   const handleLikeReply = (commentId: string, replyId: string) => {
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (!src?.replies) return
-    const reply = src.replies.find((r: any) => r.id === replyId)
+    const reply = src.replies.find((r: CommentReply) => r.id === replyId)
     if (!reply) return
     const wasLiked = likedIds.includes(replyId)
     const wasDisliked = dislikedIds.includes(replyId)
@@ -996,14 +1153,14 @@ export default function ShortsPage() {
     if (wasLiked) setLikedIds(p => p.filter(id => id !== replyId))
     else setLikedIds(p => [...p, replyId])
 
-    setComments(p => p.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r: any) => r.id === replyId ? { ...r, likes: reply.likes, _isLiked: !wasLiked, _isDisliked: false, dislikes: wasDisliked ? r.dislikes - 1 : r.dislikes } : r) } : c))
+    setComments(p => p.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r: CommentReply) => r.id === replyId ? { ...r, likes: reply.likes, _isLiked: !wasLiked, _isDisliked: false, dislikes: wasDisliked ? r.dislikes - 1 : r.dislikes } : r) } : c))
     persistComments()
   }
 
   const handleDislikeReply = (commentId: string, replyId: string) => {
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (!src?.replies) return
-    const reply = src.replies.find((r: any) => r.id === replyId)
+    const reply = src.replies.find((r: CommentReply) => r.id === replyId)
     if (!reply) return
     const wasDisliked = dislikedIds.includes(replyId)
     const wasLiked = likedIds.includes(replyId)
@@ -1014,14 +1171,14 @@ export default function ShortsPage() {
     if (wasDisliked) setDislikedIds(p => p.filter(id => id !== replyId))
     else setDislikedIds(p => [...p, replyId])
 
-    setComments(p => p.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r: any) => r.id === replyId ? { ...r, dislikes: reply.dislikes, _isDisliked: !wasDisliked, _isLiked: false, likes: wasLiked ? r.likes - 1 : r.likes } : r) } : c))
+    setComments(p => p.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r: CommentReply) => r.id === replyId ? { ...r, dislikes: reply.dislikes, _isDisliked: !wasDisliked, _isLiked: false, likes: wasLiked ? r.likes - 1 : r.likes } : r) } : c))
     persistComments()
   }
 
   const handleReplyNested = (commentId: string, replyId: string, text: string) => {
     const nr = { id: `nr${Date.now()}`, user: "You", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "Just now", content: text, likes: 0, dislikes: 0, parentId: replyId }
     setComments(p => p.map(c => c.id === commentId ? { ...c, replies: [...(c.replies || []), nr] } : c))
-    const src = commentsByVideo[currentShort.id]?.find((c: any) => c.id === commentId)
+    const src = commentsByVideo[currentShort.id]?.find((c: VideoComment) => c.id === commentId)
     if (src) { if (!src.replies) src.replies = []; src.replies.push(nr); persistComments() }
   }
 
@@ -1029,12 +1186,12 @@ export default function ShortsPage() {
   const openPanel = (type: PanelType) => { if (activePanel === type) { setActivePanel(null); return }; setActivePanel(type); setDescExpanded(false); if (type === "comments") { loadCommentsForCurrentShort(); setTimeout(() => commentInputRef.current?.focus(), 400) } else if (type === "description") loadDescriptionForCurrentShort() }
   type PanelType = "comments" | "description" | null
   const panelTitle = activePanel === "comments" ? "Comments" : activePanel === "description" ? "Description" : ""
-  const panelWidth = typeof window !== 'undefined' && window.innerWidth >= 1440 ? 480 : 380
+  const panelWidth = isWideViewport ? 480 : 380
   const panelRight = 96
   const iframeShiftRight = panelWidth + 20 + panelRight
 
   const currentComments2 = commentsByVideo[currentShort?.id] || []
-  const totalCommentsCount = currentComments2.length + currentComments2.reduce((acc: number, c: any) => acc + (c.replies?.length || 0), 0)
+  const totalCommentsCount = currentComments2.length + currentComments2.reduce((acc: number, c: VideoComment) => acc + (c.replies?.length || 0), 0)
 
   // ---- FEEDBACK HANDLING ----
   const handleSendFeedback = () => {
@@ -1050,6 +1207,7 @@ export default function ShortsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <h1 className="sr-only">Shorts</h1>
       <style>{`
         @keyframes fadeInLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -1088,7 +1246,11 @@ export default function ShortsPage() {
       `}</style>
 
       {/* Share Modal */}
-      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} />
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        videoUrl={typeof window !== "undefined" && currentShort ? `${window.location.origin}/shorts?v=${currentShort.videoId}` : ""}
+      />
 
       {/* Feedback Dialog */}
       <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
@@ -1128,8 +1290,8 @@ export default function ShortsPage() {
 
       {/* Desktop navigation arrows */}
       <div className="hidden md:flex fixed right-6 top-1/2 -translate-y-1/2 z-50 flex-col gap-1 bg-background/80 dark:bg-[#b5abab66] rounded-full p-1.5 shadow-md">
-        <button onClick={() => scrollToVideo(currentIndex - 1)} disabled={currentIndex === 0} className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronUp className="h-6 w-6" /></button>
-        <button onClick={() => scrollToVideo(currentIndex + 1)} disabled={currentIndex === shortsData.length - 1} className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronDown className="h-6 w-6" /></button>
+        <button aria-label="Previous short" onClick={() => scrollToVideo(currentIndex - 1)} disabled={currentIndex === 0} className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronUp className="h-6 w-6" /></button>
+        <button aria-label="Next short" onClick={() => scrollToVideo(currentIndex + 1)} disabled={currentIndex === shortsData.length - 1} className="w-10 h-10 rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><ChevronDown className="h-6 w-6" /></button>
       </div>
 
       {/* Desktop Panel */}
@@ -1141,7 +1303,7 @@ export default function ShortsPage() {
                 <h3 className="text-foreground font-semibold">{panelTitle}</h3>
                 {activePanel === "comments" && <span className="text-muted-foreground text-sm">{totalCommentsCount}</span>}
               </div>
-              <button onClick={() => setActivePanel(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted">
+              <button aria-label="Close" onClick={() => setActivePanel(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1180,7 +1342,7 @@ export default function ShortsPage() {
                         onKeyDown={handleKeyPress}
                         className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                       />
-                      <button onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
+                      <button aria-label="Post comment" onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
                         <Send className="h-5 w-5" />
                       </button>
                     </div>
@@ -1216,13 +1378,13 @@ export default function ShortsPage() {
 
       {/* Mobile Panel */}
       {activePanel && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div className="md:hidden fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-black/60" onClick={() => setActivePanel(null)} />
           <div className="absolute bottom-0 left-0 right-0 bg-card dark:bg-[#212121] rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up">
             <div className="w-10 h-1 bg-muted rounded-full mx-auto mt-3 mb-2 flex-shrink-0" />
             <div className="flex items-center justify-between px-4 py-2 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2"><h3 className="text-foreground font-semibold">{panelTitle}</h3>{activePanel === "comments" && <span className="text-muted-foreground text-sm">{totalCommentsCount}</span>}</div>
-              <button onClick={() => setActivePanel(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted"><X className="h-5 w-5" /></button>
+              <button aria-label="Close" onClick={() => setActivePanel(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
             {activePanel === "comments" && (
               <>
@@ -1258,7 +1420,7 @@ export default function ShortsPage() {
                         onKeyDown={handleKeyPress}
                         className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                       />
-                      <button onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
+                      <button aria-label="Post comment" onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
                         <Send className="h-5 w-5" />
                       </button>
                     </div>
@@ -1296,13 +1458,15 @@ export default function ShortsPage() {
       {/* Main Shorts Content */}
       <div
         ref={containerRef}
-        className="fixed inset-0 top-0 bottom-[56px] md:top-[56px] md:bottom-0 overflow-y-scroll snap-y snap-mandatory overscroll-y-contain scrollbar-none transition-all duration-300 ease-in-out"
+        className="fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll snap-y snap-mandatory overscroll-y-contain scrollbar-none transition-all duration-300 ease-in-out"
         style={{
           scrollSnapType: "y mandatory",
-          left: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${desktopSidebarWidth}px` : "0px",
-          right: typeof window !== 'undefined' && window.innerWidth >= 768 && activePanel ? `${iframeShiftRight}px` : "0px",
+          left: isDesktopViewport ? `${desktopSidebarWidth}px` : "0px",
+          right: isDesktopViewport && activePanel ? `${iframeShiftRight}px` : "0px",
         }}
       >
+        {/* Refs below are only used inside event handlers and ref callbacks, never read while rendering */}
+        {/* eslint-disable-next-line react-hooks/refs */}
         {shortsData.map((short, index) => {
           const isActive = index === currentIndex
           const isHovered = hoveredVideoId === short.id
@@ -1342,7 +1506,8 @@ export default function ShortsPage() {
                         alt={short.title}
                         fill
                         className="object-cover"
-                        priority={index < 2}
+                        // The first short's thumbnail shows until its player loads; the rest stay lazy (no preload: players cover them)
+                        loading={index === 0 ? "eager" : "lazy"}
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
@@ -1377,7 +1542,8 @@ export default function ShortsPage() {
                 <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
 
                 {/* Top controls (hover only) */}
-                <div className={`absolute top-0 left-0 right-0 z-30 px-4 pt-4 pb-16 transition-opacity duration-200 ${(isHovered || isActive) && !isScrolling ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                {/* Only the control row takes clicks; the padded area below it must not cover the action rail on short windows */}
+                <div className={`absolute top-0 left-0 right-0 z-30 px-4 pt-4 pb-16 transition-opacity duration-200 pointer-events-none ${(isHovered || isActive) && !isScrolling ? "opacity-100 [&>*]:pointer-events-auto" : "opacity-0"}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {/* Mobile: back button in play/pause slot */}
@@ -1385,29 +1551,29 @@ export default function ShortsPage() {
                         <ChevronLeft className="h-5 w-5" />
                       </button>
                       {/* Desktop: play/pause */}
-                      <button onClick={handleTogglePlay} className="hidden md:flex w-10 h-10 rounded-full items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                      <button type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={handleTogglePlay} className="hidden md:flex w-10 h-10 rounded-full items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                         {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                       </button>
                       <div className="relative flex items-center" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-                        <button onClick={() => setIsMuted(!isMuted)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                        <button type="button" aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => setIsMuted(!isMuted)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                           {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                         </button>
                         {showVolumeSlider && (
                           <div className="hidden md:flex items-center rounded-full px-3 py-2 ml-1 shadow-lg" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-                            <input type="range" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
+                            <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setCaptionsEnabled(!captionsEnabled)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                      <button type="button" aria-label={captionsEnabled ? "Turn off captions" : "Turn on captions"} aria-pressed={captionsEnabled} onClick={toggleCaptions} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                         {captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />}
                       </button>
-                      <button onClick={toggleFullscreen} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                      <button type="button" aria-label="Full screen" onClick={toggleFullscreen} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                         <FullscreenIcon className="h-5 w-5" />
                       </button>
                       <div className="relative">
-                        <button onClick={() => setShowMoreMenu(!showMoreMenu)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                        <button type="button" aria-label="More options" aria-expanded={showMoreMenu} onClick={() => setShowMoreMenu(!showMoreMenu)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                           <MoreIcon className="h-5 w-5" />
                         </button>
 
@@ -1419,10 +1585,10 @@ export default function ShortsPage() {
                               <button className="w-full flex items-center gap-4 px-4 py-3 text-foreground text-sm hover:bg-muted transition-colors rounded-t-xl" onClick={() => { openPanel("description"); setShowMoreMenu(false) }}>
                                 <List className="h-5 w-5" /> Description
                               </button>
-                              <button className="w-full flex items-center gap-4 px-4 py-3 text-foreground text-sm hover:bg-muted transition-colors" onClick={() => setShowMoreMenu(false)}>
-                                <Bookmark className="h-5 w-5" /> Save to playlist
+                              <button type="button" className="w-full flex items-center gap-4 px-4 py-3 text-foreground text-sm hover:bg-muted transition-colors" onClick={() => { toggleSaveShort(short); setShowMoreMenu(false) }}>
+                                <Bookmark className={cn("h-5 w-5", isShortSaved(short) && "fill-current")} /> {isShortSaved(short) ? "Saved to Watch Later" : "Save to Watch Later"}
                               </button>
-                              <button className="w-full flex items-center justify-between px-4 py-3 text-foreground text-sm hover:bg-muted transition-colors" onClick={() => { setCaptionsEnabled(!captionsEnabled); setShowMoreMenu(false) }}>
+                              <button className="w-full flex items-center justify-between px-4 py-3 text-foreground text-sm hover:bg-muted transition-colors" onClick={() => { toggleCaptions(); setShowMoreMenu(false) }}>
                                 <div className="flex items-center gap-4">{captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />} Captions</div>
                                 <span className="text-muted-foreground text-xs">{captionsEnabled ? "On" : "Off"}</span>
                               </button>
@@ -1457,29 +1623,29 @@ export default function ShortsPage() {
                 </div>
 
                 <div className={`absolute right-3 bottom-28 flex flex-col gap-6 items-center z-20 transition-all duration-500 ${isActive && !isScrolling ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"}`}>
-                  <button onClick={() => toggleLike(short.id)} className="flex flex-col items-center gap-1 group">
-                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all", isLiked[short.id] ? "scale-110" : "", "group-hover:bg-white/10 group-active:scale-95")} style={{ backgroundColor: isLiked[short.id] ? "rgba(255, 0, 0, 0.2)" : "rgba(0,0,0,0.4)" }}>
-                      <Heart className={cn("h-6 w-6", isLiked[short.id] ? "text-red-500 fill-red-500" : "text-white")} />
+                  <button type="button" aria-label={isLikedShort(short.videoId) ? "Unlike" : "Like"} aria-pressed={isLikedShort(short.videoId)} onClick={() => toggleLike(short.id)} className="flex flex-col items-center gap-1 group">
+                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center transition-all", isLikedShort(short.videoId) ? "scale-110" : "", "group-hover:bg-white/10 group-active:scale-95")} style={{ backgroundColor: isLikedShort(short.videoId) ? "rgba(255, 0, 0, 0.2)" : "rgba(0,0,0,0.4)" }}>
+                      <Heart className={cn("h-6 w-6", isLikedShort(short.videoId) ? "text-red-500 fill-red-500" : "text-white")} />
                     </div>
                     <span className="text-white text-xs font-medium">{short.likes}</span>
                   </button>
-                  <button onClick={() => openPanel("comments")} className="flex flex-col items-center gap-1 group">
+                  <button type="button" aria-label="Comments" onClick={() => openPanel("comments")} className="flex flex-col items-center gap-1 group">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-white/10 group-active:scale-95" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                       <MessageCircle className="h-6 w-6 text-white" />
                     </div>
                     <span className="text-white text-xs font-medium">{short.comments}</span>
                   </button>
-                  <button onClick={() => setShowShareModal(true)} className="flex flex-col items-center gap-1 group">
+                  <button type="button" onClick={() => setShowShareModal(true)} className="flex flex-col items-center gap-1 group">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-white/10 group-active:scale-95" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                       <Share2 className="h-6 w-6 text-white" />
                     </div>
                     <span className="text-white text-xs font-medium">Share</span>
                   </button>
-                  <button className="flex flex-col items-center gap-1 group">
+                  <button type="button" aria-pressed={isShortSaved(short)} onClick={() => toggleSaveShort(short)} className="flex flex-col items-center gap-1 group">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center group-hover:bg-white/10 group-active:scale-95" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-                      <Bookmark className="h-6 w-6 text-white" />
+                      <Bookmark className={cn("h-6 w-6 text-white", isShortSaved(short) && "fill-white")} />
                     </div>
-                    <span className="text-white text-xs font-medium">Save</span>
+                    <span className="text-white text-xs font-medium">{isShortSaved(short) ? "Saved" : "Save"}</span>
                   </button>
                   <ReportDialog videoTitle={short.title} videoId={short.id}>
                     <button className="flex flex-col items-center gap-1 group">
@@ -1503,7 +1669,7 @@ export default function ShortsPage() {
                       onMouseLeave={() => { setIsProgressHovered(false) }}
                       onMouseDown={(e) => {
                         e.stopPropagation()
-                        isSeekingRef.current = true
+                        isSeekingRef.current = true; setIsSeeking(true)
                         const bar = e.currentTarget
                         const doSeek = (clientX: number) => {
                           const rect = bar.getBoundingClientRect()
@@ -1516,7 +1682,7 @@ export default function ShortsPage() {
                         doSeek(e.clientX)
                         const onMove = (ev: MouseEvent) => doSeek(ev.clientX)
                         const onUp = () => {
-                          isSeekingRef.current = false
+                          isSeekingRef.current = false; setIsSeeking(false)
                           window.removeEventListener('mousemove', onMove)
                           window.removeEventListener('mouseup', onUp)
                         }
@@ -1525,7 +1691,7 @@ export default function ShortsPage() {
                       }}
                       onTouchStart={(e) => {
                         e.stopPropagation()
-                        isSeekingRef.current = true
+                        isSeekingRef.current = true; setIsSeeking(true)
                         setIsProgressTouch(true)
                         const touch = e.touches[0]; if (!touch) return
                         const rect = e.currentTarget.getBoundingClientRect()
@@ -1545,7 +1711,7 @@ export default function ShortsPage() {
                         const iframe = videoRefs.current.get(short.id)
                         iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [t, true] }), 'https://www.youtube.com')
                       }}
-                      onTouchEnd={() => { isSeekingRef.current = false; setIsProgressTouch(false) }}
+                      onTouchEnd={() => { isSeekingRef.current = false; setIsSeeking(false); setIsProgressTouch(false) }}
                     >
                       {/* Visual track — scrubber centers on this div so it's always correctly positioned */}
                       <div
@@ -1557,7 +1723,7 @@ export default function ShortsPage() {
                           className="h-full bg-red-500 pointer-events-none"
                           style={{
                             width: `${fillPct}%`,
-                            transition: isSeekingRef.current ? 'none' : 'width 0.25s linear',
+                            transition: isSeeking ? 'none' : 'width 0.25s linear',
                           }}
                         />
                         {/* Scrubber — centered on the visual track, visible on hover/touch */}
@@ -1577,5 +1743,14 @@ export default function ShortsPage() {
         })}
       </div>
     </div>
+  )
+}
+
+// useSearchParams() needs a Suspense boundary so the page can be prerendered
+export default function ShortsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShortsPageContent />
+    </Suspense>
   )
 }

@@ -20,7 +20,6 @@ const ABDULLAH_AVATAR =
   "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj";
 const ZAKARIA_AVATAR =
   "https://yt3.googleusercontent.com/B5dEWmLpOG-j07FqzYJJW2snv2yep93R_AcnBx05lzn56r0CJdX8LtrEASS-FxW3r663GNzLHQ=s160-c-k-c0x00ffffff-no-rj";
-const IMAM_HOSSAIN_AVATAR = "/placeholder.svg?height=48&width=48";
 const SAIFULLAH_AVATAR =
   "https://yt3.googleusercontent.com/A5R8WWONod1kMdbHn1IYpzBELTF3y6fA12F2t-ZORFbzQqFX08Hp-sm9KLwdYheHiSLu9Ltm=s160-c-k-c0x00ffffff-no-rj";
 const VOICE_OF_TRUE_AVATAR =
@@ -127,20 +126,6 @@ export const videoData: VideoItem[] = [
     description: "জীবন ঘনিষ্ঠ গুরুত্বপূর্ণ কিছু ইসলামিক প্রশ্নোত্তর। Islamic Question & Answer (Full Video) by Dr. Khondokar Abdullah Jahangir.",
     language: "bn",
     category: "Islamic Lecture",
-  },
-  {
-    id: "v7",
-    videoId: "bUNorIRvpaY",
-    title: "Biography of Prophet (S.) Dr.Khandaker Abdullah Jahangir (Rh.)",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
-    channelId: "abdullah-jahangir",
-    channelAvatar: ABDULLAH_AVATAR,
-    duration: "55:30",
-    views: "2.4M views",
-    timeAgo: "2 years ago",
-    description: "ড.খন্দকার আব্দুল্লাহ জাহাঙ্গীর (রহ.)।",
-    language: "bn",
-    category: "Seerah",
   },
   {
     id: "v8",
@@ -254,7 +239,7 @@ export const videoData: VideoItem[] = [
     title: "আল্লাহ রাব্বুল আলামিনের তাওহীদ || হালাকাহ || Dr. Mohammad Imam Hossain",
     channel: "Dr. Mohammad Imam Hossain",
     channelId: "imam-hossain",
-    channelAvatar: IMAM_HOSSAIN_AVATAR,
+    channelAvatar: TAFSEERUL_QURAN_AVATAR,
     duration: "35:15",
     views: "280K views",
     timeAgo: "1 month ago",
@@ -268,7 +253,7 @@ export const videoData: VideoItem[] = [
     title: "কিছু গুরুত্বপূর্ণ ফতোয়া ।। বইঃ দারসুল আম ।। Dr. Mohammad Imam Hossain",
     channel: "Dr. Mohammad Imam Hossain",
     channelId: "imam-hossain",
-    channelAvatar: IMAM_HOSSAIN_AVATAR,
+    channelAvatar: TAFSEERUL_QURAN_AVATAR,
     duration: "42:30",
     views: "195K views",
     timeAgo: "3 months ago",

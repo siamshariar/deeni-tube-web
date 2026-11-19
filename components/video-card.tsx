@@ -4,19 +4,20 @@
 import { MoreVertical, Clock, Bookmark, Share, UserX, Flag, BookmarkCheck, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { useFeedPreferences } from "@/hooks/useFeedPreferences";
-import { useLanguage } from "@/hooks/use-language";
+import { useDontRecommend } from "@/hooks/useDontRecommend";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ShareModal } from "@/components/share-modal";
 import { ReportDialog } from "@/components/report-dialog";
 import { toast } from "sonner";
+import { getChannelHref } from "@/lib/channel-data";
+import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
 
 interface VideoCardProps {
   isHorizontal?: boolean;
@@ -29,6 +30,8 @@ interface VideoCardProps {
   timestamp: string;
   duration: string;
   thumbnail: string;
+  /** Loading hint for cards above the fold (see lib/image-priority) */
+  imagePriority?: ImagePriority;
 }
 
 export default function VideoCard({
@@ -42,28 +45,24 @@ export default function VideoCard({
   timestamp,
   duration,
   thumbnail,
+  imagePriority,
 }: VideoCardProps) {
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [hidden, setHidden] = useState(false);
   const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
-  const { toggleFollowChannel, isFollowed } = useFeedPreferences();
-  const { isGuest } = useLanguage();
+  const dontRecommend = useDontRecommend();
 
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setSaved(isInWatchLater(videoId));
-  }, [videoId, isInWatchLater]);
+  // Read straight from the shared Watch Later store
+  const saved = isInWatchLater(videoId);
 
   const handleWatchLaterToggle = () => {
     if (saved) {
       removeFromWatchLater(videoId);
       toast.success("Removed from Watch Later");
-      setSaved(false);
     } else {
       addToWatchLater({
         id: videoId,
@@ -77,23 +76,10 @@ export default function VideoCard({
         addedAt: Date.now(),
       });
       toast.success("Added to Watch Later");
-      setSaved(true);
     }
   };
 
-  const handleDontRecommend = () => {
-    if (isGuest) {
-      toast.error("Please sign in to manage channel feed", {
-        action: {
-          label: "Sign in",
-          onClick: () => window.location.href = "/signin",
-        },
-      });
-      return;
-    }
-    toggleFollowChannel(channelId);
-    toast.success(`Channel ${isFollowed(channelId) ? "removed from" : "added to"} feed`);
-  };
+  const handleDontRecommend = () => dontRecommend(channelId, channel);
 
   const handleNotInterested = () => {
     setHidden(true);
@@ -124,7 +110,7 @@ export default function VideoCard({
         <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
       </div>
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); handleDontRecommend(); }}>
-        <UserX className="h-5 w-5" /><span>Don't recommend channel</span>
+        <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
       </div>
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); handleNotInterested(); }}>
         <EyeOff className="h-5 w-5" /><span>Not interested</span>
@@ -148,7 +134,7 @@ export default function VideoCard({
         <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={handleDontRecommend}>
-        <UserX className="h-5 w-5" /><span>Don't recommend channel</span>
+        <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={handleNotInterested}>
         <EyeOff className="h-5 w-5" /><span>Not interested</span>
@@ -160,7 +146,7 @@ export default function VideoCard({
   );
 
   const videoLink = `/videos/${channel}/${videoId}`;
-  const channelLink = `/channel-new/${channelId}`;
+  const channelLink = getChannelHref(channelId);
 
   if (isHorizontal) {
     // Mobile horizontal list – unchanged
@@ -168,12 +154,12 @@ export default function VideoCard({
       <div className="flex flex-col p-3">
         <Link href={videoLink} className="block">
           <div className="relative aspect-video w-full">
-            <Image src={thumbnail} alt={title} fill className="object-cover rounded-lg" />
+            <Image src={thumbnail} alt={title} fill {...imagePriorityProps(imagePriority)} className="object-cover rounded-lg" />
             <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 py-0.5 rounded">{duration}</div>
           </div>
         </Link>
         <div className="flex mt-3 gap-3">
-          <Link href={channelLink} className="flex-shrink-0">
+          <Link aria-label={channel} href={channelLink} className="flex-shrink-0">
             <Avatar className="h-9 w-9">
               <AvatarImage src={channelAvatar} />
               <AvatarFallback>{channel.charAt(0)}</AvatarFallback>
@@ -189,7 +175,7 @@ export default function VideoCard({
           {isMobile ? (
             <Drawer open={open} onOpenChange={setOpen}>
               <DrawerTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DrawerTrigger>
@@ -200,7 +186,7 @@ export default function VideoCard({
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -220,7 +206,7 @@ export default function VideoCard({
     <div className="group/card flex flex-col border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 bg-card">
       <Link href={videoLink} className="block relative overflow-hidden">
         <div className="relative aspect-video w-full">
-          <Image src={thumbnail} alt={title} fill className="object-cover transition-transform duration-300 group-hover/card:scale-105" />
+          <Image src={thumbnail} alt={title} fill {...imagePriorityProps(imagePriority)} className="object-cover transition-transform duration-300 group-hover/card:scale-105" />
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 py-0.5 rounded font-medium">{duration}</div>
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
             <div className="bg-black/60 rounded-full p-2.5">
@@ -238,7 +224,7 @@ export default function VideoCard({
           {isMobile ? (
             <Drawer open={open} onOpenChange={setOpen}>
               <DrawerTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DrawerTrigger>
@@ -249,7 +235,7 @@ export default function VideoCard({
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

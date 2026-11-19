@@ -1,5 +1,7 @@
 // lib/shorts-data.ts
 
+import type { VideoComment } from "@/lib/types"
+
 export interface ShortVideo {
   id: string
   youtubeId: string
@@ -197,7 +199,7 @@ export function getYouTubeWatchUrl(youtubeId: string): string {
 }
 
 // Default comments for each video
-export const initialCommentsByVideo: Record<string, any[]> = {
+export const initialCommentsByVideo: Record<string, VideoComment[]> = {
   s1: [
     { id: "s1c1", user: "Rahman Ahmed", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "2 hours ago", content: "মাশাআল্লাহ, খুবই সুন্দর আলোচনা। আল্লাহ আমাদেরকে সঠিক পথে চলার তাওফীক দান করুন।", likes: 245, dislikes: 12, replies: [] },
     { id: "s1c2", user: "Fatema Khatun", avatar: "/placeholder.svg?height=32&width=32", timeAgo: "5 hours ago", content: "সুবহানাল্লাহ! এই কথাগুলো শুনে চোখে পানি চলে এসেছে। জাযাকাল্লাহ খাইরান।", likes: 567, dislikes: 23, replies: [] },

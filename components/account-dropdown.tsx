@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
@@ -18,7 +17,6 @@ import {
   Sun,
   Check,
   Send,
-  Heart,
   X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -39,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import LanguagePrompt from "@/components/language-prompt";
 import { toast } from "sonner";
+import { readLanguagePrefs, signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 
 function getInitials(name: string): string {
   return name
@@ -54,7 +53,7 @@ type ThemeMode = "system" | "light" | "dark";
 export default function AccountDropdown() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [userData, setUserData] = useState({
     name: "Guest",
@@ -73,6 +72,7 @@ export default function AccountDropdown() {
       const storedUser = localStorage.getItem("deeni-user-data");
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
         setUserData({
           name: parsed.name || "Guest",
           email: parsed.email || "",
@@ -91,14 +91,8 @@ export default function AccountDropdown() {
   };
 
   const handleSignOut = () => {
-    localStorage.setItem("deeni-lang-prefs", JSON.stringify({
-      languages: ["en"],
-      hasSelected: false,
-      isGuest: true,
-    }));
-    localStorage.removeItem("deeni-user-data");
+    signOutKeepingLanguages();
     setOpen(false);
-    window.dispatchEvent(new Event("auth-changed"));
     router.push("/signin");
   };
 
@@ -145,15 +139,21 @@ export default function AccountDropdown() {
     <>
       <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
         <DropdownMenuTrigger asChild>
-          <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-background hover:ring-primary/20 transition-all">
-            {userData.avatar ? (
-              <AvatarImage src={userData.avatar} alt={userData.name} />
-            ) : (
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                {userData.initials}
-              </AvatarFallback>
-            )}
-          </Avatar>
+          <button
+            type="button"
+            aria-label="Account menu"
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-background hover:ring-primary/20 transition-all">
+              {userData.avatar ? (
+                <AvatarImage src={userData.avatar} alt={userData.name} />
+              ) : (
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                  {userData.initials}
+                </AvatarFallback>
+              )}
+            </Avatar>
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-80 p-2 mr-4" align="end" sideOffset={8}>
           {/* User info header */}
@@ -333,12 +333,12 @@ export default function AccountDropdown() {
       <LanguagePrompt
         open={showLanguagePrompt}
         onSave={(langs) => {
-          localStorage.setItem("deeni-lang-prefs", JSON.stringify({ languages: langs, hasSelected: true, isGuest: false }));
+          updateLanguagePrefs({ languages: langs });
           toast.success("Language preferences updated");
           setShowLanguagePrompt(false);
         }}
         onSkip={() => setShowLanguagePrompt(false)}
-        initialSelected={["en"]}
+        initialSelected={showLanguagePrompt ? readLanguagePrefs().languages ?? ["en"] : ["en"]}
       />
 
       {/* Send Feedback Dialog */}

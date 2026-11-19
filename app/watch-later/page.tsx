@@ -10,7 +10,6 @@ import {
   Play,
   Shuffle,
   Trash2,
-  ListPlus,
   BookmarkPlus,
   Share2,
   ChevronsUp,
@@ -32,9 +31,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { videoData, VideoItem } from "@/lib/video-data";
-import { shortsVideos, ShortVideo } from "@/lib/shorts-data";
+import { useWatchLater, WatchLaterVideo } from "@/hooks/useWatchLater";
+import { useHydrated } from "@/lib/local-store";
+import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 
+import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
+import { youtubeThumb } from "@/lib/media-lookup";
 type SortOption =
   | "manual"
   | "date-added-newest"
@@ -71,13 +73,26 @@ const parseTimeAgo = (timeAgo: string): number => {
   return 0;
 };
 
-const INITIAL_VIDEOS: VideoItem[] = videoData.slice(0, 8);
-const INITIAL_SHORTS: ShortVideo[] = shortsVideos.slice(0, 4);
+const ytId = (v: WatchLaterVideo) => v.videoId ?? v.id;
+const videoHref = (v: WatchLaterVideo) => `/videos/${v.channel}/${ytId(v)}`;
 
 export default function WatchLaterPage() {
   const router = useRouter();
-  const [videos, setVideos] = useState<VideoItem[]>(INITIAL_VIDEOS);
-  const [shorts, setShorts] = useState<ShortVideo[]>(INITIAL_SHORTS);
+  const hydrated = useHydrated();
+  const { videos: saved, setWatchLater, removeFromWatchLater } = useWatchLater();
+  const videos = useMemo(() => saved.filter((v) => v.type !== "short"), [saved]);
+  const shorts = useMemo(() => saved.filter((v) => v.type === "short"), [saved]);
+  const setVideos = (next: WatchLaterVideo[]) => setWatchLater([...next, ...shorts]);
+  const [playlistTarget, setPlaylistTarget] = useState<WatchLaterVideo | null>(null);
+
+  const shareVideo = async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      toast.success("Link copied to clipboard");
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
+  };
   const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
   const [sortBy, setSortBy] = useState<SortOption>("manual");
 
@@ -115,34 +130,31 @@ export default function WatchLaterPage() {
   };
 
   // Move to top/bottom always switches to manual sort
-  const moveToTop = (video: VideoItem) => {
-    setVideos((prev) => [video, ...prev.filter((v) => v.id !== video.id)]);
+  const moveToTop = (video: WatchLaterVideo) => {
+    setVideos([video, ...videos.filter((v) => v.id !== video.id)]);
     setSortBy("manual");
   };
 
-  const moveToBottom = (video: VideoItem) => {
-    setVideos((prev) => [...prev.filter((v) => v.id !== video.id), video]);
+  const moveToBottom = (video: WatchLaterVideo) => {
+    setVideos([...videos.filter((v) => v.id !== video.id), video]);
     setSortBy("manual");
   };
 
   const removeVideo = (id: string) => {
-    setVideos((prev) => prev.filter((v) => v.id !== id));
+    removeFromWatchLater(id);
     toast.success("Removed from Watch Later");
   };
 
-  const removeShort = (id: string) => {
-    setShorts((prev) => prev.filter((s) => s.id !== id));
-    toast.success("Removed from Watch Later");
-  };
+  const removeShort = removeVideo;
 
   const sortedVideos = useMemo(() => {
     if (sortBy === "manual") return videos;
     const copy = [...videos];
     switch (sortBy) {
       case "date-added-newest":
-        return copy.reverse();
+        return copy.sort((a, b) => b.addedAt - a.addedAt);
       case "date-added-oldest":
-        return copy;
+        return copy.sort((a, b) => a.addedAt - b.addedAt);
       case "most-popular":
         return copy.sort((a, b) => parseViews(b.views) - parseViews(a.views));
       case "date-published-newest":
@@ -160,7 +172,7 @@ export default function WatchLaterPage() {
   const isDraggable = sortBy === "manual";
   const firstVideo = videos[0];
   const firstThumb = firstVideo
-    ? `https://img.youtube.com/vi/${firstVideo.videoId}/hqdefault.jpg`
+    ? `https://img.youtube.com/vi/${ytId(firstVideo)}/hqdefault.jpg`
     : null;
 
   const showVideos = activeFilter === "all" || activeFilter === "videos";
@@ -172,6 +184,8 @@ export default function WatchLaterPage() {
       {/* Mobile sticky header */}
       <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b sticky top-14 bg-background z-10">
         <button
+          type="button"
+          aria-label="Go back"
           onClick={() => router.back()}
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"
         >
@@ -184,7 +198,7 @@ export default function WatchLaterPage() {
       </div>
 
       <div className="px-3 md:px-6 py-4 md:py-6">
-        {isEmpty ? (
+        {!hydrated ? null : isEmpty ? (
           <div className="text-center py-20">
             <Clock className="h-16 w-16 mx-auto text-muted-foreground/20 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Watch Later is empty</h2>
@@ -207,8 +221,8 @@ export default function WatchLaterPage() {
                       src={firstThumb}
                       alt=""
                       fill
+                      loading="eager" // same file as the preview below, so no extra download
                       className="object-cover scale-110 blur-md opacity-30"
-                      priority
                     />
                     <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
                   </>
@@ -218,7 +232,7 @@ export default function WatchLaterPage() {
                   {/* Top: icon + title + count */}
                   <div className="mb-5">
                     <Clock className="h-7 w-7 mb-2 opacity-70" />
-                    <h2 className="text-xl font-bold leading-tight">Watch Later</h2>
+                    <h1 className="text-xl font-bold leading-tight">Watch Later</h1>
                     <p className="text-sm text-white/60 mt-1">
                       {videos.length} videos · {shorts.length} shorts
                     </p>
@@ -227,7 +241,7 @@ export default function WatchLaterPage() {
                   {/* First video preview */}
                   {firstVideo && (
                     <Link
-                      href={`/videos/${firstVideo.channel}/${firstVideo.videoId}`}
+                      href={videoHref(firstVideo)}
                       className="block mb-5 group flex-shrink-0"
                     >
                       <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10">
@@ -235,6 +249,7 @@ export default function WatchLaterPage() {
                           src={firstThumb!}
                           alt={firstVideo.title}
                           fill
+                          {...imagePriorityProps("lcp", { preload: false })}
                           className="object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
@@ -259,9 +274,7 @@ export default function WatchLaterPage() {
                     <Button
                       onClick={() =>
                         firstVideo &&
-                        router.push(
-                          `/videos/${firstVideo.channel}/${firstVideo.videoId}`
-                        )
+                        router.push(videoHref(firstVideo))
                       }
                       className="rounded-full gap-2 bg-white text-black hover:bg-white/90 w-full font-semibold"
                     >
@@ -271,7 +284,7 @@ export default function WatchLaterPage() {
                       onClick={() => {
                         const r =
                           videos[Math.floor(Math.random() * videos.length)];
-                        if (r) router.push(`/videos/${r.channel}/${r.videoId}`);
+                        if (r) router.push(videoHref(r));
                       }}
                       variant="outline"
                       className="rounded-full gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20 w-full"
@@ -359,7 +372,8 @@ export default function WatchLaterPage() {
                   )}
                   <div className="space-y-0.5">
                     {sortedVideos.map((video, index) => {
-                      const thumb = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
+                      // Rows are small; the first row shares the side panel's (larger) image so it downloads once
+                      const thumb = youtubeThumb(ytId(video), index === 0 ? "medium" : "small");
                       const isDragOver = dragOverIndex === index;
                       return (
                         <div
@@ -395,13 +409,14 @@ export default function WatchLaterPage() {
 
                           {/* Thumbnail */}
                           <Link
-                            href={`/videos/${video.channel}/${video.videoId}`}
+                            href={videoHref(video)}
                             className="relative flex-shrink-0 w-28 sm:w-32 md:w-36 aspect-video rounded-lg overflow-hidden bg-black"
                           >
                             <Image
                               src={thumb}
                               alt={video.title}
                               fill
+                              {...imagePriorityProps(priorityForIndex(index), { preload: false })}
                               className="object-cover"
                             />
                             <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded font-medium">
@@ -412,7 +427,7 @@ export default function WatchLaterPage() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <Link
-                              href={`/videos/${video.channel}/${video.videoId}`}
+                              href={videoHref(video)}
                             >
                               <h3 className="text-sm font-medium line-clamp-2 hover:text-primary transition-colors leading-snug">
                                 {video.title}
@@ -437,7 +452,7 @@ export default function WatchLaterPage() {
                           {/* Three-dot menu — always visible */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
+                              <button type="button" aria-label="More actions" className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </button>
                             </DropdownMenuTrigger>
@@ -446,13 +461,7 @@ export default function WatchLaterPage() {
                               className="w-56 rounded-xl"
                             >
                               <DropdownMenuItem
-                                onClick={() => toast("Added to queue")}
-                              >
-                                <ListPlus className="h-4 w-4 mr-3" /> Add to
-                                queue
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => toast("Saved to playlist")}
+                                onClick={() => setPlaylistTarget(video)}
                               >
                                 <BookmarkPlus className="h-4 w-4 mr-3" /> Save
                                 to playlist
@@ -472,9 +481,7 @@ export default function WatchLaterPage() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={() =>
-                                  toast("Link copied to clipboard")
-                                }
+                                onClick={() => shareVideo(videoHref(video))}
                               >
                                 <Share2 className="h-4 w-4 mr-3" /> Share
                               </DropdownMenuItem>
@@ -504,10 +511,10 @@ export default function WatchLaterPage() {
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     {shorts.map((short) => {
-                      const thumb = `https://img.youtube.com/vi/${short.youtubeId}/hqdefault.jpg`;
+                      const thumb = `https://img.youtube.com/vi/${ytId(short)}/hqdefault.jpg`;
                       return (
                         <div key={short.id} className="relative">
-                          <Link href="/shorts" className="block group">
+                          <Link href={`/shorts?v=${ytId(short)}`} className="block group">
                             <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-black">
                               <Image
                                 src={thumb}
@@ -531,7 +538,7 @@ export default function WatchLaterPage() {
                           <div className="absolute bottom-[38px] right-2 z-10">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1 rounded-full bg-black/50 hover:bg-black/70 transition-colors">
+                                <button type="button" aria-label="More actions" className="p-1 rounded-full bg-black/50 hover:bg-black/70 transition-colors">
                                   <MoreVertical className="h-3.5 w-3.5 text-white" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -540,21 +547,13 @@ export default function WatchLaterPage() {
                                 className="w-52 rounded-xl"
                               >
                                 <DropdownMenuItem
-                                  onClick={() => toast("Added to queue")}
-                                >
-                                  <ListPlus className="h-4 w-4 mr-3" /> Add to
-                                  queue
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => toast("Saved to playlist")}
+                                  onClick={() => setPlaylistTarget(short)}
                                 >
                                   <BookmarkPlus className="h-4 w-4 mr-3" />{" "}
                                   Save to playlist
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() =>
-                                    toast("Link copied to clipboard")
-                                  }
+                                  onClick={() => shareVideo(`/shorts?v=${ytId(short)}`)}
                                 >
                                   <Share2 className="h-4 w-4 mr-3" /> Share
                                 </DropdownMenuItem>
@@ -602,6 +601,14 @@ export default function WatchLaterPage() {
           </div>
         )}
       </div>
+
+      {playlistTarget && (
+        <AddToPlaylistDialog
+          video={{ id: playlistTarget.id, title: playlistTarget.title, channel: playlistTarget.channel }}
+          open
+          onOpenChange={(o) => !o && setPlaylistTarget(null)}
+        />
+      )}
     </div>
   );
 }

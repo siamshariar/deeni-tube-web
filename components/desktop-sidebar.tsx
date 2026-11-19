@@ -12,7 +12,7 @@ import {
   // Clock,    // Watch Later — hidden
   // ThumbsUp, // Liked Videos — hidden
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, isActivePath } from "@/lib/utils";
 import { useHeader } from "@/app/contexts/header-context";
 import { useState, useEffect } from "react";
 import {
@@ -25,7 +25,9 @@ export default function DesktopSidebar() {
   const { headerVisible } = useHeader();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [overlayOpen, setOverlayOpen] = useState(false);
+  // The page the overlay was opened on; navigating anywhere else closes it
+  const [overlayOpenOn, setOverlayOpenOn] = useState<string | null>(null);
+  const overlayOpen = overlayOpenOn !== null && overlayOpenOn === pathname;
 
   // Overlay mode: video detail pages and playlist detail pages.
   // The sidebar appears as a slide-in overlay — content never shifts.
@@ -36,21 +38,24 @@ export default function DesktopSidebar() {
   // Restore persisted collapsed state on mount
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration (first paint is handled in globals.css)
     if (stored !== null) setIsCollapsed(stored === "true");
+    // Enable transitions only after the restored state has painted (see globals.css)
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        document.documentElement.dataset.sidebarReady = "";
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
-
-  // Close overlay whenever the route changes
-  useEffect(() => {
-    setOverlayOpen(false);
-  }, [pathname]);
 
   // Expose globals so AppHeader's hamburger can drive both modes
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    (window as any).__sidebarToggle = () => {
+    window.__sidebarToggle = () => {
       if (isOverlayPage) {
-        setOverlayOpen((prev) => !prev);
+        setOverlayOpenOn((prev) => (prev === pathname ? null : pathname));
         return;
       }
       setIsCollapsed((prev) => {
@@ -60,7 +65,7 @@ export default function DesktopSidebar() {
       });
     };
 
-    (window as any).__sidebarGetState = () => isCollapsed;
+    window.__sidebarGetState = () => isCollapsed;
 
     // Only notify AppShell when in normal (non-overlay) mode
     if (!isOverlayPage) {
@@ -68,8 +73,8 @@ export default function DesktopSidebar() {
     }
 
     return () => {
-      delete (window as any).__sidebarToggle;
-      delete (window as any).__sidebarGetState;
+      delete window.__sidebarToggle;
+      delete window.__sidebarGetState;
     };
   }, [isCollapsed, isOverlayPage, pathname]);
 
@@ -91,7 +96,7 @@ export default function DesktopSidebar() {
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
           )}
-          onClick={() => setOverlayOpen(false)}
+          onClick={() => setOverlayOpenOn(null)}
         />
 
         {/* Slide-in sidebar panel */}
@@ -115,7 +120,7 @@ export default function DesktopSidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col fixed left-0 border-r bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out sidebar-scrollbar",
+        "desktop-sidebar hidden md:flex flex-col fixed left-0 border-r bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out sidebar-scrollbar",
         isCollapsed ? "w-[72px]" : "w-[240px]",
         top,
         height
@@ -125,19 +130,19 @@ export default function DesktopSidebar() {
         {isCollapsed ? (
           <>
             {/* Mini collapsed items — order: Home, Shorts, Channels, Scholars, You, Playlists, Categories */}
-            <SidebarItem href="/" icon={<Home className="h-5 w-5 flex-shrink-0" />} label="Home" active={pathname === "/"} collapsed={true} />
-            <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={pathname === "/shorts"} collapsed={true} />
-            <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={pathname === "/channels"} collapsed={true} />
-            <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={pathname === "/scholars"} collapsed={true} />
-            <SidebarItem href="/you" icon={<UserIcon className="h-5 w-5 flex-shrink-0" />} label="You" active={pathname === "/you"} collapsed={true} />
-            <SidebarItem href="/playlists" icon={<ListVideo className="h-5 w-5 flex-shrink-0" />} label="Playlists" active={pathname === "/playlists"} collapsed={true} />
-            <SidebarItem href="/categories" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="Categories" active={pathname === "/categories"} collapsed={true} />
+            <SidebarItem href="/" icon={<Home className="h-5 w-5 flex-shrink-0" />} label="Home" active={isActivePath(pathname, "/")} collapsed={true} />
+            <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={isActivePath(pathname, "/shorts")} collapsed={true} />
+            <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={isActivePath(pathname, "/channels")} collapsed={true} />
+            <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={isActivePath(pathname, "/scholars")} collapsed={true} />
+            <SidebarItem href="/you" icon={<UserIcon className="h-5 w-5 flex-shrink-0" />} label="You" active={isActivePath(pathname, "/you")} collapsed={true} />
+            <SidebarItem href="/playlists" icon={<ListVideo className="h-5 w-5 flex-shrink-0" />} label="Playlists" active={isActivePath(pathname, "/playlists")} collapsed={true} />
+            <SidebarItem href="/categories" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="Categories" active={isActivePath(pathname, "/categories")} collapsed={true} />
             {/* History — expanded view only; uncomment to also show in mini bar */}
-            {/* <SidebarItem href="/history" icon={<History className="h-5 w-5 flex-shrink-0" />} label="History" active={pathname === "/history"} collapsed={true} /> */}
+            {/* <SidebarItem href="/history" icon={<History className="h-5 w-5 flex-shrink-0" />} label="History" active={isActivePath(pathname, "/history")} collapsed={true} /> */}
             {/* Watch Later — hidden; uncomment to re-enable */}
-            {/* <SidebarItem href="/watch-later" icon={<Clock className="h-5 w-5 flex-shrink-0" />} label="Watch Later" active={pathname === "/watch-later"} collapsed={true} /> */}
+            {/* <SidebarItem href="/watch-later" icon={<Clock className="h-5 w-5 flex-shrink-0" />} label="Watch Later" active={isActivePath(pathname, "/watch-later")} collapsed={true} /> */}
             {/* Liked Videos — hidden; uncomment to re-enable */}
-            {/* <SidebarItem href="/liked-videos" icon={<ThumbsUp className="h-5 w-5 flex-shrink-0" />} label="Liked Videos" active={pathname === "/liked-videos"} collapsed={true} /> */}
+            {/* <SidebarItem href="/liked-videos" icon={<ThumbsUp className="h-5 w-5 flex-shrink-0" />} label="Liked Videos" active={isActivePath(pathname, "/liked-videos")} collapsed={true} /> */}
           </>
         ) : (
           <SidebarExpandedContent pathname={pathname} />
