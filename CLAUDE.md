@@ -148,3 +148,10 @@ The grid card uses Tailwind named groups: `group/card` for the outer container a
 ### Page titles and 404s
 
 Pages are client components, so they can't export `metadata`. Each route has a small server `layout.tsx` that sets the title (the root layout adds the `"%s - Deeni.tube"` template). The `[slug]`/`[id]` layouts for channels, scholars, categories and videos also call `notFound()` for unknown ids, which renders `app/not-found.tsx`. Unknown ids return a real 404. Don't add an `app/loading.tsx` (or a `loading.tsx` above these layouts): it starts streaming before the check, which turns the 404 into a 200. `/search` and `/shorts` wrap their content in `<Suspense>` because they call `useSearchParams()`. The favicon is `app/icon.png` (cropped from the logo).
+
+### Image loading (measured with Lighthouse, mobile + desktop)
+
+- Load **only one** image per page early: the main (LCP) image, via `imagePriorityProps(...)` / `priorityForIndex(index)` from `lib/image-priority.ts`. Loading several images early made LCP worse on mobile: they compete for bandwidth, and pages that render a hidden desktop/mobile copy of a list download the hidden copy's eager images too.
+- Default is `preload` + high priority (React starts the download during render, which helped the heavy client-rendered lists). Watch Later and Liked measured better with `{ preload: false }` (eager + high priority). Don't add early loading to the video page's related list or the Shorts feed; both measured no better.
+- `youtubeThumb(id, "small")` (320 px) is only for images up to ~170 CSS px wide where the page has no hidden duplicate using the larger size; otherwise use the default 480 px version so both copies share one download.
+- The header logo uses `public/logo-header*.webp` (sized for the header); the original PNGs are kept for other uses.
