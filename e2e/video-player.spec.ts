@@ -1,15 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { videoData } from '../lib/video-data';
+import { videoPath } from '../lib/video-url';
 
 test.describe('Video detail page', () => {
   const firstVideo = videoData[0];
+  // An older style of link (channel id + internal id); it redirects to the readable address
   const videoUrl = `/videos/${firstVideo.channelId}/${firstVideo.id}`;
 
-  test('video page loads with iframe', async ({ page }) => {
+  test('video page loads with iframe, at its readable address', async ({ page }) => {
     await page.goto(videoUrl);
-    await expect(page).toHaveURL(videoUrl);
+    // /videos/<title in Latin letters>/<YouTube id>: no %-codes
+    await expect(page).toHaveURL(videoPath(firstVideo));
+    expect(page.url()).not.toContain('%');
     // YouTube iframe should be present
-    await expect(page.locator('iframe[src*="youtube.com"]').first()).toBeAttached({ timeout: 8000 });
+    await expect(page.locator('iframe[src*="/embed/"]').first()).toBeAttached({ timeout: 8000 });
   });
 
   test('video page shows title', async ({ page }) => {
@@ -30,7 +34,7 @@ test.describe('Video detail page', () => {
 
   test('video page shows the player and actions', async ({ page }) => {
     await page.goto(videoUrl);
-    await expect(page.locator('iframe[src*="youtube.com"]').first()).toBeAttached({ timeout: 8000 });
+    await expect(page.locator('iframe[src*="/embed/"]').first()).toBeAttached({ timeout: 8000 });
     await expect(page.locator('body')).toBeVisible();
   });
 
@@ -51,6 +55,6 @@ test.describe('Video detail – loading state', () => {
   test('skeleton loaders appear briefly then resolve', async ({ page }) => {
     await page.goto(`/videos/${videoData[0].channelId}/${videoData[0].id}`);
     // Page should settle to actual content
-    await expect(page.locator('iframe[src*="youtube.com"]').first()).toBeAttached({ timeout: 8000 });
+    await expect(page.locator('iframe[src*="/embed/"]').first()).toBeAttached({ timeout: 8000 });
   });
 });

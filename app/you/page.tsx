@@ -18,7 +18,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OptionSelect } from "@/components/playlist-fields";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -242,22 +242,17 @@ export default function YouPage() {
                 <p className="text-[15px] font-medium">Default language</p>
                 <p className="text-[13px] text-muted-foreground">Used across the app</p>
               </div>
-              <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
-                <SelectTrigger className="w-full sm:w-48 h-10 rounded-full text-sm border bg-background hover:bg-muted transition-colors [&>svg]:ml-auto [&>svg]:h-4 [&>svg]:w-4 [&>svg]:opacity-70">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border shadow-lg">
-                  {mockLanguages.map((lang) => (
-                    <SelectItem
-                      key={lang.code}
-                      value={lang.code}
-                      className="cursor-pointer hover:bg-muted transition-colors focus:bg-muted"
-                    >
-                      {lang.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <OptionSelect
+                label="Language"
+                value={defaultLanguage}
+                onChange={setDefaultLanguage}
+                options={mockLanguages.map((lang) => ({
+                  value: lang.code,
+                  label: lang.name,
+                  description: lang.native !== lang.name ? lang.native : undefined,
+                }))}
+                className="sm:w-60"
+              />
             </div>
 
             {/* Divider */}

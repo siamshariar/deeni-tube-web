@@ -9,6 +9,7 @@ import { Search, Mic, X, UserCircle, History, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AccountDropdown from "@/components/account-dropdown";
 import NotificationDropdown from "@/components/notification-dropdown";
+import { VoiceSearchDialog } from "@/components/voice-search";
 import { cn } from "@/lib/utils";
 import { useHeader } from "@/app/contexts/header-context";
 
@@ -24,6 +25,7 @@ export default function AppHeader() {
   const [showDesktopRecent, setShowDesktopRecent] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const desktopSearchRef = useRef<HTMLDivElement>(null);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -217,7 +219,7 @@ export default function AppHeader() {
                       <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
                       <button type="button" onClick={clearRecent} className="text-xs text-primary hover:underline">Clear all</button>
                     </div>
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="yt-scrollbar max-h-64 overflow-y-auto">
                       {recentSearches.map(search => (
                         <div
                           key={search}
@@ -254,10 +256,15 @@ export default function AppHeader() {
               >
                 <Search className="w-6 h-6" />
               </Button>
-              <Button type="button" aria-label="Search with your voice" variant="ghost" size="icon" className="h-10 w-10 rounded-full ml-3 bg-muted hover:bg-accent flex-shrink-0">
+              <Button type="button" aria-label="Search with your voice" title="Search with your voice" onClick={() => { setShowDesktopRecent(false); setVoiceOpen(true); }} variant="ghost" size="icon" className="h-10 w-10 rounded-full ml-3 bg-muted hover:bg-accent flex-shrink-0">
                 <Mic className="w-6 h-6" />
               </Button>
             </form>
+            <VoiceSearchDialog
+              open={voiceOpen}
+              onOpenChange={setVoiceOpen}
+              onResult={(text) => { setVoiceOpen(false); handleRecentClick(text); }}
+            />
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">

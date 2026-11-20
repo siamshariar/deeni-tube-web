@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { getChannelHref } from "@/lib/channel-data";
 import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
 import { MoreButton } from "@/components/more-button";
+import { warmYouTube } from "@/lib/warm-youtube";
+import { videoPath } from "@/lib/video-url";
 
 interface VideoCardProps {
   isHorizontal?: boolean;
@@ -93,7 +95,7 @@ export default function VideoCard({
     });
   };
 
-  const videoUrl = `${window.location.origin}/videos/${channel}/${videoId}`;
+  const videoUrl = `${window.location.origin}${videoPath({ title, videoId })}`;
 
   if (hidden) return null;
 
@@ -145,7 +147,7 @@ export default function VideoCard({
     </>
   );
 
-  const videoLink = `/videos/${channel}/${videoId}`;
+  const videoLink = videoPath({ title, videoId });
   const channelLink = getChannelHref(channelId);
 
   // Three-dot menu (always visible): a bottom drawer on phones, a dropdown elsewhere
@@ -193,7 +195,7 @@ export default function VideoCard({
   if (isHorizontal) {
     // Phone list item: edge-to-edge thumbnail, details underneath (YouTube mobile)
     return (
-      <div className="flex flex-col">
+      <div className="flex flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
         <Link href={videoLink} className="block">
           <div className="relative aspect-video w-full bg-muted sm:overflow-hidden sm:rounded-xl">
             <Image src={thumbnail} alt={title} fill sizes="100vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
@@ -218,7 +220,7 @@ export default function VideoCard({
 
   // Grid card (YouTube home layout): rounded thumbnail, avatar + text below, no card chrome
   return (
-    <div className="group/card flex min-w-0 flex-col">
+    <div className="group/card flex min-w-0 flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
       <Link href={videoLink} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
           <Image

@@ -152,7 +152,7 @@ export default function AccountDropdown() {
         <DropdownMenuContent
           align="end"
           sideOffset={4}
-          className="w-[300px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-72px)] overflow-y-auto rounded-xl py-2"
+          className="yt-scrollbar w-[300px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-72px)] overflow-y-auto rounded-xl py-2"
         >
           {view === "main" ? (
             <>

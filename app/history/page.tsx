@@ -41,6 +41,7 @@ import { useHydrated } from "@/lib/local-store";
 
 import type { HistoryItem } from "@/lib/history-data";
 import { imagePriorityProps, priorityForIndex, type ImagePriority } from "@/lib/image-priority";
+import { videoPath } from "@/lib/video-url";
 const categories = [
   { id: "all", label: "All" },
   { id: "shorts", label: "Shorts" },
@@ -294,7 +295,7 @@ export default function HistoryPage() {
   const handleShare = (video: HistoryItem) => {
     const url = video.type === "short"
       ? `${window.location.origin}/shorts?v=${video.videoId}`
-      : `${window.location.origin}/videos/${video.channel}/${video.videoId || video.id}`;
+      : `${window.location.origin}${videoPath({ title: video.title, videoId: video.videoId || video.id })}`;
     setShareUrl(url);
     setShareModalOpen(true);
   };
@@ -305,7 +306,7 @@ export default function HistoryPage() {
   }));
 
   const hrefFor = (video: HistoryItem) =>
-    video.type === "short" ? `/shorts?v=${video.videoId}` : `/videos/${video.channel}/${video.videoId || video.id}`;
+    video.type === "short" ? `/shorts?v=${video.videoId}` : videoPath({ title: video.title, videoId: video.videoId || video.id });
 
   // YouTube history row: large thumbnail, 18px title, muted channel/views underneath
   const renderVideoItem = (video: HistoryItem, priority?: ImagePriority) => (
@@ -325,19 +326,20 @@ export default function HistoryPage() {
           </p>
           <p className="hidden text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5 md:block">{video.timeAgo}</p>
         </div>
-        <div className="-mr-2 flex flex-shrink-0 flex-col-reverse items-center md:-mt-1.5 md:flex-row">
-          {/* Always visible (phones have no hover) */}
+        <div className="-mr-2 -mt-2 flex flex-shrink-0 items-center md:-mt-1.5">
+          {/* As on YouTube: on phones there is no ✕ ("Remove from History" is in the ⋮ menu); on desktop the ✕
+              shows while the row is hovered or focused (always on touch screens, which can't hover) */}
           <button
             type="button"
             aria-label={`Remove "${video.title}" from history`}
             title="Remove from watch history"
             onClick={() => handleRemove(video.id)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent"
+            className="hidden h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent focus-visible:opacity-100 md:inline-flex can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-within:opacity-100"
           >
             <X className="h-6 w-6" />
           </button>
           {isMobile ? (
-            <MoreButton onClick={() => { setDrawerVideo(video); setHistoryDrawerOpen(true); }} className="-mt-1" />
+            <MoreButton onClick={() => { setDrawerVideo(video); setHistoryDrawerOpen(true); }} />
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -495,7 +497,7 @@ export default function HistoryPage() {
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
-                if (drawerVideo) router.push(drawerVideo.type === "short" ? `/shorts?v=${drawerVideo.videoId}` : `/videos/${drawerVideo.channel}/${drawerVideo.videoId || drawerVideo.id}`);
+                if (drawerVideo) router.push(hrefFor(drawerVideo));
                 setHistoryDrawerOpen(false);
               }}
             >

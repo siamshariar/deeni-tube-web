@@ -1,7 +1,7 @@
 // app/shorts/page.tsx
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useId, Suspense } from "react"
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { imagePriorityProps } from "@/lib/image-priority"
@@ -39,6 +39,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { MoreVertIcon } from "@/components/icons/more-vert-icon"
 
 import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { DescriptionText, hashtagHref } from "@/components/description-text"
 import { ReportDialog } from "@/components/report-dialog"
 import { toast } from "sonner"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -429,7 +431,7 @@ const commentsByVideo = loadComments()
 // Action buttons (like, comment, share...): white on a dark scrim over the video on phones and tablets;
 // beside the video on wider screens, as YouTube's grey round buttons (#f2f2f2 light / #272727 dark)
 const actionCircleClass =
-  "w-12 h-12 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent"
+  "w-12 h-12 short-screen:w-10 short-screen:h-10 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent"
 const actionLabelClass =
   "text-xs font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] lg:text-sm lg:font-normal lg:text-foreground lg:[text-shadow:none]"
 
@@ -512,7 +514,7 @@ function CommentSkeleton() {
 
 function DescriptionSkeleton() {
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin">
+    <div className="flex-1 overflow-y-auto yt-scrollbar">
       <div className="px-4 py-3 space-y-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-3/4" />
@@ -567,7 +569,7 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
             <span className="text-[13px] font-medium text-foreground">@{reply.user.split(' ')[0]}</span>
             <span className="text-xs text-muted-foreground">{reply.timeAgo}</span>
           </div>
-          <p className="text-sm text-foreground mt-0.5">{reply.content}</p>
+          <p className="text-sm text-foreground mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{reply.content}</p>
           <div className="flex items-center gap-2 mt-1.5">
             <button onClick={() => onLike(reply.parentId || '', reply.id)} className={cn("flex items-center gap-1.5 hover:bg-muted rounded-full px-2.5 py-1 transition-colors", isLiked ? "text-primary" : "text-muted-foreground")}>
               <ThumbsUp className={cn("h-4 w-4", isLiked && "fill-current")} />
@@ -653,7 +655,7 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
             <span className="text-[13px] font-medium text-foreground">@{comment.user.split(' ')[0]}</span>
             <span className="text-xs text-muted-foreground">{comment.timeAgo}</span>
           </div>
-          <p className="text-sm text-foreground mt-1">{comment.content}</p>
+          <p className="text-sm text-foreground mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{comment.content}</p>
           <div className="flex items-center gap-2 mt-2">
             <button onClick={() => onLikeComment(comment.id)} className={cn("flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors", isLiked ? "text-primary" : "text-muted-foreground")}>
               <ThumbsUp className={cn("h-5 w-5", isLiked && "fill-current")} />
@@ -756,7 +758,14 @@ function ShortsPageContent() {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  // A link to a short (/shorts?v=ID) starts right on it: only its player loads, with no jump from the first
+  // short (this content renders on the client, inside Suspense, so the search params are known here)
+  const [initialIndex] = useState(() => {
+    const v = searchParams.get("v")
+    const i = v ? shortsData.findIndex((short) => short.videoId === v) : -1
+    return i >= 0 ? i : 0
+  })
+  const [currentIndex, setCurrentIndex] = useState(initialIndex)
   // Media queries (not window.innerWidth) so server and first client render match
   const isDesktopViewport = useMediaQuery("(min-width: 768px)")
   const isWideViewport = useMediaQuery("(min-width: 1440px)")
@@ -785,7 +794,8 @@ function ShortsPageContent() {
   const commentsTimerRef = useRef<NodeJS.Timeout | null>(null)
   const descTimerRef = useRef<NodeJS.Timeout | null>(null)
   const videoRefs = useRef<Map<string, HTMLIFrameElement>>(new Map())
-  const hasScrolledToTarget = useRef(false)
+  // The ?v= value already shown (later changes, e.g. from a notification, scroll to the new short)
+  const shownVideoParamRef = useRef(searchParams.get("v"))
   // Set while a keyboard/arrow-button scroll is animating towards this index
   const scrollTargetRef = useRef<number | null>(null)
   const [videoCurrentTime, setVideoCurrentTime] = useState(0)
@@ -805,9 +815,21 @@ function ShortsPageContent() {
   const readyPlayersRef = useRef(new WeakSet<HTMLIFrameElement>())   // answered the 'listening' handshake
   const primedPlayersRef = useRef(new WeakSet<HTMLIFrameElement>())  // buffered their first frames while off screen
   const playerStatesRef = useRef(new WeakMap<HTMLIFrameElement, number>())
-  const currentIndexRef = useRef(0)
+  const currentIndexRef = useRef(initialIndex)
   const userPausedRef = useRef(false)
-  const autoplayFallbackRef = useRef<NodeJS.Timeout | null>(null)
+  // Checks after each switch that the active short really plays (see startPlayer)
+  const playWatchRef = useRef<NodeJS.Timeout | null>(null)
+  // Set once the active short has reported "playing" since it became active; until then, passing
+  // states (unstarted, cued, the paused state left by priming) don't flip the UI to "paused"
+  const activePlayedRef = useRef(false)
+  // Muted because the browser blocked sound (not by the visitor): the sound comes back at their next
+  // click, tap or key press
+  const [autoMuted, setAutoMuted] = useState(false)
+  const autoMutedRef = useRef(false)
+  // Clicks that turned the sound back on; a tap on the video that does this doesn't also pause it
+  const soundRestoringEventsRef = useRef(new WeakSet<Event>())
+  // Time of the last scroll event: a tap that stops a swipe isn't meant as play/pause
+  const lastScrollAtRef = useRef(0)
   // The active short's thumbnail stays on top until its player is actually playing
   const [startedId, setStartedId] = useState<string | null>(null)
   // Neighbouring players load once the first short has started, so they don't slow it down
@@ -855,24 +877,25 @@ function ShortsPageContent() {
 
   useEffect(() => { return () => { if (commentsTimerRef.current) clearTimeout(commentsTimerRef.current); if (descTimerRef.current) clearTimeout(descTimerRef.current) } }, [])
 
-  // Handle URL parameter - scroll to specific short by videoId
+  // Open on the linked short: scroll there before the first paint
+  useLayoutEffect(() => {
+    const c = containerRef.current
+    if (!c || initialIndex === 0) return
+    const sectionH = (c.firstElementChild as HTMLElement)?.offsetHeight || c.clientHeight
+    c.scrollTop = initialIndex * sectionH
+  }, [initialIndex])
+
+  // A new ?v= while the page is open: go to that short
   useEffect(() => {
-    const targetVideoId = searchParams.get('v')
-    if (targetVideoId && !hasScrolledToTarget.current) {
-      const targetIndex = shortsData.findIndex(short => short.videoId === targetVideoId)
-      if (targetIndex !== -1) {
-        hasScrolledToTarget.current = true
-        // Small delay to ensure container is rendered
-        setTimeout(() => {
-          setCurrentIndex(targetIndex)
-          const c = containerRef.current
-          if (c) {
-            const sh = (c.firstElementChild as HTMLElement)?.offsetHeight || c.clientHeight
-            c.scrollTo({ top: targetIndex * sh, behavior: "instant" as ScrollBehavior })
-          }
-        }, 100)
-      }
-    }
+    const v = searchParams.get("v")
+    if (!v || v === shownVideoParamRef.current) return
+    shownVideoParamRef.current = v
+    const targetIndex = shortsData.findIndex((short) => short.videoId === v)
+    const c = containerRef.current
+    if (targetIndex === -1 || !c) return
+    const sectionH = (c.firstElementChild as HTMLElement)?.offsetHeight || c.clientHeight
+    setCurrentIndex(targetIndex)
+    c.scrollTo({ top: targetIndex * sectionH, behavior: "instant" as ScrollBehavior })
   }, [searchParams])
 
   const loadCommentsForCurrentShort = () => {
@@ -920,6 +943,7 @@ function ShortsPageContent() {
       if (newIdx !== currentIndex) setCurrentIndex(newIdx)
     }
     const handleScroll = () => {
+      lastScrollAtRef.current = Date.now()
       setIsScrolling(true)
       if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
       // Fallback for browsers without the 'scrollend' event
@@ -961,6 +985,15 @@ function ShortsPageContent() {
     ping()
   }, [])
 
+  // Browsers only allow playback with sound once the visitor has clicked, tapped or pressed a key on the
+  // page (scrolling with the mouse wheel or a swipe doesn't count). Until then, play muted, as YouTube does.
+  const muteAutomatically = useCallback(() => {
+    isMutedRef.current = true
+    autoMutedRef.current = true
+    setIsMuted(true)
+    setAutoMuted(true)
+  }, [])
+
   // Start the active short's player with the current mute/volume/captions settings
   const startPlayer = useCallback((id: string) => {
     const iframe = videoRefs.current.get(id)
@@ -969,21 +1002,63 @@ function ShortsPageContent() {
     ytCommand(iframe, "setVolume", [volumeRef.current])
     if (captionsRef.current) ytCommand(iframe, "loadModule", ["captions"])
     ytCommand(iframe, "playVideo")
-    // Browsers block autoplay with sound until the visitor has interacted with the page.
-    // If playback hasn't started shortly after, start it muted instead (as YouTube does).
-    if (autoplayFallbackRef.current) clearTimeout(autoplayFallbackRef.current)
-    autoplayFallbackRef.current = setTimeout(() => {
-      if (shortsData[currentIndexRef.current]?.id !== id || userPausedRef.current || isMutedRef.current) return
+    // Watchdog: a play command can get lost while the player is busy (loading, seeking), which left shorts
+    // paused. Check that it really plays and ask again if not. If it still won't start, play muted as a last
+    // resort (normally the player reports a blocked autoplay right away: see onAutoplayBlocked below).
+    if (playWatchRef.current) clearTimeout(playWatchRef.current)
+    let attempts = 0
+    const check = () => {
+      playWatchRef.current = null
+      if (shortsData[currentIndexRef.current]?.id !== id || userPausedRef.current || !iframe.isConnected) return
       const state = playerStatesRef.current.get(iframe)
-      if (state === YT_PLAYING || state === YT_BUFFERING) return
-      isMutedRef.current = true
-      setIsMuted(true)
-      ytCommand(iframe, "mute")
-      ytCommand(iframe, "playVideo")
-    }, 1500)
-  }, [])
+      if (state === YT_PLAYING) return
+      attempts++
+      if (state !== YT_BUFFERING) {
+        if (attempts >= 3 && !isMutedRef.current) {
+          muteAutomatically()
+          ytCommand(iframe, "mute")
+        }
+        ytCommand(iframe, "playVideo")
+      }
+      if (attempts < 5) playWatchRef.current = setTimeout(check, 1000)
+      // Give up: show the play button, so a tap starts it
+      else if (state !== YT_BUFFERING) setIsPlaying(false)
+    }
+    playWatchRef.current = setTimeout(check, 1000)
+  }, [muteAutomatically])
 
-  useEffect(() => () => { if (autoplayFallbackRef.current) clearTimeout(autoplayFallbackRef.current) }, [])
+  useEffect(() => () => { if (playWatchRef.current) clearTimeout(playWatchRef.current) }, [])
+
+  // Turn the sound back on after it was muted automatically
+  const restoreSound = useCallback(() => {
+    if (!autoMutedRef.current) return false
+    autoMutedRef.current = false
+    setAutoMuted(false)
+    isMutedRef.current = false
+    setIsMuted(false)
+    const activeId = shortsData[currentIndexRef.current]?.id
+    if (activeId && !userPausedRef.current) startPlayer(activeId)
+    return true
+  }, [startPlayer])
+
+  // The visitor's first click or key press allows sound: bring it back (except on the mute button itself,
+  // which handles the click)
+  useEffect(() => {
+    const onInteract = (e: Event) => {
+      if (!autoMutedRef.current) return
+      if (e instanceof KeyboardEvent && (e.key === "Escape" || e.repeat)) return
+      if ((e.target as Element | null)?.closest?.("[data-mute-toggle]")) return
+      const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation
+      if (activation && !activation.hasBeenActive) return
+      if (restoreSound()) soundRestoringEventsRef.current.add(e)
+    }
+    window.addEventListener("click", onInteract, true)
+    window.addEventListener("keydown", onInteract, true)
+    return () => {
+      window.removeEventListener("click", onInteract, true)
+      window.removeEventListener("keydown", onInteract, true)
+    }
+  }, [restoreSound])
 
   // Neighbouring players load a moment after the first short starts, when the browser is idle, so
   // they don't compete with it (each YouTube player is a lot of script). Fallback: after 6s anyway.
@@ -1019,12 +1094,25 @@ function ShortsPageContent() {
 
       if ((d?.event === "onReady" || d?.event === "initialDelivery") && !readyPlayersRef.current.has(iframe)) {
         readyPlayersRef.current.add(iframe)
+        // Ask to be told when the browser blocks playback (YouTube only sends this event on request)
+        ytCommand(iframe, "addEventListener", ["onAutoplayBlocked"])
         if (isActivePlayer) startPlayer(id)
         else if (shortsData[currentIndexRef.current + 1]?.id === id) {
           // The next short: play it muted until it starts, then pause it (below) so it begins buffering
           ytCommand(iframe, "mute")
           ytCommand(iframe, "playVideo")
         }
+      }
+
+      if (d?.event === "onAutoplayBlocked") {
+        if (!isActivePlayer || userPausedRef.current) return
+        if (!isMutedRef.current) {
+          // Sound isn't allowed yet: play muted right away instead of sitting paused
+          muteAutomatically()
+          ytCommand(iframe, "mute")
+          ytCommand(iframe, "playVideo")
+        } else setIsPlaying(false) // even muted playback is blocked: show the play button
+        return
       }
 
       if ((d?.event !== "infoDelivery" && d?.event !== "initialDelivery") || !d.info) return
@@ -1049,15 +1137,19 @@ function ShortsPageContent() {
       }
       if (typeof state === "number") {
         if (state === YT_PLAYING) {
+          activePlayedRef.current = true
           setIsPlaying(true)
           setStartedId(id)
           scheduleNeighbors(1500)
-        } else if ([-1, 0, YT_PAUSED, 5].includes(state)) setIsPlaying(false)
+        }
+        // Only a real pause after it has played. Unstarted/cued/ended are passing states while switching
+        // or looping, and showed a "paused" short that was in fact starting.
+        else if (state === YT_PAUSED && activePlayedRef.current) setIsPlaying(false)
       }
     }
     window.addEventListener("message", onYTMessage)
     return () => window.removeEventListener("message", onYTMessage)
-  }, [startPlayer, scheduleNeighbors])
+  }, [startPlayer, scheduleNeighbors, muteAutomatically])
 
   // Switching shorts: reset progress, pause the one that left, play the new one
   useEffect(() => {
@@ -1070,6 +1162,8 @@ function ShortsPageContent() {
     setIsPlaying(true)
     setStartedId(null)
     userPausedRef.current = false
+    activePlayedRef.current = false
+    if (playWatchRef.current) clearTimeout(playWatchRef.current)
     videoRefs.current.forEach((iframe, id) => {
       if (id === activeId) return
       // Rewind it too, so it starts from the beginning if you scroll back
@@ -1201,6 +1295,13 @@ function ShortsPageContent() {
   }
   const handleTogglePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
+    const onVideo = !(e.currentTarget instanceof HTMLButtonElement)
+    if (onVideo) {
+      // This tap turned the sound back on ("Tap to unmute"): don't also pause
+      if (soundRestoringEventsRef.current.has(e.nativeEvent)) return
+      // A tap that stops a swipe isn't meant as play/pause
+      if (Date.now() - lastScrollAtRef.current < 250) return
+    }
     const newPlaying = !isPlaying
     setIsPlaying(newPlaying)
     userPausedRef.current = !newPlaying
@@ -1330,7 +1431,7 @@ function ShortsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <h1 className="sr-only">Shorts</h1>
       <style>{`
         @keyframes fadeInLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
@@ -1339,12 +1440,10 @@ function ShortsPageContent() {
         .animate-fade-in-left { animation: fadeInLeft 0.3s ease-out forwards; }
         .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
         .animate-play-feedback { animation: playFeedback 0.55s ease-out forwards; }
-        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-        .scrollbar-thin::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 3px; }
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-        /* Mobile: scale iframe to cover full container — eliminates letterbox black bars */
+        /* Mobile: the 9:16 player covers the whole box (cropping the overflow), so there are no black bars at
+           the sides when the screen is wider than 9:16, which it is on most phones once the nav bar is counted */
         @media (max-width: 767px) {
           .shorts-video-iframe {
             position: absolute;
@@ -1355,6 +1454,15 @@ function ShortsPageContent() {
             aspect-ratio: 9 / 16;
             min-width: 100%;
             width: auto;
+          }
+          @supports (width: 1cqw) {
+            .shorts-player-box { container-type: size; }
+            .shorts-video-iframe {
+              aspect-ratio: auto;
+              min-width: 0;
+              width: max(100cqw, 100cqh * 9 / 16);
+              height: max(100cqh, 100cqw * 16 / 9);
+            }
           }
         }
         /* Desktop: iframe fills the already-9:16 container — no bars needed */
@@ -1433,7 +1541,7 @@ function ShortsPageContent() {
             </div>
             {activePanel === "comments" && (
               <>
-                <div className="flex-1 overflow-y-auto px-4 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 yt-scrollbar">
                   {commentsLoading ? (
                     <><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /></>
                   ) : comments.length > 0 ? (
@@ -1479,17 +1587,17 @@ function ShortsPageContent() {
                 {descLoading ? (
                   <DescriptionSkeleton />
                 ) : currentShort ? (
-                  <div className="flex-1 overflow-y-auto scrollbar-thin">
-                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug">{currentShort.title}</h4></div>
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden yt-scrollbar">
+                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentShort.title}</h4></div>
                     <div className="px-4 pb-3 flex items-center gap-4">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Eye className="h-4 w-4" /><span>{currentShort.views} views</span></div>
                       <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Clock className="h-4 w-4" /><span>{currentShort.timeAgo}</span></div>
                     </div>
                     <div className="px-4 pb-4">
-                      <div className={`text-sm text-foreground whitespace-pre-wrap leading-relaxed ${!descExpanded ? 'line-clamp-4' : ''}`}>{currentShort.description}</div>
+                      <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
                       {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
                     </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-2">{currentShort.hashtags.map((tag: string) => <span key={tag} className="text-blue-600 dark:text-blue-400 text-sm hover:underline cursor-pointer">{tag}</span>)}</div>
+                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm hover:underline [overflow-wrap:anywhere]">{tag}</Link>)}</div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full"><p className="text-muted-foreground text-sm">No description available</p></div>
@@ -1504,7 +1612,7 @@ function ShortsPageContent() {
       {activePanel && (
         <div className="md:hidden fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-black/60" onClick={() => setActivePanel(null)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-card dark:bg-[#212121] rounded-t-2xl max-h-[70vh] flex flex-col animate-slide-up">
+          <div className="absolute bottom-0 left-0 right-0 bg-card dark:bg-[#212121] rounded-t-2xl max-h-[70dvh] flex flex-col overflow-hidden animate-slide-up">
             <div className="w-10 h-1 bg-muted-foreground/40 rounded-full mx-auto mt-3 mb-2 flex-shrink-0" />
             <div className="flex items-center justify-between px-4 py-2 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2"><h3 className="text-foreground text-lg font-bold">{panelTitle}</h3>{activePanel === "comments" && <span className="text-muted-foreground text-base">{totalCommentsCount}</span>}</div>
@@ -1512,7 +1620,7 @@ function ShortsPageContent() {
             </div>
             {activePanel === "comments" && (
               <>
-                <div className="flex-1 overflow-y-auto px-4 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 yt-scrollbar">
                   {commentsLoading ? (
                     <><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /></>
                   ) : comments.length > 0 ? (
@@ -1557,17 +1665,17 @@ function ShortsPageContent() {
                 {descLoading ? (
                   <DescriptionSkeleton />
                 ) : currentShort ? (
-                  <div className="flex-1 overflow-y-auto scrollbar-thin">
-                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug">{currentShort.title}</h4></div>
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden yt-scrollbar">
+                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentShort.title}</h4></div>
                     <div className="px-4 pb-3 flex items-center gap-4">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Eye className="h-4 w-4" /><span>{currentShort.views} views</span></div>
                       <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Clock className="h-4 w-4" /><span>{currentShort.timeAgo}</span></div>
                     </div>
                     <div className="px-4 pb-4">
-                      <div className={`text-sm text-foreground whitespace-pre-wrap leading-relaxed ${!descExpanded ? 'line-clamp-4' : ''}`}>{currentShort.description}</div>
+                      <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
                       {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
                     </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-2">{currentShort.hashtags.map((tag: string) => <span key={tag} className="text-blue-600 dark:text-blue-400 text-sm hover:underline cursor-pointer">{tag}</span>)}</div>
+                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm hover:underline [overflow-wrap:anywhere]">{tag}</Link>)}</div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-32"><p className="text-muted-foreground text-sm">No description available</p></div>
@@ -1582,7 +1690,9 @@ function ShortsPageContent() {
       {/* Main Shorts Content */}
       <div
         ref={containerRef}
-        className="fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll snap-y snap-mandatory overscroll-y-contain scrollbar-none transition-all duration-300 ease-in-out"
+        // overflow-x-hidden + touch-pan-y: the feed only moves up and down (the hidden action rails of the other
+        // shorts slide in from the right and must not make it pannable sideways)
+        className="fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll overflow-x-hidden touch-pan-y snap-y snap-mandatory overscroll-contain scrollbar-none transition-all duration-300 ease-in-out"
         style={{
           scrollSnapType: "y mandatory",
           left: isDesktopViewport ? `${desktopSidebarWidth}px` : "0px",
@@ -1600,7 +1710,7 @@ function ShortsPageContent() {
           const liked = isLikedShort(short.videoId)
           const saved = isShortSaved(short)
           return (
-            <section key={short.id} className="relative h-[calc(100vh-56px)] md:h-[calc(100vh-88px)] w-full snap-start snap-always flex items-center md:items-start justify-center bg-background">
+            <section key={short.id} className="relative h-full md:h-[calc(100%-32px)] w-full overflow-x-clip snap-start snap-always flex items-center md:items-start justify-center bg-background">
               {/* The video plus its action rail: side by side from lg up; on smaller screens the rail sits over the video */}
               <div className="relative w-full h-full md:w-auto md:h-[calc(100%-12px)] md:mt-2 flex items-end lg:gap-4">
                 <div
@@ -1609,7 +1719,8 @@ function ShortsPageContent() {
                   onMouseLeave={() => { setHoveredVideoId(null); setShowVolumeSlider(false); setShowMoreMenu(false) }}
                 >
                   {/* Video Player — overflow-hidden only here so the progress bar scrubber isn't clipped */}
-                  <div className="absolute inset-0 overflow-hidden md:rounded-2xl bg-black" onClick={handleTogglePlay}>
+                  {/* Tapping a short that isn't the active one (e.g. the next one peeking in) moves to it */}
+                  <div className="shorts-player-box absolute inset-0 overflow-hidden md:rounded-2xl bg-black" onClick={isActive ? handleTogglePlay : () => scrollToVideo(index)}>
                     {hasPlayer && (
                       <iframe
                         ref={(el) => {
@@ -1635,8 +1746,8 @@ function ShortsPageContent() {
                         alt={short.title}
                         fill
                         className="object-cover"
-                        // The first short's thumbnail is the main image until its player starts, so only it loads early
-                        {...(index === 0 ? imagePriorityProps("lcp") : { loading: "lazy" as const })}
+                        // The opening short's thumbnail is the main image until its player starts, so only it loads early
+                        {...(index === initialIndex ? imagePriorityProps("lcp") : { loading: "lazy" as const })}
                       />
                     </div>
                   </div>
@@ -1678,12 +1789,12 @@ function ShortsPageContent() {
                           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                         </button>
                         <div className="relative flex items-center" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-                          <button type="button" aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => setIsMuted(!isMuted)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) setIsMuted(!isMuted) }} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                             {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                           </button>
                           {showVolumeSlider && (
                             <div className="hidden md:flex items-center rounded-full px-3 py-2 ml-1 shadow-lg" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-                              <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
+                              <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); autoMutedRef.current = false; setAutoMuted(false); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
                             </div>
                           )}
                         </div>
@@ -1731,6 +1842,20 @@ function ShortsPageContent() {
                     </div>
                   </div>
 
+                  {/* Muted because the browser didn't allow sound yet: one tap brings it back (as on YouTube) */}
+                  {isActive && autoMuted && !isScrolling && (
+                    <button
+                      type="button"
+                      data-mute-toggle
+                      onClick={(e) => { e.stopPropagation(); restoreSound() }}
+                      className="absolute left-1/2 top-16 z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                    >
+                      <VolumeX className="h-5 w-5" />
+                      <span className="md:hidden">Tap to unmute</span>
+                      <span className="hidden md:inline">Click to unmute</span>
+                    </button>
+                  )}
+
                   {/* Bottom info & actions */}
                   <div className={`absolute bottom-8 md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
                     <div className="flex items-center gap-2.5 mb-2">
@@ -1741,7 +1866,7 @@ function ShortsPageContent() {
                       <span className="text-white font-medium text-[15px] truncate">{short.channel}</span>
                     </div>
                     <button onClick={() => openPanel("description")} className="text-left w-full">
-                      <p className="text-white text-[15px] leading-snug line-clamp-2 hover:underline">{short.title}</p>
+                      <p className="text-white text-[15px] leading-snug line-clamp-2 [overflow-wrap:anywhere] hover:underline">{short.title}</p>
                     </button>
                   </div>
 
@@ -1828,7 +1953,7 @@ function ShortsPageContent() {
                 </div>
                 {/* Actions: over the video on phones/tablets, beside it on wider screens (as on YouTube) */}
                 <div className={cn(
-                  "absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5 transition-all duration-500",
+                  "absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5 short-screen:bottom-24 short-screen:gap-3 transition-all duration-500",
                   "lg:static lg:z-auto lg:flex-shrink-0 lg:gap-4 lg:mb-1",
                   isActive && !isScrolling ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
                 )}>

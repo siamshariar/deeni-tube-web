@@ -1,7 +1,7 @@
 // app/playlists/[slug]/[id]/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -47,14 +47,11 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShareModal } from "@/components/share-modal";
+import { DescriptionText } from "@/components/description-text";
+import { YouTubePlayer } from "@/components/youtube-player";
+import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -79,6 +76,7 @@ const MENU_ITEM = "flex items-center gap-4 px-4 py-2 text-sm cursor-pointer";
 const DRAWER_ITEM = "flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer";
 
 import type { CommentReply } from "@/lib/types";
+import { videoPath } from "@/lib/video-url";
 // ─── Mock comments ─────────────────────────────────
 const mockCommentsWithReplies = [
   {
@@ -350,10 +348,6 @@ export default function PlaylistDetailPage() {
   // Live order while dragging; persisted on drop
   const [dragOrder, setDragOrder] = useState<VideoItem[] | null>(null);
   const videos = dragOrder ?? savedVideos;
-  const videosRef = useRef(videos);
-  useEffect(() => {
-    videosRef.current = videos;
-  }, [videos]);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const isLoading = !hydrated;
@@ -385,37 +379,6 @@ export default function PlaylistDetailPage() {
   const [showReportDialog, setShowReportDialog] = useState(false);
 
   const [autoPlay, setAutoPlay] = useState(true);
-  const mobileIframeRef = useRef<HTMLIFrameElement>(null);
-  const desktopIframeRef = useRef<HTMLIFrameElement>(null);
-
-  const registerListener = useCallback((iframe: HTMLIFrameElement | null) => {
-    if (!iframe?.contentWindow) return;
-    setTimeout(() => {
-      iframe.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1 }), "https://www.youtube.com");
-    }, 800);
-  }, []);
-
-  // Auto-advance on video end via YouTube postMessage
-  useEffect(() => {
-    const handleMessage = (e: MessageEvent) => {
-      if (e.origin !== "https://www.youtube.com") return;
-      try {
-        const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-        if (data?.event === "infoDelivery" && data?.info?.playerState === 0) {
-          if (autoPlay) {
-            setCurrentVideoId((prevId) => {
-              const list = videosRef.current;
-              const i = Math.max(0, list.findIndex((v) => v.id === prevId));
-              return i < list.length - 1 ? list[i + 1].id : prevId;
-            });
-          }
-        }
-      } catch {}
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [autoPlay]);
-
   const filteredVideos = useMemo(() => {
     if (!searchQuery) return videos;
     return videos.filter(
@@ -426,6 +389,21 @@ export default function PlaylistDetailPage() {
   }, [videos, searchQuery]);
 
   const currentVideo = videos.find((v) => v.id === currentVideoId) ?? videos[0];
+  const currentIndex = currentVideo ? videos.findIndex((v) => v.id === currentVideo.id) : -1;
+  const nextVideo = currentIndex >= 0 ? videos[currentIndex + 1] : undefined;
+  // The player moves on to the next video at the end when Autoplay (the switch in the playlist panel, also in
+  // the player) is on; otherwise it shows its end screen with Replay and "Up next"
+  const player = currentVideo ? (
+    <YouTubePlayer
+      key={currentVideo.id}
+      videoId={currentVideo.videoId}
+      title={currentVideo.title}
+      autoplay={autoPlay}
+      onAutoplayChange={setAutoPlay}
+      onNext={nextVideo ? () => setCurrentVideoId(nextVideo.id) : undefined}
+      upNext={nextVideo ? { title: nextVideo.title, channel: nextVideo.channel, videoId: nextVideo.videoId } : null}
+    />
+  ) : null;
 
   useEffect(() => {
     if (currentVideo) recordWatch(historyEntryForVideo(currentVideo));
@@ -711,42 +689,17 @@ export default function PlaylistDetailPage() {
 
       {/* Mobile: full-width video (edge-to-edge) */}
       {isMobile && (
-        <div className="w-full bg-black">
-          <div className="relative w-full aspect-video">
-            <iframe
-              ref={mobileIframeRef}
-              key={`mobile-${currentVideo?.id}`}
-              src={`https://www.youtube.com/embed/${currentVideo?.videoId || "5qap5aO4i9A"}?autoplay=1&enablejsapi=1`}
-              title={currentVideo?.title || "Video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="absolute inset-0 w-full h-full"
-              onLoad={() => registerListener(mobileIframeRef.current)}
-            />
-          </div>
-        </div>
+        <div className="relative w-full aspect-video bg-black">{player}</div>
       )}
 
       <div className="pb-6">
-        <div className="px-3 md:pt-4 md:px-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1 min-w-0">
-              {/* Desktop video player */}
+        <div className="px-3 md:pt-6 md:px-6">
+          {/* YouTube's watch layout (see components/watch-layout.ts) */}
+          <div className={WATCH_COLUMNS}>
+            <div className={WATCH_PRIMARY}>
+              {/* Desktop video player: always exactly 16:9, so no black bars at the sides */}
               {!isMobile && (
-                <div className="w-full bg-black rounded-xl overflow-hidden">
-                  <div className="relative w-full aspect-video md:max-h-[75vh] md:mx-auto">
-                    <iframe
-                      ref={desktopIframeRef}
-                      key={`desktop-${currentVideo?.id}`}
-                      src={`https://www.youtube.com/embed/${currentVideo?.videoId || "5qap5aO4i9A"}?autoplay=1&enablejsapi=1`}
-                      title={currentVideo?.title || "Video"}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="absolute inset-0 w-full h-full"
-                      onLoad={() => registerListener(desktopIframeRef.current)}
-                    />
-                  </div>
-                </div>
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">{player}</div>
               )}
 
               {currentVideo && (
@@ -834,29 +787,26 @@ export default function PlaylistDetailPage() {
                         </button>
                       </>
                     ) : (
-                      <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{currentVideo.description}</p>
+                      <DescriptionText text={currentVideo.description} className="mt-1" />
                     )}
                   </div>
 
-                  {/* Description Modal for Mobile */}
-                  <Dialog open={descriptionModalOpen} onOpenChange={setDescriptionModalOpen}>
-                    <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto [&>button.absolute]:hidden">
-                      <button
-                        onClick={() => setDescriptionModalOpen(false)}
-                        className="rounded-full p-1 hover:bg-muted transition-colors z-10"
-                        style={{ position: "absolute", top: "10px", right: "10px" }}
-                        aria-label="Close"
-                      >
-                        <X className="h-6 w-6" />
-                      </button>
-                      <DialogHeader>
-                        <DialogTitle>Description</DialogTitle>
-                      </DialogHeader>
-                      <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                        {currentVideo.description}
+                  {/* Description for phones: a sheet from the bottom, as on YouTube */}
+                  <Drawer open={descriptionModalOpen} onOpenChange={setDescriptionModalOpen}>
+                    <DrawerContent accessibleTitle={null} className="max-h-[85dvh] px-0">
+                      <div className="flex flex-shrink-0 items-center justify-between border-b px-4 py-1">
+                        <DrawerTitle className="text-lg font-bold">Description</DrawerTitle>
+                        <button type="button" onClick={() => setDescriptionModalOpen(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent">
+                          <X className="h-6 w-6" />
+                        </button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
+                      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 pt-3">
+                        <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentVideo.title}</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">{currentVideo.views} · {currentVideo.timeAgo}</p>
+                        <DescriptionText text={currentVideo.description} className="mt-3 text-sm leading-relaxed" />
+                      </div>
+                    </DrawerContent>
+                  </Drawer>
 
                   {/* Comments section — commented out; remove the false && wrapper to re-enable */}
                   {false && (<div className="mt-4">
@@ -1018,7 +968,7 @@ export default function PlaylistDetailPage() {
                 "rounded-xl border bg-card overflow-hidden",
                 isMobile
                   ? "flex-1 min-h-0 flex flex-col"
-                  : "lg:w-[402px] flex-shrink-0 self-start"
+                  : cn(WATCH_SECONDARY, "self-start")
               )}
             >
               <div className="flex-shrink-0 bg-muted/60 px-4 pb-2 pt-3">
@@ -1225,10 +1175,16 @@ export default function PlaylistDetailPage() {
                         </p>
                       </div>
 
-                      {/* Three-dot — always visible */}
+                      {/* Three-dot: compact; with a mouse only shown on row hover/focus or while open (always shown on touch screens) */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <MoreButton aria-label={`More actions for ${video.title}`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="-ml-1 self-start" />
+                          <MoreButton
+                            size="sm"
+                            aria-label={`More actions for ${video.title}`}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="-ml-1 self-start can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-within:opacity-100 data-[state=open]:opacity-100"
+                          />
                         </DropdownMenuTrigger>
                         {/* Menu is portaled, but React still bubbles its clicks to the row; stop that */}
                         <DropdownMenuContent align="end" className="w-56 rounded-xl py-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
@@ -1259,7 +1215,7 @@ export default function PlaylistDetailPage() {
       <ShareModal
         isOpen={showVideoShareModal}
         onClose={() => setShowVideoShareModal(false)}
-        videoUrl={currentVideo && typeof window !== "undefined" ? `${window.location.origin}/videos/${encodeURIComponent(currentVideo.channel)}/${currentVideo.videoId}` : ""}
+        videoUrl={currentVideo && typeof window !== "undefined" ? `${window.location.origin}${videoPath(currentVideo)}` : ""}
       />
       {currentVideo && (
         <>

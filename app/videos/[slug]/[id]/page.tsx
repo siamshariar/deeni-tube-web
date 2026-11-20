@@ -37,13 +37,12 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { ShareModal } from "@/components/share-modal";
+import { DescriptionText } from "@/components/description-text";
+import { YouTubePlayer } from "@/components/youtube-player";
+import { warmYouTube } from "@/lib/warm-youtube";
+import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
+import { cn } from "@/lib/utils";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -56,6 +55,7 @@ import { videoData, VideoItem } from "@/lib/video-data"; // ✅ shared data
 import type { CommentReply } from "@/lib/types";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { getChannelHref } from "@/lib/channel-data";
+import { videoPath } from "@/lib/video-url";
 
 // YouTube-style action pill (36px tall, 24px icon) and round icon button
 const PILL =
@@ -354,7 +354,12 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 767px)");
 
-  const relatedVideos = useMemo(() => videoData.filter((v) => v.id !== mainVideo.id), [mainVideo.id]);
+  // The videos after this one in the catalogue, then the rest: "Up next" (and Autoplay) works through all of
+  // them instead of bouncing between two
+  const relatedVideos = useMemo(() => {
+    const i = videoData.findIndex((v) => v.id === mainVideo.id);
+    return [...videoData.slice(i + 1), ...videoData.slice(0, Math.max(0, i))];
+  }, [mainVideo.id]);
 
   useEffect(() => {
     recordWatch(historyEntryForVideo(mainVideo));
@@ -494,8 +499,16 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
     toast.success("Reply added");
   };
 
-  // Auto-play URL – standard YouTube controls visible
-  const videoSrc = `https://www.youtube.com/embed/${mainVideo.videoId}?autoplay=1`;
+  // After this video: the first related one ("Up next" on our end screen, with an Autoplay countdown)
+  const nextVideo = relatedVideos[0];
+  const player = (
+    <YouTubePlayer
+      videoId={mainVideo.videoId}
+      title={mainVideo.title}
+      upNext={nextVideo ? { title: nextVideo.title, channel: nextVideo.channel, videoId: nextVideo.videoId, href: videoPath(nextVideo) } : null}
+      onNext={nextVideo ? () => router.push(videoPath(nextVideo)) : undefined}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-background pt-14">
@@ -515,40 +528,15 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
       )}
 
       {/* Main content */}
-      <div className="md:pt-4 pb-6">
-        {/* Mobile: full-width video */}
-        {isMobile && (
-          <div className="w-full bg-black">
-            <div className="relative w-full aspect-video">
-              <iframe
-                src={videoSrc}
-                title={mainVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
+      <div className="md:pt-6 pb-6">
+        {/* Content: YouTube's watch layout (see components/watch-layout.ts) */}
         <div className="px-3 md:px-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1 min-w-0">
-              {/* Desktop video player */}
-              {!isMobile && (
-                <div className="w-full bg-black rounded-xl overflow-hidden">
-                  <div className="relative w-full aspect-video md:max-h-[75vh] md:mx-auto">
-                    <iframe
-                      src={videoSrc}
-                      title={mainVideo.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="absolute inset-0 w-full h-full"
-                    />
-                  </div>
-                </div>
-              )}
+          <div className={WATCH_COLUMNS}>
+            <div className={WATCH_PRIMARY}>
+              {/* The player, always exactly 16:9 (so YouTube adds no black bars at the sides): edge to edge on
+                  phones, rounded on bigger screens. One element placed with CSS rather than a phone/desktop
+                  switch in JS, so the server-rendered page already shows it (and its thumbnail) in place. */}
+              <div className="relative -mx-3 aspect-video bg-black md:mx-0 md:w-full md:overflow-hidden md:rounded-xl">{player}</div>
 
               {/* Video info (YouTube watch page layout) */}
               <div className="mt-3">
@@ -636,7 +624,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                     </>
                   ) : showFullDescription || (mainVideo.description?.length ?? 0) <= 150 ? (
                     <>
-                      <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{mainVideo.description}</p>
+                      <DescriptionText text={mainVideo.description} className="mt-1" />
                       {(mainVideo.description?.length ?? 0) > 150 && (
                         <button
                           type="button"
@@ -661,25 +649,22 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                   )}
                 </div>
 
-                {/* Description Modal for Mobile */}
-                <Dialog open={descriptionModalOpen} onOpenChange={setDescriptionModalOpen}>
-                  <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto [&>button.absolute]:hidden">
-                    <button
-                      onClick={() => setDescriptionModalOpen(false)}
-                      className="rounded-full p-1 hover:bg-muted transition-colors z-10"
-                      style={{ position: "absolute", top: "10px", right: "10px" }}
-                      aria-label="Close"
-                    >
-                      <X className="h-6 w-6" />
-                    </button>
-                    <DialogHeader>
-                      <DialogTitle>Description</DialogTitle>
-                    </DialogHeader>
-                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {mainVideo.description}
+                {/* Description for phones: a sheet from the bottom, as on YouTube */}
+                <Drawer open={descriptionModalOpen} onOpenChange={setDescriptionModalOpen}>
+                  <DrawerContent accessibleTitle={null} className="max-h-[85dvh] px-0">
+                    <div className="flex flex-shrink-0 items-center justify-between border-b px-4 py-1">
+                      <DrawerTitle className="text-lg font-bold">Description</DrawerTitle>
+                      <button type="button" onClick={() => setDescriptionModalOpen(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent">
+                        <X className="h-6 w-6" />
+                      </button>
                     </div>
-                  </DialogContent>
-                </Dialog>
+                    <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 pt-3">
+                      <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere]">{mainVideo.title}</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">{mainVideo.views} · {mainVideo.timeAgo}</p>
+                      <DescriptionText text={mainVideo.description} className="mt-3 text-sm leading-relaxed" />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
 
                 {/* Comments section — commented out; remove the false && wrapper to re-enable */}
                 {false && (<div className="mt-4">
@@ -891,17 +876,27 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
 
             {/* Related Videos – Desktop */}
             {!isMobile && (
-              <aside className="lg:w-[402px] flex-shrink-0" aria-labelledby="related-heading">
-                <h2 id="related-heading" className="mb-3 text-base font-medium">Related videos</h2>
-                <div className="space-y-2">
+              <aside
+                className={cn(WATCH_SECONDARY, "min-[1016px]:sticky min-[1016px]:top-20 min-[1016px]:flex min-[1016px]:max-h-[calc(100vh-104px)] min-[1016px]:flex-col min-[1016px]:self-start")}
+                aria-labelledby="related-heading"
+              >
+                {/* Beside the player (from 1016px) the list stays in view and scrolls on its own, with the thin
+                    scrollbar, so the page itself only scrolls as far as the description */}
+                <h2 id="related-heading" className="mb-3 flex-shrink-0 text-base font-medium">Related videos</h2>
+                <div
+                  tabIndex={0}
+                  aria-label="Related videos list"
+                  className="yt-scrollbar space-y-2 focus-visible:outline-none min-[1016px]:-mr-2 min-[1016px]:min-h-0 min-[1016px]:flex-1 min-[1016px]:overflow-y-auto min-[1016px]:overflow-x-hidden min-[1016px]:overscroll-contain min-[1016px]:pr-2"
+                >
                   {relatedVideos.map((v) => (
-                    <div key={v.id} className="group/rel relative flex gap-2">
-                      <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative h-[94px] w-[168px] flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                        <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
+                    <div key={v.id} className="group/rel relative flex gap-2" onPointerEnter={warmYouTube}>
+                      {/* Big thumbnails, as on YouTube: 46% of the column, 168–236px wide, 16:9 */}
+                      <Link href={videoPath(v)} className="relative aspect-video w-[46%] min-w-[168px] max-w-[236px] flex-shrink-0 self-start overflow-hidden rounded-lg bg-muted">
+                        <Image src={youtubeThumb(v.videoId)} alt={v.title} fill className="object-cover" />
                         <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
                       </Link>
                       <div className="min-w-0 flex-1 pr-7">
-                        <Link href={`/videos/${v.channel}/${v.videoId}`} className="block">
+                        <Link href={videoPath(v)} className="block">
                           <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
                         </Link>
                         <Link href={getChannelHref(v.channelId)} className="mt-1 block truncate text-[13px] leading-[18px] text-muted-foreground hover:text-foreground">{v.channel}</Link>
@@ -909,7 +904,12 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <MoreButton onClick={(e) => e.stopPropagation()} className="absolute -right-2 -top-1.5" />
+                          {/* As on YouTube: compact, and with a mouse only shown while the row is hovered or the menu is open (always shown on touch screens) */}
+                          <MoreButton
+                            size="sm"
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute -right-2 -top-1 can-hover:opacity-0 can-hover:group-hover/rel:opacity-100 can-hover:group-focus-within/rel:opacity-100 data-[state=open]:opacity-100"
+                          />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => toggleWatchLater(v)}><Clock className="h-5 w-5" /> {isInWatchLater(v.id) ? "Remove from Watch later" : "Save to Watch later"}</DropdownMenuItem>
@@ -933,13 +933,13 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
             <div className="space-y-3">
               {relatedVideos.map((v) => (
                 <div key={v.id} className="flex gap-3">
-                  <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-40 aspect-video flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <Link href={videoPath(v)} className="relative w-40 aspect-video flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                     {/* Lazy on purpose: preloading the first one measured worse (it competes with the YouTube player) */}
                     <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
                     <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
                   </Link>
                   <div className="min-w-0 flex-1">
-                    <Link href={`/videos/${v.channel}/${v.videoId}`} className="block">
+                    <Link href={videoPath(v)} className="block">
                       <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
                     </Link>
                     <p className="mt-1 truncate text-[13px] leading-[18px] text-muted-foreground">{v.channel}</p>
@@ -972,7 +972,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
           typeof window === "undefined"
             ? ""
             : selectedRelatedVideo
-              ? `${window.location.origin}/videos/${encodeURIComponent(selectedRelatedVideo.channel)}/${selectedRelatedVideo.videoId}`
+              ? `${window.location.origin}${videoPath(selectedRelatedVideo)}`
               : window.location.href
         }
       />

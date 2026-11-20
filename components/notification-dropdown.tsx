@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { videoPathForId } from "@/lib/video-url";
 
 // ── Notification Data ──
 interface Notification {
@@ -49,7 +50,7 @@ const notifications: Notification[] = [
     message: "uploaded: ইসলামিক হালাকা : শেষ জামানার ফিতনা",
     timeAgo: "2 hours ago",
     thumbnail: "https://img.youtube.com/vi/XVscS6piz9A/hqdefault.jpg",
-    link: "/videos/Dr. Mohammad Monzur-E-Elahi/XVscS6piz9A",
+    link: videoPathForId("XVscS6piz9A"),
     isUnread: true,
     type: "upload",
   },
@@ -60,7 +61,7 @@ const notifications: Notification[] = [
     message: "uploaded: জীবন ঘনিষ্ঠ গুরুত্বপূর্ণ কিছু প্রশ্নোত্তর",
     timeAgo: "5 hours ago",
     thumbnail: "https://img.youtube.com/vi/908GzCFuysY/hqdefault.jpg",
-    link: "/videos/Dr. Khandaker Abdullah Jahangir Rh./908GzCFuysY",
+    link: videoPathForId("908GzCFuysY"),
     isUnread: true,
     type: "upload",
   },
@@ -71,7 +72,7 @@ const notifications: Notification[] = [
     message: "uploaded: How to Enter Paradise in the Eyes of Islam",
     timeAgo: "1 day ago",
     thumbnail: "https://img.youtube.com/vi/XNojvAddjL8/hqdefault.jpg",
-    link: "/videos/Dr Zakir Naik/XNojvAddjL8",
+    link: videoPathForId("XNojvAddjL8"),
     isUnread: true,
     type: "upload",
   },
@@ -82,7 +83,7 @@ const notifications: Notification[] = [
     message: "uploaded: তরুণদের জন্য কুরআন-সুন্নাহ নির্দেশনা (পর্ব-১)",
     timeAgo: "2 days ago",
     thumbnail: "https://img.youtube.com/vi/UugARckPloo/hqdefault.jpg",
-    link: "/videos/Dr. Mohammad Monzur-E-Elahi/UugARckPloo",
+    link: videoPathForId("UugARckPloo"),
     isUnread: false,
     type: "upload",
   },
@@ -93,7 +94,7 @@ const notifications: Notification[] = [
     message: "uploaded: আত্মার তৃপ্তি কোথায়?",
     timeAgo: "3 days ago",
     thumbnail: "https://img.youtube.com/vi/rtVnA9EA0xg/hqdefault.jpg",
-    link: "/videos/Dr. Khandaker Abdullah Jahangir Rh./rtVnA9EA0xg",
+    link: videoPathForId("rtVnA9EA0xg"),
     isUnread: false,
     type: "upload",
   },
@@ -104,7 +105,7 @@ const notifications: Notification[] = [
     message: "uploaded: খ্রিস্টান শিক্ষক VS ডাঃ জাকির নায়েক",
     timeAgo: "4 days ago",
     thumbnail: "https://img.youtube.com/vi/wli20ZZztF4/hqdefault.jpg",
-    link: "/videos/Dr Zakir Naik/wli20ZZztF4",
+    link: videoPathForId("wli20ZZztF4"),
     isUnread: false,
     type: "upload",
   },
@@ -115,7 +116,7 @@ const notifications: Notification[] = [
     message: "uploaded: প্রকৃত ঈমানদার ও তাকওয়াবান ব্যক্তির গুণাবলি",
     timeAgo: "5 days ago",
     thumbnail: "https://img.youtube.com/vi/gZ3C_UO_tZM/hqdefault.jpg",
-    link: "/videos/Dr. Mohammad Monzur-E-Elahi/gZ3C_UO_tZM",
+    link: videoPathForId("gZ3C_UO_tZM"),
     isUnread: false,
     type: "upload",
   },
@@ -137,7 +138,7 @@ const notifications: Notification[] = [
     message: "uploaded: জুমু'আর খুতবাহ : কুরআন মুখী জীবন",
     timeAgo: "1 week ago",
     thumbnail: "https://img.youtube.com/vi/EtlK09Ikq4o/hqdefault.jpg",
-    link: "/videos/Dr. Mohammad Monzur-E-Elahi/EtlK09Ikq4o",
+    link: videoPathForId("EtlK09Ikq4o"),
     isUnread: false,
     type: "upload",
   },
@@ -205,7 +206,7 @@ export default function NotificationDropdown() {
       >
         {/* Header */}
         <div className="flex h-12 items-center justify-between border-b pl-4 pr-2">
-          <h2 className="text-base">Notifications</h2>
+          <h2 className="text-base font-medium leading-[22px]">Notifications</h2>
           <button
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent transition-colors"
             aria-label="Notification settings"
@@ -217,7 +218,7 @@ export default function NotificationDropdown() {
 
         {/* Content: a fixed height from the first frame, so the panel opens at full size (as on YouTube)
             and the placeholder rows fill it while loading, instead of growing afterwards */}
-        <div className="h-[min(560px,calc(100dvh-120px))] overflow-y-auto overscroll-contain py-2">
+        <div className="yt-scrollbar h-[min(560px,calc(100dvh-120px))] overflow-y-auto overscroll-contain py-2">
           {isLoading ? (
             <div aria-busy="true" aria-label="Loading notifications">
               {Array.from({ length: 8 }).map((_, i) => (

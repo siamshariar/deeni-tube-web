@@ -29,6 +29,7 @@ import { scholarData } from "@/lib/scholar-data";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { SEARCH_LANGUAGES, getDefaultSearchLangs, isDefaultSearchLangs, parseSearchLangs } from "@/lib/search-languages";
+import { videoPath } from "@/lib/video-url";
 
 // ── Static data ──────────────────────────────────────────────────────────────
 
@@ -186,7 +187,7 @@ function ResultList({
       {results.map(video => (
         <div key={video.id} className="flex gap-3 md:gap-4 group">
           <Link
-            href={`/videos/${video.channel}/${video.videoId}`}
+            href={videoPath(video)}
             className="relative w-40 sm:w-60 md:w-80 lg:w-[360px] aspect-video flex-shrink-0 rounded-xl overflow-hidden bg-muted"
           >
             <Image
@@ -202,7 +203,7 @@ function ResultList({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <Link href={`/videos/${video.channel}/${video.videoId}`}>
+                <Link href={videoPath(video)}>
                   <h3 className="line-clamp-2 text-[15px] font-medium leading-5 md:text-base md:leading-[22px]">
                     {video.title}
                   </h3>
@@ -443,7 +444,7 @@ function SearchPageContent() {
     window.dispatchEvent(new CustomEvent("open-search-modal"));
 
   const handleShare = (video: VideoItem) => {
-    setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`);
+    setShareUrl(`${window.location.origin}${videoPath(video)}`);
     setShareModalOpen(true);
   };
 

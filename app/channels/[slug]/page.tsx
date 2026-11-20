@@ -42,6 +42,7 @@ import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
 
 import { useDontRecommend } from "@/hooks/useDontRecommend";
 import type { ChannelShort } from "@/lib/types";
+import { DescriptionText } from "@/components/description-text";
 // Mock shorts data - combine from shorts-data.ts and add more
 const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
@@ -532,9 +533,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
         <div className="px-3 py-6 max-w-2xl space-y-4">
           <div className="p-4 border rounded-xl bg-card">
             <h2 className="text-base font-semibold mb-2">Description</h2>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-              {channel.description || "No description provided."}
-            </p>
+            <DescriptionText text={channel.description || "No description provided."} className="text-sm text-muted-foreground leading-relaxed" />
           </div>
           <div className="p-4 border rounded-xl bg-card">
             <h3 className="text-base font-semibold mb-3">Details</h3>

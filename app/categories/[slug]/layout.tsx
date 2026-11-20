@@ -5,6 +5,11 @@ import { categoryData } from "@/lib/video-data";
 
 const findCategory = (slug: string) => categoryData.find((c) => c.slug === decodeURIComponent(slug));
 
+// Pre-rendered at build time so links prefetch them in full and they open instantly
+export function generateStaticParams() {
+  return categoryData.map((c) => ({ slug: c.slug }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   return { title: pageTitle(findCategory(slug)?.name ?? "Category not found") };

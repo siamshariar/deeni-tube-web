@@ -36,6 +36,7 @@ import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 
 import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
 import { youtubeThumb } from "@/lib/media-lookup";
+import { videoPath } from "@/lib/video-url";
 type SortOption =
   | "manual"
   | "date-added-newest"
@@ -73,7 +74,7 @@ const parseTimeAgo = (timeAgo: string): number => {
 };
 
 const ytId = (v: WatchLaterVideo) => v.videoId ?? v.id;
-const videoHref = (v: WatchLaterVideo) => `/videos/${v.channel}/${ytId(v)}`;
+const videoHref = (v: WatchLaterVideo) => videoPath({ title: v.title, videoId: ytId(v) });
 
 export default function WatchLaterPage() {
   const router = useRouter();

@@ -1,0 +1,52 @@
+import { Page } from '@playwright/test';
+
+// A fake YouTube embed for tests: it speaks the same postMessage protocol as the real player (answers the
+// 'listening' handshake, reports player states, takes commands), so autoplay rules, lost commands and the
+// end of a video can be tested exactly. Like a browser, it refuses to play with sound until sound is allowed.
+// In the frame: window.__player() → { playing, muted }, window.__end() ends the video, window.__commands lists
+// the commands received.
+
+const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean) => `<!doctype html><html><body><script>
+  let muted = false, state = -1, listening = false, dropFirstPlay = ${dropFirstPlay}, time = 0, rate = 1, volume = 100;
+  const subscribed = new Set();
+  window.__allowSound = ${allowSound};
+  window.__commands = [];
+  const send = (m) => parent.postMessage(JSON.stringify(m), '*');
+  const info = () => ({ playerState: state, currentTime: time, duration: 30, muted, volume, playbackRate: rate });
+  const setState = (s, t = time) => { state = s; time = t; send({ event: 'infoDelivery', info: info() }); };
+  window.addEventListener('message', (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (d.event === 'listening') {
+      if (!listening) { listening = true; send({ event: 'initialDelivery', info: { playerState: -1 } }); send({ event: 'onReady' }); }
+      return;
+    }
+    if (d.event !== 'command') return;
+    window.__commands.push(d.func);
+    if (d.func === 'addEventListener') subscribed.add(d.args[0]);
+    else if (d.func === 'mute') muted = true;
+    else if (d.func === 'unMute') muted = false;
+    else if (d.func === 'seekTo') { time = d.args[0]; send({ event: 'infoDelivery', info: info() }); }
+    else if (d.func === 'setPlaybackRate') { rate = d.args[0]; send({ event: 'infoDelivery', info: info() }); }
+    else if (d.func === 'setVolume') volume = d.args[0];
+    else if (d.func === 'pauseVideo') { if (state === 1 || state === 3) setState(2); }
+    else if (d.func === 'playVideo') {
+      if (dropFirstPlay) { dropFirstPlay = false; return; }          // a command the player didn't act on
+      if (!muted && !window.__allowSound) {                           // the browser blocks sound
+        setState(-1);
+        if (subscribed.has('onAutoplayBlocked')) send({ event: 'onAutoplayBlocked' });
+        return;
+      }
+      setState(1, time >= 30 ? 0 : time);
+    }
+  });
+  window.__player = () => ({ playing: state === 1, muted });
+  window.__end = () => setState(0, 30);
+</script></body></html>`;
+
+export async function useFakeYouTube(page: Page, options: { allowSound?: () => boolean; dropFirstPlay?: boolean } = {}) {
+  const allowSound = options.allowSound ?? (() => true);
+  // Shorts use www.youtube.com, the watch pages the privacy-enhanced www.youtube-nocookie.com
+  for (const host of ['https://www.youtube.com', 'https://www.youtube-nocookie.com'])
+    await page.route(`${host}/embed/**`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: fakePlayer(allowSound(), !!options.dropFirstPlay) }));
+}

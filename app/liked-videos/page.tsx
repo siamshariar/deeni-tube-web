@@ -33,10 +33,11 @@ import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 
 import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
 import { youtubeThumb } from "@/lib/media-lookup";
+import { videoPath } from "@/lib/video-url";
 type FilterOption = "all" | "videos" | "shorts";
 
 const ytId = (v: LikedVideo) => v.videoId ?? v.id;
-const videoHref = (v: LikedVideo) => `/videos/${v.channel}/${ytId(v)}`;
+const videoHref = (v: LikedVideo) => videoPath({ title: v.title, videoId: ytId(v) });
 const shortHref = (v: LikedVideo) => `/shorts?v=${ytId(v)}`;
 
 export default function LikedVideosPage() {

@@ -35,12 +35,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/signin"
   );
 
+  // Shorts is a fixed, full-screen feed with its own offsets: no padding or minimum height here,
+  // so the page behind it is never taller than the screen (and can't scroll or bounce on phones)
+  const isShorts = pathname === "/shorts";
+
   return (
     <main
       data-has-sidebar={hasDesktopSidebar}
       className={
-        !hasDesktopSidebar
-          ? "flex-1 md:pl-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-none"
+        isShorts
+          ? "flex-1"
+          : !hasDesktopSidebar
+          ? // Video/playlist pages: room for the phone nav bar only on phones, so on desktop the page ends with its content
+            "flex-1 md:pl-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0 min-h-screen transition-none"
           : desktopSidebarWidth === 72
           ? "flex-1 md:pl-[72px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-all duration-300 ease-in-out"
           : "flex-1 md:pl-[240px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-all duration-300 ease-in-out"

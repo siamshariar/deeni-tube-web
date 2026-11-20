@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search, X, ArrowLeft, History, Check, ChevronDown,
+  Search, X, ArrowLeft, History, Check, ChevronDown, Mic,
 } from "lucide-react";
+import { VoiceSearchDialog } from "@/components/voice-search";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { videoData } from "@/lib/video-data";
@@ -151,6 +152,7 @@ export default function MobileSearchModal() {
 
   const [isOpen, setIsOpen]                     = useState(false);
   const [query, setQuery]                       = useState("");
+  const [voiceOpen, setVoiceOpen]               = useState(false);
   const [activeLangs, setActiveLangs]           = useState<string[]>(() => getDefaultSearchLangs());
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedScholars, setSelectedScholars] = useState<string[]>([]);
@@ -261,8 +263,8 @@ export default function MobileSearchModal() {
       </div>
 
       {/* ── Search input ────────────────────────────────────────────── */}
-      <div className="px-4 pt-3 pb-2 flex-shrink-0">
-        <div className="relative">
+      <div className="px-4 pt-3 pb-2 flex-shrink-0 flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
             ref={inputRef}
@@ -282,6 +284,19 @@ export default function MobileSearchModal() {
             </button>
           )}
         </div>
+        <button
+          type="button"
+          aria-label="Search with your voice"
+          onClick={() => setVoiceOpen(true)}
+          className="h-11 w-11 flex-shrink-0 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+        >
+          <Mic className="h-6 w-6" />
+        </button>
+        <VoiceSearchDialog
+          open={voiceOpen}
+          onOpenChange={setVoiceOpen}
+          onResult={(text) => { setVoiceOpen(false); handleRecentTap(text); }}
+        />
       </div>
 
       {/* ── Scrollable filter body ───────────────────────────────────── */}

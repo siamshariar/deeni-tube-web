@@ -40,7 +40,7 @@ test.describe('Regressions', () => {
       const response = await page.goto(url);
       expect(response?.status()).toBe(404);
       await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
-      await expect(page.locator('iframe[src*="youtube.com"]')).toHaveCount(0);
+      await expect(page.locator('iframe[src*="/embed/"]')).toHaveCount(0);
     });
   }
 

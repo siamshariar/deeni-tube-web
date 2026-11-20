@@ -44,6 +44,7 @@ import Image from "next/image";
 
 import { imagePriorityProps } from "@/lib/image-priority";
 import { youtubeThumb } from "@/lib/media-lookup";
+import { PlaylistNameField, PrivacySelect } from "@/components/playlist-fields";
 export default function PlaylistsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -341,49 +342,9 @@ export default function PlaylistsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 py-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Playlist name</label>
-              <Input
-                placeholder="My playlist"
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                className="h-10 rounded-full"
-                autoFocus
-              />
-            </div>
-
-            {/* Privacy */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Privacy</label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-full h-10 px-4 rounded-full border bg-background flex items-center gap-2 text-sm hover:bg-muted/50 transition-colors">
-                    {newPlaylistPublic ? <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                    <span className="flex-1 text-left font-medium">{newPlaylistPublic ? "Public" : "Private"}</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl p-1">
-                  <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" onClick={() => setNewPlaylistPublic(true)}>
-                    <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Public</p>
-                      <p className="text-xs text-muted-foreground">Anyone can see this playlist</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" onClick={() => setNewPlaylistPublic(false)}>
-                    <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Private</p>
-                      <p className="text-xs text-muted-foreground">Only you can see this playlist</p>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
+          <div className="space-y-3 py-2">
+            <PlaylistNameField value={newPlaylistName} onChange={setNewPlaylistName} onEnter={handleCreatePlaylist} placeholder="My playlist" autoFocus />
+            <PrivacySelect isPublic={newPlaylistPublic} onChange={setNewPlaylistPublic} />
           </div>
 
           <DialogFooter className="pt-2 border-t">
@@ -412,45 +373,9 @@ export default function PlaylistsPage() {
             <DialogTitle>Edit playlist</DialogTitle>
             <DialogDescription>Update the name and privacy settings.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Playlist name</label>
-              <Input
-                placeholder="Playlist name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="h-10 rounded-full"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Privacy</label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-full h-10 px-4 rounded-full border bg-background flex items-center gap-2 text-sm hover:bg-muted/50 transition-colors">
-                    {editPublic ? <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                    <span className="flex-1 text-left font-medium">{editPublic ? "Public" : "Private"}</span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl p-1">
-                  <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" onClick={() => setEditPublic(true)}>
-                    <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Public</p>
-                      <p className="text-xs text-muted-foreground">Anyone can see this playlist</p>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" onClick={() => setEditPublic(false)}>
-                    <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Private</p>
-                      <p className="text-xs text-muted-foreground">Only you can see this playlist</p>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          <div className="space-y-3 py-2">
+            <PlaylistNameField value={editName} onChange={setEditName} onEnter={handleEditPlaylist} placeholder="Playlist name" autoFocus />
+            <PrivacySelect isPublic={editPublic} onChange={setEditPublic} />
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-full" onClick={() => setShowEditDialog(false)}>

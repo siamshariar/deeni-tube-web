@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss"
 import tailwindcssAnimate from "tailwindcss-animate"
+import plugin from "tailwindcss/plugin"
 
 const config: Config = {
   darkMode: ["class"],
@@ -78,7 +79,16 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    plugin(({ addVariant }) => {
+      // Devices with a mouse. Hover-only controls use it (`can-hover:opacity-0 can-hover:group-hover:opacity-100`),
+      // so on touch screens, which can't hover, they stay visible
+      addVariant("can-hover", "@media (hover: hover) and (pointer: fine)")
+      // Short phone screens (e.g. iPhone SE), where tall overlays need to be more compact
+      addVariant("short-screen", "@media (max-width: 1023px) and (max-height: 680px)")
+    }),
+  ],
 }
 
 export default config

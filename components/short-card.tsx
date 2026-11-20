@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
+import { warmYouTube } from "@/lib/warm-youtube";
 
 interface ShortCardProps {
   href: string;
@@ -23,7 +24,7 @@ interface ShortCardProps {
 
 export default function ShortCard({ href, title, views, thumbnail, imagePriority, menu, className }: ShortCardProps) {
   return (
-    <div className={cn("flex min-w-0 flex-col", className)}>
+    <div className={cn("flex min-w-0 flex-col", className)} onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
       <Link href={href} className="relative block aspect-[9/16] w-full overflow-hidden rounded-xl bg-muted">
         <Image src={thumbnail} alt={title} fill sizes="(min-width: 768px) 220px, 50vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
       </Link>

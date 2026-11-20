@@ -69,10 +69,38 @@ body {
   position: relative;
 }
 
-/* Prevent any element from causing horizontal overflow */
-[class*="fixed"],
-[class*="absolute"] {
-  max-width: 100vw;
+/* `overflow-x: hidden` on body makes it a scroll container that never scrolls, which silently breaks every
+   `position: sticky` (the watch page's related column, the back bars on video/playlist pages). `clip` hides the
+   same overflow without creating a scroll container. (html keeps `hidden`: that applies to the viewport.) */
+@supports (overflow-x: clip) {
+  body {
+    overflow-x: clip !important;
+  }
+}
+
+/* Radix menus and dialogs lock page scrolling with react-remove-scroll, which also puts `overflow: hidden` and a
+   scrollbar-wide `margin-right` on body while they're open. Here the page scrolls on <html>, which always shows
+   its scrollbar, so neither is needed (the lock itself works by blocking wheel/touch scrolling), and both did
+   harm: the overflow broke position: sticky (the watch page's related column jumped up when a menu opened) and
+   the margin shifted the page sideways. More specific than the injected `body[data-scroll-locked]` rule. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+@supports (overflow-x: clip) {
+  html body[data-scroll-locked] {
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+  }
+}
+
+/* Prevent any element from causing horizontal overflow. In the base layer so that max-w-* utilities
+   (dialog widths and the like) still win: unlayered, this rule overrode them and made every dialog
+   full-width on desktop. */
+@layer base {
+  [class*="fixed"],
+  [class*="absolute"] {
+    max-width: 100vw;
+  }
 }
 
 @layer base {
@@ -86,57 +114,37 @@ body {
 /* app/globals.css */
 /* Add these styles at the end of the file */
 
-/* YouTube-style thin scrollbar - ONLY for sidebars (desktop sidebar and mobile sidebar) */
-.sidebar-scrollbar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-}
-
-.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: #909090;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #606060;
-}
-
-.sidebar-scrollbar::-webkit-scrollbar-thumb:active {
-  background: #404040;
-}
-
-/* Dark mode */
-.dark .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: #717171;
-}
-
-.dark .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #909090;
-}
-
-.dark .sidebar-scrollbar::-webkit-scrollbar-thumb:active {
-  background: #aaaaaa;
-}
-
-/* Firefox */
-.sidebar-scrollbar {
+/* YouTube-style thin scrollbar for sidebars, popups and panels (`yt-scrollbar`): no arrow buttons, a
+   transparent track and a grey thumb that shows while the area is hovered. Chrome and Firefox use the
+   standard properties (Chrome then ignores the ::-webkit-scrollbar rules); Safari uses the webkit ones. */
+.yt-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-
-.sidebar-scrollbar:hover {
+.yt-scrollbar:hover,
+.yt-scrollbar:focus-within {
   scrollbar-color: #909090 transparent;
 }
-
-.dark .sidebar-scrollbar:hover {
+.dark .yt-scrollbar:hover,
+.dark .yt-scrollbar:focus-within {
   scrollbar-color: #717171 transparent;
+}
+.yt-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.yt-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.yt-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+.yt-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #909090;
+}
+.dark .yt-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #717171;
 }
 
 /* Ensure scrollbar-none still works for chip bar and other elements */
@@ -189,4 +197,10 @@ html:not([data-sidebar-ready]) main[data-has-sidebar] {
     left: 72px !important;
     width: calc(100% - 72px) !important;
   }
+}
+
+/* Watch-page player: the play/pause/seek icon that flashes in the middle (components/youtube-player.tsx) */
+@keyframes player-feedback {
+  0% { opacity: 1; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(1.35); }
 }

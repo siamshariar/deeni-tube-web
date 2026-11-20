@@ -102,7 +102,7 @@ export default function DesktopSidebar() {
         {/* Slide-in sidebar panel */}
         <aside
           className={cn(
-            "hidden md:flex fixed left-0 w-[240px] bg-background border-r z-50 overflow-y-auto overflow-x-hidden flex-col transition-transform duration-300 ease-in-out sidebar-scrollbar",
+            "hidden md:flex fixed left-0 w-[240px] bg-background border-r z-50 overflow-y-auto overflow-x-hidden flex-col transition-transform duration-300 ease-in-out yt-scrollbar",
             top,
             height,
             overlayOpen ? "translate-x-0" : "-translate-x-full"
@@ -120,7 +120,7 @@ export default function DesktopSidebar() {
   return (
     <aside
       className={cn(
-        "desktop-sidebar hidden md:flex flex-col fixed left-0 bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out sidebar-scrollbar",
+        "desktop-sidebar hidden md:flex flex-col fixed left-0 bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out yt-scrollbar",
         isCollapsed ? "w-[72px]" : "w-[240px]",
         top,
         height

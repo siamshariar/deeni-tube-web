@@ -5,6 +5,11 @@ import { channelData } from "@/lib/channel-data";
 
 const findChannel = (slug: string) => channelData.find((c) => c.slug === decodeURIComponent(slug));
 
+// Pre-rendered at build time so links prefetch them in full and they open instantly
+export function generateStaticParams() {
+  return channelData.map((c) => ({ slug: c.slug }));
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   return { title: pageTitle(findChannel(slug)?.name ?? "Channel not found") };
