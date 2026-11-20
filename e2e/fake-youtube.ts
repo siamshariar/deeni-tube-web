@@ -3,11 +3,11 @@ import { Page } from '@playwright/test';
 // A fake YouTube embed for tests: it speaks the same postMessage protocol as the real player (answers the
 // 'listening' handshake, reports player states, takes commands), so autoplay rules, lost commands and the
 // end of a video can be tested exactly. Like a browser, it refuses to play with sound until sound is allowed.
-// In the frame: window.__player() → { playing, muted }, window.__end() ends the video, window.__commands lists
+// It starts muted when the URL says mute=1. In the frame: window.__player() → { playing, muted }, window.__end() ends the video, window.__commands lists
 // the commands received.
 
 const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean) => `<!doctype html><html><body><script>
-  let muted = false, state = -1, listening = false, dropFirstPlay = ${dropFirstPlay}, time = 0, rate = 1, volume = 100;
+  let muted = new URLSearchParams(location.search).get('mute') === '1', state = -1, listening = false, dropFirstPlay = ${dropFirstPlay}, time = 0, rate = 1, volume = 100;
   const subscribed = new Set();
   window.__allowSound = ${allowSound};
   window.__commands = [];

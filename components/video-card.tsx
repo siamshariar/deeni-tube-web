@@ -20,6 +20,7 @@ import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
 import { MoreButton } from "@/components/more-button";
 import { warmYouTube } from "@/lib/warm-youtube";
 import { videoPath } from "@/lib/video-url";
+import { InlinePreview } from "@/components/inline-preview";
 
 interface VideoCardProps {
   isHorizontal?: boolean;
@@ -196,12 +197,15 @@ export default function VideoCard({
     // Phone list item: edge-to-edge thumbnail, details underneath (YouTube mobile)
     return (
       <div className="flex flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
-        <Link href={videoLink} className="block">
-          <div className="relative aspect-video w-full bg-muted sm:overflow-hidden sm:rounded-xl">
-            <Image src={thumbnail} alt={title} fill sizes="100vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
-            {durationBadge}
-          </div>
-        </Link>
+        {/* Plays in the card while it's on screen, as in the YouTube app (Settings → Playback in feeds) */}
+        <InlinePreview videoId={videoId} title={title} rounded="sm:rounded-xl">
+          <Link href={videoLink} className="block">
+            <div className="relative aspect-video w-full bg-muted sm:overflow-hidden sm:rounded-xl">
+              <Image src={thumbnail} alt={title} fill sizes="100vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
+              {durationBadge}
+            </div>
+          </Link>
+        </InlinePreview>
         <div className="flex gap-3 pl-3 pr-1 pt-3">
           {avatar}
           <div className="min-w-0 flex-1">
@@ -221,19 +225,22 @@ export default function VideoCard({
   // Grid card (YouTube home layout): rounded thumbnail, avatar + text below, no card chrome
   return (
     <div className="group/card flex min-w-0 flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
-      <Link href={videoLink} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
-          <Image
-            src={thumbnail}
-            alt={title}
-            fill
-            sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-            {...imagePriorityProps(imagePriority)}
-            className="object-cover"
-          />
-          {durationBadge}
-        </div>
-      </Link>
+      {/* The video plays in the thumbnail: on hover with a mouse, on screen on touch devices (Settings → Playback in feeds) */}
+      <InlinePreview videoId={videoId} title={title} className="rounded-xl">
+        <Link href={videoLink} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
+            <Image
+              src={thumbnail}
+              alt={title}
+              fill
+              sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+              {...imagePriorityProps(imagePriority)}
+              className="object-cover"
+            />
+            {durationBadge}
+          </div>
+        </Link>
+      </InlinePreview>
       <div className="flex gap-3 pt-3">
         {avatar}
         <div className="min-w-0 flex-1">

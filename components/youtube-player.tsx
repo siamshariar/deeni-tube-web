@@ -24,6 +24,7 @@ import { Captions, Check, ChevronLeft, ChevronRight, Maximize, Minimize, Pause, 
 import { youtubeThumb } from "@/lib/media-lookup";
 import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
+import { takePreviewResume } from "@/components/inline-preview";
 
 // YouTube's privacy-enhanced embed: same player and postMessage API, but it doesn't show creators' end-screen
 // cards (video/playlist thumbnails over a video's last seconds), which the normal embed does
@@ -160,6 +161,9 @@ export function YouTubePlayer({
         readyRef.current = true;
         // Be told when the browser blocks playback, then start (autoplay=0 in the URL, so nothing is missed)
         command("addEventListener", ["onAutoplayBlocked"]);
+        // Opened from a card's hover preview: go on from where the preview was, as on YouTube
+        const resumeAt = takePreviewResume(videoId);
+        if (resumeAt) command("seekTo", [resumeAt, true]);
         command("playVideo");
         return;
       }
@@ -216,7 +220,7 @@ export function YouTubePlayer({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [command]);
+  }, [command, videoId]);
 
   // If the player doesn't start (e.g. even muted autoplay is blocked), show our paused controls
   useEffect(() => {

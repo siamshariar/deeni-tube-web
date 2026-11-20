@@ -16,6 +16,7 @@ import {
   Mail,
   Monitor,
   Moon,
+  MonitorPlay,
   Shield,
   Smartphone,
   Sun,
@@ -34,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { readLanguagePrefs, updateLanguagePrefs } from "@/lib/language-prefs";
 import { useHydrated } from "@/lib/local-store";
+import { setFeedPlayback, useFeedPlaybackSetting } from "@/lib/feed-playback";
 import { mockLanguages } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +75,8 @@ export default function SettingsPage() {
     email: false,
     push: true,
   });
+
+  const feedPlayback = useFeedPlaybackSetting();
 
   const [showLanguageDialog, setShowLanguageDialog] = useState(false);
   // Saved choice (shown in the row) vs. the draft being edited in the dialog
@@ -224,6 +228,20 @@ export default function SettingsPage() {
                 Change
               </Button>
             </div>
+          </SettingsSection>
+
+          {/* Playback */}
+          <SettingsSection id="playback" title="Playback">
+            <SwitchRow
+              icon={<MonitorPlay />}
+              label="Playback in feeds"
+              description="Play videos muted in their cards: on hover with a mouse, and as you scroll on a phone or tablet"
+              checked={feedPlayback}
+              onCheckedChange={(value) => {
+                setFeedPlayback(value);
+                toast.success(`Playback in feeds turned ${value ? "on" : "off"}`);
+              }}
+            />
           </SettingsSection>
 
           {/* Notifications */}

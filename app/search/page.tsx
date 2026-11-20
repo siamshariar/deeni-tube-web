@@ -30,6 +30,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { SEARCH_LANGUAGES, getDefaultSearchLangs, isDefaultSearchLangs, parseSearchLangs } from "@/lib/search-languages";
 import { videoPath } from "@/lib/video-url";
+import { InlinePreview } from "@/components/inline-preview";
 
 // ── Static data ──────────────────────────────────────────────────────────────
 
@@ -186,20 +187,23 @@ function ResultList({
     <div className="flex flex-col gap-4">
       {results.map(video => (
         <div key={video.id} className="flex gap-3 md:gap-4 group">
-          <Link
-            href={videoPath(video)}
-            className="relative w-40 sm:w-60 md:w-80 lg:w-[360px] aspect-video flex-shrink-0 rounded-xl overflow-hidden bg-muted"
-          >
-            <Image
-              src={youtubeThumb(video.videoId)}
-              alt={video.title} fill
-              sizes="(min-width: 1024px) 360px, (min-width: 768px) 320px, (min-width: 640px) 240px, 160px"
-              className="object-cover"
-            />
-            <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1 py-px rounded font-medium">
-              {video.duration}
-            </div>
-          </Link>
+          {/* Rest the mouse on the thumbnail: the video plays in it, as on YouTube (mouse only) */}
+          <InlinePreview videoId={video.videoId} title={video.title} className="w-40 sm:w-60 md:w-80 lg:w-[360px] flex-shrink-0 self-start rounded-xl">
+            <Link
+              href={videoPath(video)}
+              className="relative block w-full aspect-video rounded-xl overflow-hidden bg-muted"
+            >
+              <Image
+                src={youtubeThumb(video.videoId)}
+                alt={video.title} fill
+                sizes="(min-width: 1024px) 360px, (min-width: 768px) 320px, (min-width: 640px) 240px, 160px"
+                className="object-cover"
+              />
+              <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1 py-px rounded font-medium">
+                {video.duration}
+              </div>
+            </Link>
+          </InlinePreview>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
