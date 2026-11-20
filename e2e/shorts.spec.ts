@@ -17,9 +17,9 @@ test.describe('Shorts page', () => {
   test('desktop navigation arrows are visible', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.waitForTimeout(500);
-    // Desktop nav arrows (ChevronUp/Down) are in a fixed right-side panel (hidden md:flex)
-    const navPanel = page.locator('.hidden.md\\:flex').filter({ has: page.locator('button') }).last();
-    await expect(navPanel).toBeVisible({ timeout: 5000 });
+    // Desktop up/down buttons sit in a fixed panel on the right (shown from the lg breakpoint)
+    await expect(page.getByRole('button', { name: 'Previous short' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'Next short' })).toBeVisible();
   });
 
   test('progress bar is present for active video', async ({ page }) => {

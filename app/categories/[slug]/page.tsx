@@ -3,39 +3,19 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
 import {
   ArrowLeft,
   Search,
   X,
-  MoreVertical,
-  Play,
-  Clock,
-  Bookmark,
-  Share,
   FolderOpen,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { videoData, VideoItem, categoryData } from "@/lib/video-data";
-import { getChannelHref } from "@/lib/channel-data";
-import { ShareModal } from "@/components/share-modal";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
-import { ReportDialog } from "@/components/report-dialog";
 import { SortDropdown } from "@/components/sort-dropdown";
-import { useWatchLater } from "@/hooks/useWatchLater";
-import { toast } from "sonner";
+import VideoGrid from "@/components/video-grid";
 
-import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
 const SORT_OPTIONS = [
   { label: "Priority", value: "priority" },
   { label: "Latest", value: "latest" },
@@ -81,12 +61,6 @@ export default function CategoryVideosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [sortMode, setSortMode] = useState<"priority" | "latest" | "popular">("priority");
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
-  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
-  const [showReportDialog, setShowReportDialog] = useState(false);
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -167,7 +141,7 @@ export default function CategoryVideosPage() {
                 <Skeleton className="h-9 w-16 rounded-full" />
               </div>
             </div>
-            <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-10">
               {Array.from({ length: 4 }).map((_, i) => (
                 <VideoSkeleton key={i} />
               ))}
@@ -234,157 +208,13 @@ export default function CategoryVideosPage() {
               </div>
             ) : (
               <>
-                {/* Desktop grid */}
-                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredVideos.map((video, index) => (
-                    <div key={video.id} className="flex flex-col group">
-                      <Link
-                        href={`/videos/${video.channel}/${video.videoId}`}
-                        className="relative aspect-video w-full"
-                      >
-                        <Image
-                          src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                          alt={video.title}
-                          fill
-                          {...imagePriorityProps(priorityForIndex(index))}
-                          className="object-cover rounded-xl"
-                        />
-                        <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
-                          {video.duration}
-                        </div>
-                        <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="bg-black/60 rounded-full p-2">
-                            <Play className="h-5 w-5 text-white fill-white" />
-                          </div>
-                        </div>
-                      </Link>
-                      <div className="flex mt-3 gap-2">
-                        <Link aria-label={video.channel} href={getChannelHref(video.channelId)}>
-                          <Avatar className="h-9 w-9 flex-shrink-0">
-                            <AvatarImage src={video.channelAvatar} />
-                            <AvatarFallback>{video.channel.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <Link href={`/videos/${video.channel}/${video.videoId}`}>
-                              <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                                {video.title}
-                              </h3>
-                            </Link>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-                                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                                <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                                  if (isInWatchLater(video.id)) { removeFromWatchLater(video.id); toast.success("Removed from Watch Later"); }
-                                  else { addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar, thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
-                                }}>
-                                  <Clock className="h-4 w-4 mr-2" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}>
-                                  <Bookmark className="h-4 w-4 mr-2" /> Save to playlist
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`); setShareModalOpen(true); }}>
-                                  <Share className="h-4 w-4 mr-2" /> Share
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {video.channel}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {video.views} • {video.timeAgo}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Mobile list */}
-                <div className="flex flex-col md:hidden">
-                  {filteredVideos.map((video, index) => (
-                    <div key={video.id} className="flex gap-3 py-2.5 hover:bg-muted/30 rounded-lg px-1 -mx-1 transition-colors group">
-                      <Link
-                        href={`/videos/${video.channel}/${video.videoId}`}
-                        className="relative w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden"
-                      >
-                        <Image
-                          src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                          alt={video.title}
-                          fill
-                          {...imagePriorityProps(priorityForIndex(index))}
-                          className="object-cover"
-                        />
-                        <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded font-medium">
-                          {video.duration}
-                        </div>
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-1">
-                          <Link href={`/videos/${video.channel}/${video.videoId}`}>
-                            <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                              {video.title}
-                            </h3>
-                          </Link>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                                if (isInWatchLater(video.id)) { removeFromWatchLater(video.id); toast.success("Removed from Watch Later"); }
-                                else { addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar, thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
-                              }}>
-                                <Clock className="h-4 w-4 mr-2" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}>
-                                <Bookmark className="h-4 w-4 mr-2" /> Save to playlist
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`); setShareModalOpen(true); }}>
-                                <Share className="h-4 w-4 mr-2" /> Share
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Avatar className="h-4 w-4">
-                            <AvatarImage src={video.channelAvatar} />
-                            <AvatarFallback className="text-[8px]">
-                              {video.channel.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs text-muted-foreground">
-                            {video.channel}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {video.views} • {video.timeAgo}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <VideoGrid videos={filteredVideos} className="-mx-3 md:mx-0" />
               </>
             )}
           </>
         )}
       </div>
 
-      <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
-      {selectedVideo && (
-        <>
-          <AddToPlaylistDialog video={{ id: selectedVideo.id, title: selectedVideo.title, channel: selectedVideo.channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
-          <ReportDialog videoTitle={selectedVideo.title} videoId={selectedVideo.id} open={showReportDialog} onOpenChange={setShowReportDialog} />
-        </>
-      )}
     </div>
   );
 }

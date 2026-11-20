@@ -8,8 +8,8 @@ import Link from "next/link";
 import {
   Bell,
   Settings,
-  MoreVertical,
 } from "lucide-react";
+import { MoreButton } from "@/components/more-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -152,14 +152,14 @@ const moreNotifications = notifications.filter(n => !n.isUnread);
 // ── Skeleton ──
 function NotificationSkeleton() {
   return (
-    <div className="flex gap-3 px-4 py-3">
-      <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+    <div className="flex gap-3 pl-6 pr-4 py-3">
+      <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
       <div className="flex-1 min-w-0 space-y-2">
         <Skeleton className="h-3.5 w-full" />
         <Skeleton className="h-3 w-16" />
       </div>
       <Skeleton className="h-[52px] w-[86px] rounded-lg flex-shrink-0" />
-      <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+      <div className="w-8 flex-shrink-0" />
     </div>
   );
 }
@@ -185,10 +185,10 @@ export default function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full relative"
+          className="h-10 w-10 rounded-full relative"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-6 w-6" />
           {/* Notification count badge */}
           {unreadCount > 0 && (
             <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
@@ -198,44 +198,40 @@ export default function NotificationDropdown() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-[calc(100vw-2rem)] max-w-[480px] sm:w-[440px] md:w-[480px] p-0 overflow-hidden"
+        className="w-[calc(100vw-16px)] max-w-[480px] sm:w-[440px] md:w-[480px] p-0 py-0 overflow-hidden"
         align="end"
         sideOffset={isMobile ? 4 : 8}
         alignOffset={isMobile ? 8 : 0}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-background">
-          <h2 className="font-semibold text-base">Notifications</h2>
+        <div className="flex h-12 items-center justify-between border-b pl-4 pr-2">
+          <h2 className="text-base">Notifications</h2>
           <button
-            className="p-1.5 rounded-full hover:bg-muted transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent transition-colors"
             aria-label="Notification settings"
             onClick={() => { setOpen(false); router.push("/settings"); }}
           >
-            <Settings className="h-5 w-5 text-muted-foreground" />
+            <Settings className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="max-h-[550px] overflow-y-auto">
+        {/* Content: a fixed height from the first frame, so the panel opens at full size (as on YouTube)
+            and the placeholder rows fill it while loading, instead of growing afterwards */}
+        <div className="h-[min(560px,calc(100dvh-120px))] overflow-y-auto overscroll-contain py-2">
           {isLoading ? (
-            <div>
-              <NotificationSkeleton />
-              <NotificationSkeleton />
-              <NotificationSkeleton />
-              <NotificationSkeleton />
+            <div aria-busy="true" aria-label="Loading notifications">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <NotificationSkeleton key={i} />
+              ))}
             </div>
           ) : (
             <>
               {/* Important section */}
               {importantNotifications.length > 0 && (
                 <div>
-                  <div className="px-5 py-2">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Recent
-                    </h3>
-                  </div>
+                  <h3 className="px-4 pb-1 pt-2 text-base font-medium">Important</h3>
                   {importantNotifications.map((notif) => (
-                    <NotificationItem key={notif.id} notification={notif} />
+                    <NotificationItem key={notif.id} notification={notif} onNavigate={() => setOpen(false)} />
                   ))}
                 </div>
               )}
@@ -243,13 +239,9 @@ export default function NotificationDropdown() {
               {/* More notifications section */}
               {moreNotifications.length > 0 && (
                 <div>
-                  <div className="px-5 py-2 border-t">
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      More notifications
-                    </h3>
-                  </div>
+                  <h3 className="mt-2 border-t px-4 pb-1 pt-4 text-base font-medium">More notifications</h3>
                   {moreNotifications.map((notif) => (
-                    <NotificationItem key={notif.id} notification={notif} />
+                    <NotificationItem key={notif.id} notification={notif} onNavigate={() => setOpen(false)} />
                   ))}
                 </div>
               )}
@@ -275,21 +267,21 @@ export default function NotificationDropdown() {
 }
 
 // ── Notification Item (YouTube style) ──
-function NotificationItem({ notification }: { notification: Notification }) {
+// onNavigate closes the panel: it stays mounted (modal={false}) across client-side navigation
+function NotificationItem({ notification, onNavigate }: { notification: Notification; onNavigate: () => void }) {
   return (
     <div
       className={cn(
-        "relative flex items-start gap-3 px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer",
-        notification.isUnread && "bg-primary/[0.04] dark:bg-primary/[0.08]"
+        "relative flex items-start gap-3 pl-6 pr-2 py-3 hover:bg-muted transition-colors group cursor-pointer"
       )}
     >
       {/* Unread dot */}
       {notification.isUnread && (
-        <span className="absolute left-2 top-[36px] -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
+        <span aria-label="Unread" className="absolute left-2 top-[36px] -translate-y-1/2 w-1.5 h-1.5 bg-[#065fd4] dark:bg-[#3ea6ff] rounded-full flex-shrink-0" />
       )}
 
       {/* Clickable link area */}
-      <Link href={notification.link} className="flex gap-3 flex-1 min-w-0">
+      <Link href={notification.link} onClick={onNavigate} className="flex gap-3 flex-1 min-w-0">
         {/* Channel Avatar */}
         <Avatar className="h-12 w-12 flex-shrink-0 ring-1 ring-border/50">
           <AvatarImage src={notification.channelAvatar} alt={notification.channelName} />
@@ -339,12 +331,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
       {/* Three-dot menu button — always visible */}
       <SubDropdownMenu>
         <SubDropdownTrigger asChild>
-          <button aria-label="More actions"
-            className="p-1.5 rounded-full hover:bg-muted/80 transition-colors flex-shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+          <MoreButton onClick={(e) => e.stopPropagation()} />
         </SubDropdownTrigger>
         <SubDropdownContent align="end" className="w-48 rounded-xl">
           <SubDropdownItem

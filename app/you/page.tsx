@@ -96,7 +96,7 @@ export default function YouPage() {
       <div className="min-h-screen bg-background">
         <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16 max-w-3xl mx-auto">
           {/* Desktop title skeleton */}
-          <div className="hidden md:block mb-6">
+          <div className="mb-6">
             <Skeleton className="h-8 w-20 mb-2" />
             <Skeleton className="h-4 w-64" />
           </div>
@@ -158,46 +158,44 @@ export default function YouPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16 max-w-3xl mx-auto">
-        <h1 className="sr-only md:hidden">You</h1>
-        {/* Desktop title */}
-        <div className="hidden md:block mb-6">
-          <h1 className="text-2xl font-bold">You</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="mb-5 md:mb-6">
+          <h1 className="text-xl font-bold md:text-2xl">You</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage your profile and preferences
           </p>
         </div>
 
         {/* User Profile Card */}
-        <div className="mb-6 rounded-xl border shadow-sm overflow-hidden">
-          <div className="p-4 md:p-5 flex items-center gap-4">
-            <Avatar className="h-14 w-14 md:h-16 md:w-16 ring-2 ring-primary/10 flex-shrink-0">
+        <div className="mb-6 overflow-hidden rounded-2xl border">
+          <div className="flex items-center gap-4 p-4 md:gap-5 md:p-6">
+            <Avatar className="h-16 w-16 flex-shrink-0 md:h-20 md:w-20">
               {userAvatar && !isGuest ? (
                 <AvatarImage src={userAvatar} alt={userName} />
               ) : (
-                <AvatarFallback className="text-lg font-semibold bg-primary/10 text-primary">
-                  {isGuest ? <UserIcon className="h-6 w-6" /> : userInitials}
+                <AvatarFallback className="bg-muted text-xl font-semibold text-foreground">
+                  {isGuest ? <UserIcon className="h-8 w-8 text-muted-foreground" /> : userInitials}
                 </AvatarFallback>
               )}
             </Avatar>
             {isGuest ? (
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-base">You&apos;re browsing as a guest</p>
-                <p className="text-sm text-muted-foreground">Sign in to sync your playlists and preferences.</p>
+                <p className="text-lg font-bold leading-6 md:text-xl">You&apos;re browsing as a guest</p>
+                <p className="mt-1 text-sm text-muted-foreground">Sign in to sync your playlists and preferences.</p>
                 <Link
                   href="/signin"
-                  className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                  className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full border px-4 text-sm font-medium text-[#065fd4] transition-colors hover:border-transparent hover:bg-[#def1ff] dark:text-[#3ea6ff] dark:hover:bg-[#263850]"
                 >
-                  Sign in
+                  <UserIcon className="h-5 w-5" /> Sign in
                 </Link>
               </div>
             ) : (
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-base truncate">{userName}</p>
-                <p className="text-sm text-muted-foreground truncate">{userEmail}</p>
+                <p className="truncate text-lg font-bold leading-6 md:text-xl">{userName}</p>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{userEmail}</p>
                 <button
                   type="button"
                   onClick={() => setShowSignOutDialog(true)}
-                  className="mt-1.5 flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors font-medium"
+                  className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-full border px-4 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                 >
                   <LogOut className="h-4 w-4" /> Sign out
                 </button>
@@ -207,7 +205,7 @@ export default function YouPage() {
         </div>
 
         {/* Library Section — visible on mobile only; web screen uses sidebar links */}
-        <div className="mb-6 rounded-xl border shadow-sm overflow-hidden md:hidden">
+        <div className="mb-6 overflow-hidden rounded-2xl border md:hidden">
           {[
             { href: "/history", icon: History, label: "History", desc: "Your watch history" },
             // { href: "/liked-videos", icon: ThumbsUp, label: "Liked Videos", desc: "Videos you've liked" },
@@ -217,35 +215,35 @@ export default function YouPage() {
             <Link
               key={href}
               href={href}
-              className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors group border-b last:border-0"
+              className="group flex items-center justify-between border-b px-4 py-3 transition-colors last:border-0 hover:bg-muted active:bg-accent"
             >
-              <div className="flex items-center gap-3">
-                <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <div className="flex items-center gap-4">
+                <Icon className="h-6 w-6 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
+                  <p className="text-[15px] font-medium leading-5">{label}</p>
+                  <p className="text-[13px] leading-[18px] text-muted-foreground">{desc}</p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </Link>
           ))}
         </div>
 
         {/* Language Preference Card */}
-        <div className="mb-6 rounded-xl border shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b">
-            <Globe className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-sm">Language preference</h2>
+        <div className="mb-6 overflow-hidden rounded-2xl border">
+          <div className="flex items-center gap-3 border-b px-4 py-3.5 md:px-5">
+            <Globe className="h-5 w-5" />
+            <h2 className="text-base font-medium">Language preference</h2>
           </div>
-          <div className="p-4 md:p-5 space-y-5">
+          <div className="space-y-5 p-4 md:p-5">
             {/* Default language */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <p className="text-sm font-medium">Default language</p>
-                <p className="text-xs text-muted-foreground">Used across the app</p>
+                <p className="text-[15px] font-medium">Default language</p>
+                <p className="text-[13px] text-muted-foreground">Used across the app</p>
               </div>
               <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
-                <SelectTrigger className="w-full sm:w-44 h-10 rounded-full text-sm border bg-background hover:bg-muted/50 transition-colors [&>svg]:ml-auto [&>svg]:h-4 [&>svg]:w-4 [&>svg]:opacity-70">
+                <SelectTrigger className="w-full sm:w-48 h-10 rounded-full text-sm border bg-background hover:bg-muted transition-colors [&>svg]:ml-auto [&>svg]:h-4 [&>svg]:w-4 [&>svg]:opacity-70">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border shadow-lg">
@@ -267,8 +265,8 @@ export default function YouPage() {
 
             {/* Preferred languages */}
             <div>
-              <p className="text-sm font-medium mb-3">Preferred languages</p>
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="text-[15px] font-medium">Preferred languages</p>
+              <p className="mb-3 text-[13px] text-muted-foreground">
                 Select languages for content in your feed
               </p>
               <div className="border rounded-xl divide-y overflow-hidden">
@@ -278,9 +276,12 @@ export default function YouPage() {
                     <button
                       key={lang.code}
                       onClick={() => togglePreferredLanguage(lang.code)}
-                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted"
                     >
-                      <span className="text-sm">{lang.name}</span>
+                      <span className="text-[15px]">{lang.name}</span>
                       <span
                         className={cn(
                           "h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all",
@@ -301,7 +302,7 @@ export default function YouPage() {
             <div className="flex justify-end items-center gap-3">
               <Button
                 onClick={savePreferences}
-                className="rounded-full px-8 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="h-10 rounded-full px-6 font-medium"
               >
                 {prefSaved ? "Saved preferences" : "Save preferences"}
               </Button>
@@ -310,7 +311,7 @@ export default function YouPage() {
         </div>
 
         {/* Settings & More Section — visible on mobile only; web screen uses sidebar links */}
-        <div className="mb-6 rounded-xl border shadow-sm overflow-hidden md:hidden">
+        <div className="mb-6 overflow-hidden rounded-2xl border md:hidden">
           {[
             { href: "/settings", icon: Settings, label: "Settings", desc: "App preferences" },
             { href: "/donate", icon: Heart, label: "Donate", desc: "Support the platform" },
@@ -320,35 +321,35 @@ export default function YouPage() {
             <Link
               key={href}
               href={href}
-              className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors group border-b last:border-0"
+              className="group flex items-center justify-between border-b px-4 py-3 transition-colors last:border-0 hover:bg-muted active:bg-accent"
             >
-              <div className="flex items-center gap-3">
-                <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <div className="flex items-center gap-4">
+                <Icon className="h-6 w-6 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
+                  <p className="text-[15px] font-medium leading-5">{label}</p>
+                  <p className="text-[13px] leading-[18px] text-muted-foreground">{desc}</p>
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </Link>
           ))}
         </div>
 
         {/* Channel Preference Card */}
-        <div className="rounded-xl border shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b">
-            <Tv className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-sm">Channel preference</h2>
+        <div className="overflow-hidden rounded-2xl border">
+          <div className="flex items-center gap-3 border-b px-4 py-3.5 md:px-5">
+            <Tv className="h-5 w-5" />
+            <h2 className="text-base font-medium">Channel preference</h2>
           </div>
           <Link
             href="/channels"
-            className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors group"
+            className="group flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted md:px-5"
           >
             <div>
-              <p className="text-sm font-medium">Manage channels</p>
-              <p className="text-xs text-muted-foreground">Customise your channel feed</p>
+              <p className="text-[15px] font-medium">Manage channels</p>
+              <p className="text-[13px] text-muted-foreground">Customise your channel feed</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+            <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>

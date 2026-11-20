@@ -4,8 +4,6 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  MoreVertical,
   ThumbsUp,
   Play,
   Shuffle,
@@ -14,8 +12,9 @@ import {
   Share2,
   Clock,
 } from "lucide-react";
+import ShortCard from "@/components/short-card";
+import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,9 +74,18 @@ export default function LikedVideosPage() {
   };
 
   const firstVideo = videos[0];
-  const firstThumb = firstVideo
-    ? `https://img.youtube.com/vi/${ytId(firstVideo)}/hqdefault.jpg`
-    : null;
+  // Cover: the first video (or the first short when only shorts are saved)
+  const cover = firstVideo ?? shorts[0];
+  const coverThumb = cover ? youtubeThumb(ytId(cover)) : null;
+  const coverHref = firstVideo ? videoHref(firstVideo) : cover ? shortHref(cover) : "/";
+  const playAll = () => {
+    if (cover) router.push(coverHref);
+  };
+  const shufflePlay = () => {
+    const r = videos[Math.floor(Math.random() * videos.length)];
+    if (r) router.push(videoHref(r));
+    else playAll();
+  };
 
   const showVideos = activeFilter === "all" || activeFilter === "videos";
   const showShorts = activeFilter === "all" || activeFilter === "shorts";
@@ -85,28 +93,14 @@ export default function LikedVideosPage() {
 
   return (
     <div className="min-h-screen bg-background mt-14 md:mt-16">
-      {/* Mobile sticky header */}
-      <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b sticky top-14 bg-background z-10">
-        <button
-          type="button"
-          aria-label="Go back"
-          onClick={() => router.back()}
-          className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h1 className="font-semibold text-lg">Liked videos</h1>
-        <span className="text-sm text-muted-foreground">
-          ({videos.length + shorts.length})
-        </span>
-      </div>
-
-      <div className="px-3 md:px-6 py-4 md:py-6">
+      <div className="px-3 pb-8 md:px-6 md:py-6">
         {!hydrated ? null : isEmpty ? (
-          <div className="text-center py-20">
-            <ThumbsUp className="h-16 w-16 mx-auto text-muted-foreground/20 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No liked videos</h2>
-            <p className="text-muted-foreground mb-5">
+          <div className="flex flex-col items-center px-6 py-20 text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <ThumbsUp className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h1 className="mb-2 text-xl font-bold">No liked videos</h1>
+            <p className="mb-5 text-sm text-muted-foreground">
               Videos you like will appear here
             </p>
             <Button className="rounded-full" onClick={() => router.push("/")}>
@@ -114,90 +108,67 @@ export default function LikedVideosPage() {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* ── Left panel (desktop only) ── */}
-            <div className="hidden md:flex md:w-[300px] xl:w-[340px] flex-shrink-0 sticky top-[80px] self-start h-[calc(100vh-80px)] flex-col">
-              <div className="relative flex-1 rounded-2xl overflow-hidden bg-card border shadow-sm flex flex-col">
-                {/* Blurred background */}
-                {firstThumb && (
+          <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+            {/* ── Playlist panel: a hero on phones and tablets, a sticky side panel on desktop (YouTube layout) ── */}
+            <div className="-mx-3 md:mx-0 lg:sticky lg:top-[88px] lg:h-[calc(100vh-112px)] lg:w-[340px] lg:flex-shrink-0 lg:self-start xl:w-[360px]">
+              <div className="relative flex h-full flex-col overflow-hidden bg-neutral-800 text-white md:rounded-2xl">
+                {/* Blurred cover behind the panel; white text stays readable in both themes */}
+                {coverThumb && (
                   <>
                     <Image
-                      src={firstThumb}
+                      src={coverThumb}
                       alt=""
                       fill
-                      loading="eager" // same file as the preview below, so no extra download
-                      className="object-cover scale-110 blur-md opacity-30"
+                      loading="eager" // same file as the cover below, so no extra download
+                      className="scale-125 object-cover opacity-80 blur-2xl"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/55 to-black/85" />
                   </>
                 )}
 
-                <div className="relative z-10 flex flex-col h-full p-6 text-white">
-                  {/* Top: icon + title + count */}
-                  <div className="mb-5">
-                    <ThumbsUp className="h-7 w-7 mb-2 opacity-70" />
-                    <h1 className="text-xl font-bold leading-tight">
-                      Liked videos
-                    </h1>
-                    <p className="text-sm text-white/60 mt-1">
-                      {videos.length} videos · {shorts.length} shorts
-                    </p>
-                  </div>
-
-                  {/* First video preview */}
-                  {firstVideo && (
-                    <Link
-                      href={videoHref(firstVideo)}
-                      className="block mb-5 group flex-shrink-0"
-                    >
-                      <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10">
+                <div className="relative z-10 flex flex-col p-4 md:flex-row md:items-end md:gap-6 md:p-6 lg:flex-col lg:items-stretch lg:gap-0">
+                  {cover && coverThumb && (
+                    <Link href={coverHref} className="group mb-4 block flex-shrink-0 md:mb-0 md:w-80 lg:mb-5 lg:w-full">
+                      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/30">
                         <Image
-                          src={firstThumb!}
-                          alt={firstVideo.title}
+                          src={coverThumb}
+                          alt={cover.title}
                           fill
                           {...imagePriorityProps("lcp", { preload: false })}
-                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="object-cover"
                         />
-                        <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-                          {firstVideo.duration}
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="bg-black/60 rounded-full p-3">
-                            <Play className="h-6 w-6 fill-white text-white" />
-                          </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            <Play className="h-5 w-5 fill-white" /> Play all
+                          </span>
                         </div>
                       </div>
-                      <p className="text-xs font-medium line-clamp-2 mt-2 text-white/70 group-hover:text-white transition-colors">
-                        {firstVideo.title}
-                      </p>
                     </Link>
                   )}
 
-                  <div className="flex-1" />
+                  <div className="min-w-0">
+                    <ThumbsUp className="mb-2 h-6 w-6 opacity-80" />
+                    <h1 className="text-2xl font-bold leading-8 md:text-[28px] md:leading-9">Liked videos</h1>
+                    <p className="mt-2 text-[13px] leading-5 text-white/75">
+                      {videos.length} videos · {shorts.length} shorts · Private
+                    </p>
 
-                  {/* Action buttons */}
-                  <div className="space-y-2">
-                    <Button
-                      onClick={() =>
-                        firstVideo &&
-                        router.push(videoHref(firstVideo))
-                      }
-                      className="rounded-full gap-2 bg-white text-black hover:bg-white/90 w-full font-semibold"
-                    >
-                      <Play className="h-4 w-4 fill-current" /> Play all
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const r =
-                          videos[Math.floor(Math.random() * videos.length)];
-                        if (r)
-                          router.push(videoHref(r));
-                      }}
-                      variant="outline"
-                      className="rounded-full gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20 w-full"
-                    >
-                      <Shuffle className="h-4 w-4" /> Shuffle
-                    </Button>
+                    {/* Play all / Shuffle */}
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        onClick={playAll}
+                        className="h-10 flex-1 gap-2 rounded-full bg-white text-sm font-medium text-black hover:bg-white/85"
+                      >
+                        <Play className="h-5 w-5 fill-current" /> Play all
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={shufflePlay}
+                        className="h-10 flex-1 gap-2 rounded-full bg-white/20 text-sm font-medium text-white hover:bg-white/30 hover:text-white"
+                      >
+                        <Shuffle className="h-5 w-5" /> Shuffle
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -206,7 +177,7 @@ export default function LikedVideosPage() {
             {/* ── Right column ── */}
             <div className="flex-1 min-w-0">
               {/* Filter chips */}
-              <div className="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-none pb-0.5">
+              <div className="mb-5 flex items-center gap-3 overflow-x-auto scrollbar-none">
                 {(["all", "videos", "shorts"] as FilterOption[]).map(
                   (filter) => {
                     const count =
@@ -220,10 +191,10 @@ export default function LikedVideosPage() {
                         key={filter}
                         onClick={() => setActiveFilter(filter)}
                         className={cn(
-                          "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0",
+                          "h-8 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0",
                           activeFilter === filter
                             ? "bg-foreground text-background"
-                            : "bg-muted hover:bg-muted/80 text-foreground"
+                            : "bg-muted hover:bg-accent text-foreground"
                         )}
                       >
                         {filter === "all"
@@ -231,7 +202,7 @@ export default function LikedVideosPage() {
                           : filter === "videos"
                           ? "Videos"
                           : "Shorts"}{" "}
-                        <span className="text-xs opacity-60">({count})</span>
+                        <span className="font-normal opacity-70">{count}</span>
                       </button>
                     );
                   }
@@ -242,9 +213,9 @@ export default function LikedVideosPage() {
               {showVideos && videos.length > 0 && (
                 <section className="mb-8">
                   {activeFilter === "all" && (
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                      Videos — {videos.length}
-                    </p>
+                    <h2 className="mb-3 text-lg font-bold md:text-xl">
+                      Videos <span className="font-normal text-muted-foreground">— {videos.length}</span>
+                    </h2>
                   )}
                   <div className="space-y-0.5">
                     {videos.map((video, index) => {
@@ -253,12 +224,17 @@ export default function LikedVideosPage() {
                       return (
                         <div
                           key={video.id}
-                          className="group flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-muted/60 transition-colors"
+                          className="group flex items-center gap-2 rounded-xl py-1.5 transition-colors hover:bg-muted sm:gap-3 sm:pr-1"
                         >
+                          {/* Index */}
+                          <div className="hidden w-7 flex-shrink-0 select-none justify-center sm:flex">
+                            <span className="text-sm tabular-nums text-muted-foreground">{index + 1}</span>
+                          </div>
+
                           {/* Thumbnail */}
                           <Link
                             href={videoHref(video)}
-                            className="relative flex-shrink-0 w-28 sm:w-32 md:w-36 aspect-video rounded-lg overflow-hidden bg-black"
+                            className="relative aspect-video w-40 flex-shrink-0 overflow-hidden rounded-lg bg-muted"
                           >
                             <Image
                               src={thumb}
@@ -267,32 +243,22 @@ export default function LikedVideosPage() {
                               {...imagePriorityProps(priorityForIndex(index), { preload: false })}
                               className="object-cover"
                             />
-                            <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded font-medium">
+                            <div className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-4 text-white">
                               {video.duration}
                             </div>
                           </Link>
 
                           {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <Link
-                              href={videoHref(video)}
-                            >
-                              <h3 className="text-sm font-medium line-clamp-2 hover:text-primary transition-colors leading-snug">
+                          <div className="min-w-0 flex-1">
+                            <Link href={videoHref(video)}>
+                              <h3 className="line-clamp-2 break-words text-[15px] font-medium leading-5 md:text-base md:leading-[22px]">
                                 {video.title}
                               </h3>
                             </Link>
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <Avatar className="h-4 w-4 flex-shrink-0">
-                                <AvatarImage src={video.channelAvatar} />
-                                <AvatarFallback className="text-[8px]">
-                                  {video.channel.charAt(0)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs text-muted-foreground truncate">
-                                {video.channel}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="mt-1 truncate text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">
+                              {video.channel}
+                            </p>
+                            <p className="text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">
                               {video.views} · {video.timeAgo}
                             </p>
                           </div>
@@ -300,37 +266,35 @@ export default function LikedVideosPage() {
                           {/* Three-dot menu — always visible */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button type="button" aria-label="More actions" className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
+                              <MoreButton />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="w-56 rounded-xl"
+                              className="w-60 rounded-xl py-2"
                             >
                               <DropdownMenuItem
                                 onClick={() => saveToWatchLater(video)}
                               >
-                                <Clock className="h-4 w-4 mr-3" /> Save to
+                                <Clock className="h-5 w-5" /> Save to
                                 Watch Later
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setPlaylistTarget(video)}
                               >
-                                <BookmarkPlus className="h-4 w-4 mr-3" /> Save
+                                <BookmarkPlus className="h-5 w-5" /> Save
                                 to playlist
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => shareVideo(videoHref(video))}
                               >
-                                <Share2 className="h-4 w-4 mr-3" /> Share
+                                <Share2 className="h-5 w-5" /> Share
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600 dark:text-red-400"
                                 onClick={() => removeVideo(video.id)}
                               >
-                                <Trash2 className="h-4 w-4 mr-3" /> Remove
+                                <Trash2 className="h-5 w-5" /> Remove
                                 from Liked Videos
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -346,89 +310,58 @@ export default function LikedVideosPage() {
               {showShorts && shorts.length > 0 && (
                 <section>
                   {activeFilter === "all" && (
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                      Shorts — {shorts.length}
-                    </p>
+                    <h2 className="mb-3 text-lg font-bold md:text-xl">
+                      Shorts <span className="font-normal text-muted-foreground">— {shorts.length}</span>
+                    </h2>
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 min-[1400px]:grid-cols-4">
                     {shorts.map((short) => {
                       const thumb = `https://img.youtube.com/vi/${ytId(short)}/hqdefault.jpg`;
                       return (
-                        <div key={short.id} className="relative">
-                          <Link href={shortHref(short)} className="block group">
-                            <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-black">
-                              <Image
-                                src={thumb}
-                                alt={short.title}
-                                fill
-                                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                              <div className="absolute bottom-10 left-3 right-10">
-                                <p className="text-white text-xs font-medium line-clamp-2">
-                                  {short.title}
-                                </p>
-                                <p className="text-white/60 text-[10px] mt-0.5">
-                                  {short.views} views
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-
-                          {/* Always-visible three-dot — overlaid on card */}
-                          <div className="absolute bottom-[38px] right-2 z-10">
+                        <ShortCard
+                          key={short.id}
+                          href={`/shorts?v=${ytId(short)}`}
+                          title={short.title}
+                          views={`${short.views} views`}
+                          thumbnail={thumb}
+                          menu={
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button type="button" aria-label="More actions" className="p-1 rounded-full bg-black/50 hover:bg-black/70 transition-colors">
-                                  <MoreVertical className="h-3.5 w-3.5 text-white" />
-                                </button>
+                                <MoreButton />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent
                                 align="end"
-                                className="w-52 rounded-xl"
+                                className="w-60 rounded-xl py-2"
                               >
                                 <DropdownMenuItem
                                   onClick={() => saveToWatchLater(short)}
                                 >
-                                  <Clock className="h-4 w-4 mr-3" /> Save to
+                                  <Clock className="h-5 w-5" /> Save to
                                   Watch Later
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => setPlaylistTarget(short)}
                                 >
-                                  <BookmarkPlus className="h-4 w-4 mr-3" />{" "}
+                                  <BookmarkPlus className="h-5 w-5" />{" "}
                                   Save to playlist
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => shareVideo(shortHref(short))}
                                 >
-                                  <Share2 className="h-4 w-4 mr-3" /> Share
+                                  <Share2 className="h-5 w-5" /> Share
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-red-600 dark:text-red-400"
                                   onClick={() => removeShort(short.id)}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-3" /> Remove
+                                  <Trash2 className="h-5 w-5" /> Remove
                                   from Liked Videos
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </div>
-
-                          {/* Channel info below card */}
-                          <div className="mt-2 flex items-center gap-1.5 px-1">
-                            <Avatar className="h-5 w-5 flex-shrink-0">
-                              <AvatarImage src={short.channelAvatar} />
-                              <AvatarFallback className="text-[8px]">
-                                {short.channel.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {short.channel}
-                            </span>
-                          </div>
-                        </div>
+                          }
+                        />
                       );
                     })}
                   </div>
@@ -438,8 +371,8 @@ export default function LikedVideosPage() {
               {/* Empty state for active filter */}
               {((activeFilter === "videos" && videos.length === 0) ||
                 (activeFilter === "shorts" && shorts.length === 0)) && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-sm">
+                <div className="py-12 text-center">
+                  <p className="text-sm text-muted-foreground">
                     No {activeFilter} liked yet
                   </p>
                 </div>

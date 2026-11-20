@@ -133,10 +133,10 @@ export default function CategoriesPage() {
               key={lang.code}
               onClick={() => toggleLanguage(lang.code)}
               className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
                 selectedLanguages.includes(lang.code)
                   ? "bg-foreground text-background"
-                  : "bg-muted hover:bg-muted/80 text-foreground"
+                  : "bg-muted hover:bg-accent text-foreground"
               )}
             >
               {lang.name}
@@ -190,13 +190,13 @@ export default function CategoriesPage() {
                     {category.languages.slice(0, 3).map((lang) => (
                       <span
                         key={lang}
-                        className="text-[10px] uppercase bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground"
+                        className="text-[11px] uppercase bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground"
                       >
                         {lang}
                       </span>
                     ))}
                     {category.languages.length > 3 && (
-                      <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground">
+                      <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded font-medium text-muted-foreground">
                         +{category.languages.length - 3}
                       </span>
                     )}

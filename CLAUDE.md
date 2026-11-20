@@ -18,7 +18,7 @@ npx playwright test               # run all tests (starts dev server automatical
 npx playwright test e2e/navigation.spec.ts --project=chromium  # single file
 ```
 
-Tests live in `e2e/` covering navigation, Shorts player, video detail, and responsive layouts. The `playwright.config.ts` at project root auto-starts the dev server via `webServer` config with `reuseExistingServer: true`.
+Tests live in `e2e/` covering navigation, Shorts player, video detail, responsive layouts, and the YouTube-style UI rules (`e2e/ui.spec.ts`). The `playwright.config.ts` at project root auto-starts the dev server via `webServer` config with `reuseExistingServer: true`.
 
 TypeScript build errors are suppressed (`typescript.ignoreBuildErrors: true` in `next.config.mjs`), so run `npx tsc --noEmit` to type-check (it should report 0 errors). `npm run lint` runs ESLint 9 with `eslint-config-next` (flat config in `eslint.config.mjs`; Next 16 removed `next lint`) and should pass with 0 problems. Generated shadcn code in `components/ui/` is excluded. The few `eslint-disable` comments each say why: mostly effects that read localStorage or the URL after hydration.
 
@@ -92,15 +92,17 @@ All user-generated state is persisted directly to `localStorage`:
 
 ### Shorts page (`app/shorts/page.tsx`)
 
-The most complex file (~1400 lines), entirely `"use client"`. Key layout mechanics:
+The most complex file (~1800 lines), entirely `"use client"`. Key mechanics:
 
 - **Scroll container**: `position: fixed; inset: 0; top: 56px` with `overflow-y-scroll snap-y snap-mandatory`
-- **Each section**: `h-[calc(100vh-56px)]` on mobile (full screen), `h-[calc(100vh-80px)]` on desktop (leaves 24px of next video peeking at bottom)
-- **Video container**: `h-full md:h-[calc(100%-4px)] md:mt-0.5 md:aspect-[9/16]` — 2px gaps top/bottom on desktop; aspect ratio enforces 9:16
+- **Each section**: `h-[calc(100vh-56px)]` on mobile (full screen), `h-[calc(100vh-88px)]` on desktop (the next video peeks at the bottom); the video keeps a 9:16 aspect on desktop
+- **Action rail**: from `lg` up, like/comment/share/save/report sit beside the video as `bg-secondary` circles with `text-foreground` icons (readable in light mode); below `lg` they sit over the video, white on a dark backing
 - **Mobile iframe cover**: CSS class `.shorts-video-iframe` uses `position: absolute; height: 100%; aspect-ratio: 9/16; min-width: 100%; transform: translate(-50%, -50%)` to cover any portrait container without letterboxing
-- **Scroll detection**: `scrollend` event (Chrome/Firefox) with a 250ms debounced fallback; a 500ms `useEffect([currentIndex])` safety net guarantees controls always appear after a video switch
+- **Players (instant switching, no black screen)**: the active short and its neighbours (`PRELOAD_RANGE`) have a mounted iframe. Neighbours mount 1.5s after the first short starts playing, when the browser is idle (or after 6s). Each iframe's `src` is fixed (`autoplay=0`) and never rewritten; play/pause/seek/mute go through postMessage. The next short is "primed": played muted under its thumbnail, then paused at 0, so its stream is buffered. Each short's thumbnail covers its iframe, and the iframe stays `opacity-0`, until that player reports `playerState === 1`. Keep the opacity: YouTube resizes its `<video>` while loading, which Lighthouse otherwise counts as layout shift for the page (CLS went 0.94 → 0).
+- **Autoplay**: if the browser blocks playback with sound (no interaction yet), the short starts muted after 1.5s and the mute button shows "Unmute", as on YouTube.
+- **Scroll detection**: `scrollend` event (Chrome/Firefox) with a 250ms debounced fallback; arrow keys and the up/down buttons switch immediately
 - **Controls visibility**: gated on `isActive && !isScrolling` for the current video; `(isHovered || isActive) && !isScrolling` for top controls
-- **YouTube postMessage protocol**: iframes use `enablejsapi=1`. After each iframe loads (`onLoad` + 500ms delay) and on every `currentIndex` change (1000ms delay), a `{ event: 'listening', id }` message is sent to the iframe to register as a listener. YouTube then sends periodic `infoDelivery` messages containing `currentTime` and `duration`, which drive the progress bar. Play/pause sends `{ event: 'command', func: 'playVideo'/'pauseVideo' }`. Seek sends `{ event: 'command', func: 'seekTo', args: [seconds, true] }`. All postMessage calls target `'https://www.youtube.com'`.
+- **YouTube postMessage protocol**: iframes use `enablejsapi=1`. After an iframe loads, `{ event: 'listening', id }` is sent repeatedly until the player answers. Incoming messages are matched to the iframe that sent them (`e.source`), so only the active player drives the progress bar and play state. YouTube sends periodic `infoDelivery` messages (`currentTime`, `duration`, `playerState`). Commands are `{ event: 'command', func, args }` (`playVideo`, `pauseVideo`, `seekTo`, `mute`, …). All postMessage calls target `'https://www.youtube.com'`.
 - **Progress bar**: `absolute bottom-0` inside the video container, 3px tall, red fill. `videoCurrentTime`/`videoDuration` state is reset to 0 on every video switch. `videoDurationRef` (a ref mirroring `videoDuration`) is used inside mouse/touch drag closures to avoid stale state captures. Drag-to-seek wires `mousemove`/`mouseup` on `window` and `touchmove` on the bar element.
 
 ### Contexts
@@ -109,7 +111,7 @@ The most complex file (~1400 lines), entirely `"use client"`. Key layout mechani
 
 ### Theming
 
-CSS custom properties defined in `app/globals.css` for all colour tokens (`--background`, `--foreground`, `--primary`, etc.). Tailwind uses these via `hsl(var(--...))` mappings in `tailwind.config.ts`. Dark mode is toggled via the `class` strategy (`next-themes`).
+CSS custom properties defined in `app/globals.css` for all colour tokens (`--background`, `--foreground`, `--primary`, etc.), using a YouTube-like neutral palette (see "UI conventions"). Tailwind uses these via `hsl(var(--...))` mappings in `tailwind.config.ts`. Dark mode is toggled via the `class` strategy (`next-themes`).
 
 ### Header clearance rules
 
@@ -125,13 +127,26 @@ The `AppHeader` is `fixed top-0 h-14 z-40` (56px). Every page must push its cont
 
 The math: header occupies 0–56px. With `pt-14`, content starts at 56px. The `sticky top-14` back button sticks at exactly 56px, immediately below the header. The video below the back button starts at 56px + back-button height (~40px) = 96px, with no gap.
 
-### VideoCard
+### VideoCard and VideoGrid
 
-`components/video-card.tsx` has two render paths gated on the `isHorizontal` prop:
-- `isHorizontal={false}` (default) — grid card with `group/card` hover effects (thumbnail scale, play overlay, three-dot appears on hover)
-- `isHorizontal={true}` — flat mobile list card with always-visible three-dot
+`components/video-card.tsx` follows YouTube's card: rounded thumbnail, 36px channel avatar, 16px title (2 lines), 14px channel and views lines, no card border or shadow. Two render paths, gated on `isHorizontal`:
+- `isHorizontal={false}` (default): grid card.
+- `isHorizontal={true}`: phone list item, with an edge-to-edge thumbnail and "channel · views · time" on one line.
 
-The grid card uses Tailwind named groups: `group/card` for the outer container and `group/ch` for the channel link row, allowing `group-hover/card:scale-105` etc. without conflicts.
+`components/video-grid.tsx` renders a list of `VideoItem`s as the standard grid (md+) plus the phone list, with only the first card loading early. Use it for video lists instead of hand-written cards (category, scholar and channel pages already do). The home feed has its own grid: 3 columns with the full sidebar and 4 with the mini sidebar (at xl+; 3/2 on narrower screens).
+
+`components/short-card.tsx` is the one Shorts card (9:16 thumbnail, title, views, menu) used on the channel, scholar, History, Watch Later and Liked pages. Card and list-row text is the same everywhere: titles 16px medium on desktop / 15px on phones (`text-[15px] md:text-base`), secondary text 14px / 13px; the compact related list and playlist panel use the phone sizes.
+
+### UI conventions (YouTube-like)
+
+- Font: Roboto via `next/font` (`--font-roboto`, Tailwind `font-sans`). Bangla/Arabic/Urdu text falls back to the system font.
+- Colours: the tokens in `app/globals.css` use YouTube's neutrals (`muted` = #f2f2f2 / #272727 fills and chips, `accent` = hover, `muted-foreground` = #606060 / #aaa secondary text). YouTube blue (`#065fd4`, dark `#3ea6ff`) is only for the Sign in button and the search focus border.
+- Three-dot menus: use `MoreButton` (`components/more-button.tsx`): solid dots (`MoreVertIcon`), 20px on phones and 24px from `md` up, in a 40px circle. Always visible, never hover-only (phones have no hover); the same goes for row buttons like History's remove ✕. Don't use lucide's `MoreVertical` (its dots are too small).
+- Sizes: page titles 24px bold, card/list titles 16px medium (14–15px on phones), secondary text 12–14px. Avoid text under 12px except the 10px nav labels.
+- Chips: `h-8 px-3 rounded-lg text-sm font-medium`, `bg-muted hover:bg-accent`, selected `bg-foreground text-background`.
+- Dropdown menus (`components/ui/dropdown-menu.tsx`) have YouTube-sized rows: 36px+, 20px icons (the item sets the size and gap; don't add `mr-*` to icons), full-width hover.
+- Account menu (`components/account-dropdown.tsx`): profile header with "View your account", then grouped rows; Appearance opens as an in-place sub-page with a back arrow (same on phones).
+- Notifications panel (`components/notification-dropdown.tsx`): the list area has a fixed height from the first frame and the loading placeholders fill it, so the panel opens at full size instead of growing after loading.
 
 ### Route patterns
 
@@ -152,6 +167,6 @@ Pages are client components, so they can't export `metadata`. Each route has a s
 ### Image loading (measured with Lighthouse, mobile + desktop)
 
 - Load **only one** image per page early: the main (LCP) image, via `imagePriorityProps(...)` / `priorityForIndex(index)` from `lib/image-priority.ts`. Loading several images early made LCP worse on mobile: they compete for bandwidth, and pages that render a hidden desktop/mobile copy of a list download the hidden copy's eager images too.
-- Default is `preload` + high priority (React starts the download during render, which helped the heavy client-rendered lists). Watch Later and Liked measured better with `{ preload: false }` (eager + high priority). Don't add early loading to the video page's related list or the Shorts feed; both measured no better.
+- Default is `preload` + high priority (React starts the download during render, which helped the heavy client-rendered lists). Watch Later and Liked measured better with `{ preload: false }` (eager + high priority). Don't add early loading to the video page's related list; it measured no better. On Shorts only the first short's thumbnail loads early (it is the main image until the player starts; mobile LCP 2.6s → 2.3s).
 - `youtubeThumb(id, "small")` (320 px) is only for images up to ~170 CSS px wide where the page has no hidden duplicate using the larger size; otherwise use the default 480 px version so both copies share one download.
 - The header logo uses `public/logo-header*.webp` (sized for the header); the original PNGs are kept for other uses.

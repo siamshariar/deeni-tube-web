@@ -20,8 +20,6 @@ export default function Home() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [allVideos] = useState<VideoItem[]>(videoData);
   const [preferredLanguages, setPreferredLanguages] = useState<string[]>(["en"]);
-  const [hasSelected, setHasSelected] = useState(false);
-  const [isGuest, setIsGuest] = useState(true);
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
   const { followedChannels: visibleChannelIds } = useFeedPreferences();
@@ -90,8 +88,6 @@ export default function Home() {
       try {
         const parsed = JSON.parse(hasSelectedPref);
         setPreferredLanguages(parsed.languages || ["en"]);
-        setHasSelected(true);
-        setIsGuest(parsed.isGuest !== false);
       } catch {}
     }
   }, []);
@@ -103,8 +99,6 @@ export default function Home() {
 
   const saveLanguagePrefs = (languages: string[], guest: boolean = true) => {
     setPreferredLanguages(languages);
-    setHasSelected(true);
-    setIsGuest(guest);
     localStorage.setItem(
       "deeni-lang-prefs",
       JSON.stringify({ languages, hasSelected: true, isGuest: guest })
@@ -152,17 +146,17 @@ export default function Home() {
 
   // Chip bar position: follows header visibility, starts right below header
   const chipBarTop = headerVisible ? "top-[56px]" : "top-0";
-  const contentMarginTop = headerVisible ? "104px" : "48px";
+  const contentMarginTop = headerVisible ? "112px" : "56px";
   
   // Dynamic chip bar width based on sidebar state
   const chipBarLeft = sidebarCollapsed ? "md:left-[72px]" : "md:left-[240px]";
   const chipBarWidth = sidebarCollapsed ? "md:w-[calc(100%-72px)]" : "md:w-[calc(100%-240px)]";
 
-  // Dynamic grid columns based on sidebar state
-  // A collapsed sidebar frees up width, so it should never give fewer columns
+  // Grid columns: 3 per row with the full sidebar, 4 with the mini sidebar (more room),
+  // fewer on narrower screens.
   const gridColumns = sidebarCollapsed
-    ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-    : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+    ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+    : "md:grid-cols-2 lg:grid-cols-3";
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -179,7 +173,7 @@ export default function Home() {
       {/* Category chip bar — hidden until first-time language selection is done */}
       <div
         className={cn(
-          "sidebar-offset fixed z-20 h-12 border-b bg-background w-full transition-all duration-300",
+          "sidebar-offset fixed z-20 h-14 bg-background w-full transition-all duration-300",
           chipBarLeft,
           chipBarWidth,
           chipBarTop,
@@ -188,7 +182,7 @@ export default function Home() {
       >
         <div
           ref={scrollContainerRef}
-          className="h-full overflow-x-auto scrollbar-none px-3"
+          className="h-full overflow-x-auto scrollbar-none px-3 lg:px-6"
           style={{
             WebkitOverflowScrolling: "touch",
             overscrollBehaviorX: "contain",
@@ -197,16 +191,18 @@ export default function Home() {
             msOverflowStyle: 'none', // IE/Edge
           }}
         >
-          <div className="flex gap-2 py-2 w-max items-center h-full">
+          <div className="flex gap-3 w-max items-center h-full">
             {chipItems.map((chip: string) => (
               <button
                 key={chip}
+                type="button"
+                aria-pressed={activeChip === chip}
                 onClick={() => setActiveChip(chip)}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 select-none",
+                  "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 select-none",
                   activeChip === chip
                     ? "bg-foreground text-background"
-                    : "bg-muted hover:bg-muted/80 text-foreground"
+                    : "bg-muted hover:bg-accent text-foreground"
                 )}
               >
                 {chip}
@@ -221,38 +217,36 @@ export default function Home() {
         style={{ marginTop: contentMarginTop }}
         className={cn("transition-[margin-top] duration-300", isFirstTime && showLanguagePrompt && "invisible")}
       >
-        {hasSelected && preferredLanguages.length > 0 && (
-          <div className="px-4 py-1.5 text-xs text-muted-foreground bg-muted/30 border-b hidden md:block">
-            Content: {preferredLanguages.map((l: string) => l.toUpperCase()).join(", ")}
-            {isGuest && " (Guest)"}
-          </div>
-        )}
-
         {initialLoading ? (
           <>
             <div className={cn(
-              "hidden md:grid gap-4 p-4 transition-all duration-300",
+              "hidden md:grid gap-x-4 gap-y-10 px-4 pb-10 pt-6 lg:px-6",
               gridColumns
             )}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={`dsk-${i}`} className="flex flex-col border rounded-xl overflow-hidden bg-card shadow-sm">
-                  <Skeleton className="aspect-video w-full" />
-                  <div className="p-3 space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={`dsk-${i}`} className="flex flex-col">
+                  <Skeleton className="aspect-video w-full rounded-xl" />
+                  <div className="flex gap-3 pt-3">
+                    <Skeleton className="h-9 w-9 flex-shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2 pt-0.5">
+                      <Skeleton className="h-4 w-11/12" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3.5 w-1/2" />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-1 gap-4 p-2 md:hidden">
+            <div className="grid grid-cols-1 gap-6 pb-4 sm:grid-cols-2 sm:gap-x-4 sm:px-4 sm:pt-4 md:hidden">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={`msk-${i}`} className="flex flex-col border rounded-xl overflow-hidden shadow-sm">
-                  <Skeleton className="aspect-video w-full" />
-                  <div className="p-3 space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
+                <div key={`msk-${i}`} className="flex flex-col">
+                  <Skeleton className="aspect-video w-full rounded-none sm:rounded-xl" />
+                  <div className="flex gap-3 px-3 pt-3">
+                    <Skeleton className="h-9 w-9 flex-shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2 pt-0.5">
+                      <Skeleton className="h-4 w-11/12" />
+                      <Skeleton className="h-3.5 w-2/3" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -277,7 +271,7 @@ export default function Home() {
         ) : (
           <>
             <div className={cn(
-              "hidden md:grid gap-4 p-4 transition-all duration-300",
+              "hidden md:grid gap-x-4 gap-y-10 px-4 pb-10 pt-6 lg:px-6",
               gridColumns
             )}>
               {displayedVideos.map((video: VideoItem, index: number) => (
@@ -297,7 +291,7 @@ export default function Home() {
                 />
               ))}
             </div>
-            <div className="grid grid-cols-1 gap-4 p-2 md:hidden">
+            <div className="grid grid-cols-1 gap-6 pb-4 sm:grid-cols-2 sm:gap-x-4 sm:px-4 sm:pt-4 md:hidden">
               {displayedVideos.map((video: VideoItem, index: number) => (
                 <VideoCard
                   key={video.id}
@@ -310,7 +304,7 @@ export default function Home() {
                   timestamp={video.timeAgo}
                   duration={video.duration}
                   thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                  isHorizontal={false}
+                  isHorizontal={true}
                   imagePriority={priorityForIndex(index)}
                 />
               ))}

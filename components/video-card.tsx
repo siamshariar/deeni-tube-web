@@ -1,11 +1,10 @@
 // components/video-card.tsx
 "use client";
 
-import { MoreVertical, Clock, Bookmark, Share, UserX, Flag, BookmarkCheck, EyeOff } from "lucide-react";
+import { Clock, Bookmark, Share, UserX, Flag, BookmarkCheck, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,6 +17,7 @@ import { ReportDialog } from "@/components/report-dialog";
 import { toast } from "sonner";
 import { getChannelHref } from "@/lib/channel-data";
 import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
+import { MoreButton } from "@/components/more-button";
 
 interface VideoCardProps {
   isHorizontal?: boolean;
@@ -100,22 +100,22 @@ export default function VideoCard({
   // Drawer items (mobile)
   const drawerItems = (
     <>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowShareModal(true), 150); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowShareModal(true), 150); }}>
         <Share className="h-5 w-5" /><span>Share</span>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); handleWatchLaterToggle(); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); handleWatchLaterToggle(); }}>
         {saved ? <><BookmarkCheck className="h-5 w-5 fill-current text-primary" /><span className="text-primary">Saved</span></> : <><Clock className="h-5 w-5" /><span>Save to Watch later</span></>}
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowPlaylistDialog(true), 150); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowPlaylistDialog(true), 150); }}>
         <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); handleDontRecommend(); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); handleDontRecommend(); }}>
         <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); handleNotInterested(); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); handleNotInterested(); }}>
         <EyeOff className="h-5 w-5" /><span>Not interested</span>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}>
         <Flag className="h-5 w-5" /><span>Report</span>
       </div>
     </>
@@ -124,22 +124,22 @@ export default function VideoCard({
   // Dropdown items (desktop) — use onSelect+preventDefault for items that open modals
   const dropdownItems = (
     <>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowShareModal(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowShareModal(true); }}>
         <Share className="h-5 w-5" /><span>Share</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={handleWatchLaterToggle}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleWatchLaterToggle}>
         {saved ? <><BookmarkCheck className="h-5 w-5 fill-current text-primary" /><span className="text-primary">Saved</span></> : <><Clock className="h-5 w-5" /><span>Save to Watch later</span></>}
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); }}>
         <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={handleDontRecommend}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleDontRecommend}>
         <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={handleNotInterested}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleNotInterested}>
         <EyeOff className="h-5 w-5" /><span>Not interested</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}>
         <Flag className="h-5 w-5" /><span>Report</span>
       </DropdownMenuItem>
     </>
@@ -148,119 +148,106 @@ export default function VideoCard({
   const videoLink = `/videos/${channel}/${videoId}`;
   const channelLink = getChannelHref(channelId);
 
+  // Three-dot menu (always visible): a bottom drawer on phones, a dropdown elsewhere
+  const menu = isMobile ? (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
+        <MoreButton onClick={(e) => e.stopPropagation()} />
+      </DrawerTrigger>
+      <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
+        <div className="mt-2 pb-6">{drawerItems}</div>
+      </DrawerContent>
+    </Drawer>
+  ) : (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <MoreButton onClick={(e) => e.stopPropagation()} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">{dropdownItems}</DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const dialogs = (
+    <>
+      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} videoUrl={videoUrl} />
+      <AddToPlaylistDialog video={{ id: videoId, title, channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
+      <ReportDialog videoTitle={title} videoId={videoId} open={showReportDialog} onOpenChange={setShowReportDialog} />
+    </>
+  );
+
+  const avatar = (
+    <Link aria-label={channel} href={channelLink} className="mt-0.5 flex-shrink-0">
+      <Avatar className="h-9 w-9">
+        <AvatarImage src={channelAvatar} alt="" />
+        <AvatarFallback className="text-sm font-medium">{channel.charAt(0)}</AvatarFallback>
+      </Avatar>
+    </Link>
+  );
+
+  const durationBadge = duration ? (
+    <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">
+      {duration}
+    </span>
+  ) : null;
+
   if (isHorizontal) {
-    // Mobile horizontal list – unchanged
+    // Phone list item: edge-to-edge thumbnail, details underneath (YouTube mobile)
     return (
-      <div className="flex flex-col p-3">
+      <div className="flex flex-col">
         <Link href={videoLink} className="block">
-          <div className="relative aspect-video w-full">
-            <Image src={thumbnail} alt={title} fill {...imagePriorityProps(imagePriority)} className="object-cover rounded-lg" />
-            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 py-0.5 rounded">{duration}</div>
+          <div className="relative aspect-video w-full bg-muted sm:overflow-hidden sm:rounded-xl">
+            <Image src={thumbnail} alt={title} fill sizes="100vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
+            {durationBadge}
           </div>
         </Link>
-        <div className="flex mt-3 gap-3">
-          <Link aria-label={channel} href={channelLink} className="flex-shrink-0">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={channelAvatar} />
-              <AvatarFallback>{channel.charAt(0)}</AvatarFallback>
-            </Avatar>
-          </Link>
-          <div className="flex-1 min-w-0">
-            <Link href={videoLink} className="line-clamp-2 font-medium text-sm">{title}</Link>
-            <Link href={channelLink} className="text-muted-foreground text-xs mt-1 block">{channel}</Link>
-            <div className="text-muted-foreground text-xs flex items-center gap-1">
-              <span>{views}</span><span>•</span><span>{timestamp}</span>
-            </div>
+        <div className="flex gap-3 pl-3 pr-1 pt-3">
+          {avatar}
+          <div className="min-w-0 flex-1">
+            <Link href={videoLink} className="line-clamp-2 text-[15px] font-medium leading-5">{title}</Link>
+            <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">
+              <Link href={channelLink} className="hover:text-foreground">{channel}</Link>
+              <span aria-hidden="true"> · </span>{views}<span aria-hidden="true"> · </span>{timestamp}
+            </p>
           </div>
-          {isMobile ? (
-            <Drawer open={open} onOpenChange={setOpen}>
-              <DrawerTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent className="px-0 max-h-[70vh]">
-                <div className="mt-2 pb-6">{drawerItems}</div>
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full self-start" onClick={e => e.stopPropagation()}>
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 p-0 rounded-xl">{dropdownItems}</DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <div className="-mt-2">{menu}</div>
         </div>
-        <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} videoUrl={videoUrl} />
-        <AddToPlaylistDialog video={{ id: videoId, title, channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
-        <ReportDialog videoTitle={title} videoId={videoId} open={showReportDialog} onOpenChange={setShowReportDialog} />
+        {dialogs}
       </div>
     );
   }
 
-  // Desktop grid card
+  // Grid card (YouTube home layout): rounded thumbnail, avatar + text below, no card chrome
   return (
-    <div className="group/card flex flex-col border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 bg-card">
-      <Link href={videoLink} className="block relative overflow-hidden">
-        <div className="relative aspect-video w-full">
-          <Image src={thumbnail} alt={title} fill {...imagePriorityProps(imagePriority)} className="object-cover transition-transform duration-300 group-hover/card:scale-105" />
-          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 py-0.5 rounded font-medium">{duration}</div>
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-            <div className="bg-black/60 rounded-full p-2.5">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white fill-white"><path d="M8 5v14l11-7z"/></svg>
-            </div>
-          </div>
+    <div className="group/card flex min-w-0 flex-col">
+      <Link href={videoLink} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
+          <Image
+            src={thumbnail}
+            alt={title}
+            fill
+            sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+            {...imagePriorityProps(imagePriority)}
+            className="object-cover"
+          />
+          {durationBadge}
         </div>
       </Link>
-      <div className="p-3 flex-1 flex flex-col gap-1">
-        {/* Title + three‑dot menu */}
-        <div className="flex items-start justify-between gap-1">
-          <Link href={videoLink} className="line-clamp-2 font-medium text-sm hover:text-primary transition-colors flex-1 leading-snug">
-            {title}
+      <div className="flex gap-3 pt-3">
+        {avatar}
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-medium leading-[22px]">
+            <Link href={videoLink} className="line-clamp-2 [overflow-wrap:anywhere]" title={title}>{title}</Link>
+          </h3>
+          <Link href={channelLink} className="mt-1 block truncate text-sm leading-5 text-muted-foreground transition-colors hover:text-foreground">
+            {channel}
           </Link>
-          {isMobile ? (
-            <Drawer open={open} onOpenChange={setOpen}>
-              <DrawerTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent className="px-0 max-h-[70vh]">
-                <div className="mt-2 pb-6">{drawerItems}</div>
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions" className="h-8 w-8 rounded-full flex-shrink-0 -mr-1" onClick={e => e.stopPropagation()}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-60 p-0 rounded-xl">{dropdownItems}</DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <p className="truncate text-sm leading-5 text-muted-foreground">
+            {views}<span aria-hidden="true"> • </span>{timestamp}
+          </p>
         </div>
-
-        {/* Channel row with avatar */}
-        <Link href={channelLink} className="flex items-center gap-1.5 mt-0.5 group/ch">
-          <Avatar className="h-5 w-5 flex-shrink-0">
-            <AvatarImage src={channelAvatar} />
-            <AvatarFallback className="text-[9px]">{channel.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <span className="text-xs text-muted-foreground group-hover/ch:text-foreground transition-colors truncate">{channel}</span>
-        </Link>
-
-        {/* Views and time */}
-        <div className="text-muted-foreground text-xs flex items-center gap-1">
-          <span>{views}</span><span>•</span><span>{timestamp}</span>
-        </div>
+        <div className="-mr-2 -mt-1.5">{menu}</div>
       </div>
-      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} videoUrl={videoUrl} />
-      <AddToPlaylistDialog video={{ id: videoId, title, channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
-      <ReportDialog videoTitle={title} videoId={videoId} open={showReportDialog} onOpenChange={setShowReportDialog} />
+      {dialogs}
     </div>
   );
 }

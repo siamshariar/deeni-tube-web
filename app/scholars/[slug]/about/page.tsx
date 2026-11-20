@@ -133,7 +133,7 @@ export default function ScholarAboutPage() {
                       sizes="128px"
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded">{video.duration}</div>
+                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs font-medium px-1 py-px rounded">{video.duration}</div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">{video.title}</p>

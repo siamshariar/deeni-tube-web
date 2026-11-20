@@ -125,9 +125,9 @@ export default function AppHeader() {
       ) : isLoggedIn ? (
         <AccountDropdown />
       ) : (
-        <Button asChild variant="ghost" size="icon" className="rounded-full">
+        <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           <Link href="/signin" aria-label="Sign in">
-            <UserCircle className="h-5 w-5" />
+            <UserCircle className="h-6 w-6" />
           </Link>
         </Button>
       )}
@@ -153,11 +153,11 @@ export default function AppHeader() {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full"
+              className="h-10 w-10 rounded-full"
               aria-label="Search"
               onClick={() => window.dispatchEvent(new CustomEvent("open-search-modal"))}
             >
-              <Search className="h-5 w-5" />
+              <Search className="h-6 w-6" />
             </Button>
             <NotificationDropdown />
             {userArea}
@@ -172,15 +172,15 @@ export default function AppHeader() {
           !headerVisible && "-translate-y-full"
         )}
       >
-        <div className="flex items-center justify-between px-4 py-2 border-b">
+        <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-4 flex-shrink-0">
             <button
               onClick={toggleSidebar}
-              className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted transition-colors"
+              className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-muted active:bg-accent transition-colors"
               type="button"
               aria-label="Toggle sidebar"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </button>
             <Link href="/">
               <Logo height={28} className="h-7 w-auto" />
@@ -198,7 +198,7 @@ export default function AppHeader() {
                   onChange={e => setDesktopSearchQuery(e.target.value)}
                   onFocus={() => { loadRecentSearches(); setShowDesktopRecent(true); }}
                   onClick={() => { loadRecentSearches(); setShowDesktopRecent(true); }}
-                  className="w-full h-10 py-2 px-4 rounded-l-full border border-r-0 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-background text-foreground"
+                  className="w-full h-10 py-2 pl-4 pr-10 rounded-l-full border border-input border-r-0 text-base placeholder:text-muted-foreground focus:outline-none focus:border-[#1c62b9] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] dark:focus:border-[#3ea6ff] bg-background text-foreground"
                 />
                 {desktopSearchQuery && (
                   <button
@@ -207,13 +207,13 @@ export default function AppHeader() {
                     type="button"
                     aria-label="Clear search"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-5 w-5" />
                   </button>
                 )}
 
                 {showDesktopRecent && recentSearches.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-xl shadow-lg z-50 overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2 border-b">
+                    <div className="flex h-14 items-center justify-between px-4">
                       <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
                       <button type="button" onClick={clearRecent} className="text-xs text-primary hover:underline">Clear all</button>
                     </div>
@@ -248,19 +248,19 @@ export default function AppHeader() {
               <Button
                 variant="secondary"
                 size="icon"
-                className="rounded-r-full h-10 border border-l-0 bg-muted hover:bg-muted/80 flex-shrink-0"
+                className="rounded-r-full h-10 w-16 border border-input bg-[#f8f8f8] hover:bg-[#f0f0f0] dark:bg-[#222] dark:hover:bg-[#2a2a2a] flex-shrink-0"
                 type="submit"
                 aria-label="Search"
               >
-                <Search className="w-5 h-5" />
+                <Search className="w-6 h-6" />
               </Button>
-              <Button type="button" aria-label="Search with your voice" variant="ghost" size="icon" className="rounded-full ml-2 bg-muted hover:bg-muted/80 flex-shrink-0">
-                <Mic className="w-5 h-5" />
+              <Button type="button" aria-label="Search with your voice" variant="ghost" size="icon" className="h-10 w-10 rounded-full ml-3 bg-muted hover:bg-accent flex-shrink-0">
+                <Mic className="w-6 h-6" />
               </Button>
             </form>
           </div>
 
-          <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <NotificationDropdown />
             <div className="flex items-center justify-end">
               {!authLoaded ? (
@@ -268,9 +268,9 @@ export default function AppHeader() {
               ) : isLoggedIn ? (
                 <AccountDropdown />
               ) : (
-                <Button asChild variant="outline" className="rounded-full flex items-center gap-2 h-9 text-sm px-4 text-primary border-primary/50 hover:bg-primary/10">
+                <Button asChild variant="outline" className="rounded-full flex items-center gap-1.5 h-9 text-sm font-medium pl-2 pr-3 text-[#065fd4] dark:text-[#3ea6ff] border-border bg-transparent hover:bg-[#def1ff] dark:hover:bg-[#263850] hover:text-[#065fd4] dark:hover:text-[#3ea6ff] hover:border-transparent">
                   <Link href="/signin">
-                    <UserCircle className="h-5 w-5" />
+                    <UserCircle className="h-6 w-6" />
                     <span>Sign In</span>
                   </Link>
                 </Button>

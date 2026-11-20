@@ -7,20 +7,21 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
-  MoreVertical,
   Share,
   Clock,
-  Bookmark,
   UserX,
   Flag,
   ThumbsUp,
   ThumbsDown,
   MoreHorizontal,
   MessageCircle,
+  ListPlus,
+  Check,
   EyeOff,
   Send,
   X,
 } from "lucide-react";
+import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -54,6 +55,15 @@ import { videoData, VideoItem } from "@/lib/video-data"; // ✅ shared data
 
 import type { CommentReply } from "@/lib/types";
 import { youtubeThumb } from "@/lib/media-lookup";
+import { getChannelHref } from "@/lib/channel-data";
+
+// YouTube-style action pill (36px tall, 24px icon) and round icon button
+const PILL =
+  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+const ROUND =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+const MENU_ITEM = "flex items-center gap-4 px-4 py-2 text-sm cursor-pointer";
+const DRAWER_ITEM = "flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer";
 // ─── Mock comments (unchanged) ─────────────────────────────────────
 const mockCommentsWithReplies = [
   {
@@ -362,6 +372,15 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [selectedRelatedVideo, setSelectedRelatedVideo] = useState<VideoItem | null>(null);
   const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
+  const toggleWatchLater = (v: VideoItem) => {
+    if (isInWatchLater(v.id)) {
+      removeFromWatchLater(v.id);
+      toast.success("Removed from Watch later");
+    } else {
+      addToWatchLater({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration, addedAt: Date.now() });
+      toast.success("Saved to Watch later");
+    }
+  };
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
 
@@ -488,7 +507,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
             className="flex items-center gap-1.5 px-4 py-2 w-full min-h-[44px]"
           >
             <ArrowLeft className="h-5 w-5 shrink-0" />
-            <span className="text-sm font-medium line-clamp-1 text-left">
+            <span className="text-[15px] font-medium line-clamp-1 text-left">
               {mainVideo.title}
             </span>
           </button>
@@ -513,8 +532,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
         )}
 
         {/* Content */}
-        <div className="px-3 md:px-4">
-          <div className="flex flex-col lg:flex-row gap-4">
+        <div className="px-3 md:px-6">
+          <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
               {/* Desktop video player */}
               {!isMobile && (
@@ -531,121 +550,114 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                 </div>
               )}
 
-              {/* Video info */}
-              <div className="mt-2">
-                {/* ── Mobile: single row — avatar | title+channel | share+3-dot ── */}
-                <div className="flex md:hidden items-center gap-2">
-                  <Avatar className="h-9 w-9 flex-shrink-0">
-                    <AvatarImage src={mainVideo.channelAvatar} />
-                    <AvatarFallback>{mainVideo.channel.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-sm font-semibold leading-snug line-clamp-2">{mainVideo.title}</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">{mainVideo.channel} • 780K subscribers</p>
-                  </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <Button aria-label="Share" variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowShareModal(true)}>
-                      <Share className="h-4 w-4" />
-                    </Button>
-                    <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
-                      <DrawerTrigger asChild>
-                        <Button aria-label="More actions" variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent className="px-0 max-h-[70vh]">
-                        <div className="mt-2 pb-6">
-                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</div>
-                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</div>
-                          <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-5 w-5" /> Report</div>
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-                  </div>
-                </div>
+              {/* Video info (YouTube watch page layout) */}
+              <div className="mt-3">
+                <h1 className="text-lg md:text-xl font-semibold md:font-bold leading-6 md:leading-7 line-clamp-2 md:line-clamp-none [overflow-wrap:anywhere]">
+                  {mainVideo.title}
+                </h1>
 
-                {/* ── Desktop: title above, channel row with actions ── */}
-                <div className="hidden md:block">
-                  <h1 className="text-xl font-bold leading-tight">{mainVideo.title}</h1>
-                  <div className="flex md:items-center md:justify-between gap-2 mt-2">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={mainVideo.channelAvatar} />
-                        <AvatarFallback>{mainVideo.channel.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{mainVideo.channel}</p>
-                        <p className="text-xs text-muted-foreground">780K subscribers</p>
-                      </div>
+                <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  {/* Channel */}
+                  <Link href={getChannelHref(mainVideo.channelId)} className="flex min-w-0 items-center gap-3 self-start md:self-auto">
+                    <Avatar className="h-9 w-9 md:h-10 md:w-10 flex-shrink-0">
+                      <AvatarImage src={mainVideo.channelAvatar} alt="" />
+                      <AvatarFallback className="font-medium">{mainVideo.channel.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] md:text-base font-medium leading-5">{mainVideo.channel}</p>
+                      <p className="text-xs leading-[18px] text-muted-foreground">780K subscribers</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button aria-label="Share" variant="ghost" size="icon" className="rounded-full" onClick={() => setShowShareModal(true)}>
-                        <Share className="h-5 w-5" />
-                      </Button>
+                  </Link>
+
+                  {/* Actions — a scrollable row of pills on phones */}
+                  <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 scrollbar-none md:mx-0 md:overflow-visible md:px-0">
+                    <button type="button" className={PILL} onClick={() => setShowShareModal(true)}>
+                      <Share /> Share
+                    </button>
+                    <button
+                      type="button"
+                      className={PILL}
+                      aria-pressed={isInWatchLater(mainVideo.id)}
+                      onClick={() => toggleWatchLater(mainVideo)}
+                    >
+                      {isInWatchLater(mainVideo.id) ? <><Check /> Saved</> : <><Clock /> Watch later</>}
+                    </button>
+                    <button type="button" className={PILL} onClick={() => setShowPlaylistDialog(true)}>
+                      <ListPlus /> Save
+                    </button>
+                    {isMobile ? (
+                      <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
+                        <DrawerTrigger asChild>
+                          <button type="button" aria-label="More actions" className={ROUND}>
+                            <MoreHorizontal />
+                          </button>
+                        </DrawerTrigger>
+                        <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
+                          <div className="mt-2 pb-6">
+                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
+                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
+                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-6 w-6" /> Report</div>
+                          </div>
+                        </DrawerContent>
+                      </Drawer>
+                    ) : (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
-                            <MoreHorizontal className="h-5 w-5" />
-                          </Button>
+                          <button type="button" aria-label="More actions" className={ROUND}>
+                            <MoreHorizontal />
+                          </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-72">
-                          <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
+                        <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Description – inline expand on desktop, modal on mobile */}
-                <div className="mt-2 bg-muted/40 rounded-xl p-3 md:p-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium">{mainVideo.views}</span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-muted-foreground">{mainVideo.timeAgo}</span>
-                  </div>
+                <div className="mt-3 rounded-xl bg-muted p-3 text-sm leading-5">
+                  <p className="font-medium">
+                    {mainVideo.views}
+                    <span className="ml-2">{mainVideo.timeAgo}</span>
+                  </p>
                   {isMobile ? (
                     <>
-                      <p className="text-sm mt-1 line-clamp-2">
-                        {mainVideo.description}
-                      </p>
+                      <p className="mt-1 line-clamp-2 [overflow-wrap:anywhere]">{mainVideo.description}</p>
                       <button
+                        type="button"
                         onClick={() => setDescriptionModalOpen(true)}
-                        className="text-sm text-primary hover:underline font-medium mt-1"
+                        className="mt-1 font-medium hover:underline"
                       >
-                        Read more
+                        ...more
                       </button>
                     </>
-                  ) : (
+                  ) : showFullDescription || (mainVideo.description?.length ?? 0) <= 150 ? (
                     <>
-                      {showFullDescription ? (
-                        <p className="text-sm mt-1 whitespace-pre-wrap">
-                          {mainVideo.description}
-                          <button
-                            onClick={() => setShowFullDescription(false)}
-                            className="text-primary ml-1 hover:underline font-medium text-sm"
-                          >
-                            Show less
-                          </button>
-                        </p>
-                      ) : (
-                        <>
-                          <p className="text-sm mt-1 line-clamp-2">
-                            {mainVideo.description?.slice(0, 150)}
-                            {mainVideo.description && mainVideo.description.length > 150 && "..."}
-                          </p>
-                          {mainVideo.description && mainVideo.description.length > 150 && (
-                            <button
-                              onClick={() => setShowFullDescription(true)}
-                              className="text-sm text-primary hover:underline font-medium mt-1"
-                            >
-                              Read more
-                            </button>
-                          )}
-                        </>
+                      <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{mainVideo.description}</p>
+                      {(mainVideo.description?.length ?? 0) > 150 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowFullDescription(false)}
+                          className="mt-3 font-medium hover:underline"
+                        >
+                          Show less
+                        </button>
                       )}
                     </>
+                  ) : (
+                    <p className="mt-1 [overflow-wrap:anywhere]">
+                      {mainVideo.description?.slice(0, 150)}...{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowFullDescription(true)}
+                        className="font-medium hover:underline"
+                      >
+                        more
+                      </button>
+                    </p>
                   )}
                 </div>
 
@@ -879,84 +891,76 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
 
             {/* Related Videos – Desktop */}
             {!isMobile && (
-              <div className="lg:w-[450px] flex-shrink-0">
-                <h3 className="font-semibold text-base mb-2">Related Videos</h3>
-                <div className="space-y-3">
+              <aside className="lg:w-[402px] flex-shrink-0" aria-labelledby="related-heading">
+                <h2 id="related-heading" className="mb-3 text-base font-medium">Related videos</h2>
+                <div className="space-y-2">
                   {relatedVideos.map((v) => (
-                    <div key={v.id} className="flex gap-2 group hover:bg-muted/30 rounded-lg p-1 transition-colors">
-                      <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-[168px] h-[94px] flex-shrink-0">
-                        <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover rounded-lg" />
-                        <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1 py-0.5 rounded font-medium">{v.duration}</div>
+                    <div key={v.id} className="group/rel relative flex gap-2">
+                      <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative h-[94px] w-[168px] flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                        <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
+                        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
                       </Link>
-                      <div className="flex-1 min-w-0 py-1">
-                        <div className="flex items-start gap-1">
-                          <Link href={`/videos/${v.channel}/${v.videoId}`} className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary">{v.title}</h4>
-                          </Link>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { if (isInWatchLater(v.id)) { removeFromWatchLater(v.id); toast.success("Removed from Watch Later"); } else { addToWatchLater({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`, views: v.views, timeAgo: v.timeAgo, duration: v.duration, addedAt: Date.now() }); toast.success("Saved to Watch Later"); } }}><Clock className="h-4 w-4 mr-2" /> {isInWatchLater(v.id) ? "Saved to Watch Later" : "Save to Watch Later"}</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); setSelectedRelatedVideo(v); }}><Bookmark className="h-4 w-4 mr-2" /> Save to playlist</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); setSelectedRelatedVideo(v); }}><Flag className="h-4 w-4 mr-2" /> Report</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><Share className="h-4 w-4 mr-2" /> Share</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">{v.channel}</p>
-                        <p className="text-xs text-muted-foreground">{v.views} • {v.timeAgo}</p>
+                      <div className="min-w-0 flex-1 pr-7">
+                        <Link href={`/videos/${v.channel}/${v.videoId}`} className="block">
+                          <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
+                        </Link>
+                        <Link href={getChannelHref(v.channelId)} className="mt-1 block truncate text-[13px] leading-[18px] text-muted-foreground hover:text-foreground">{v.channel}</Link>
+                        <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{v.views} • {v.timeAgo}</p>
                       </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <MoreButton onClick={(e) => e.stopPropagation()} className="absolute -right-2 -top-1.5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => toggleWatchLater(v)}><Clock className="h-5 w-5" /> {isInWatchLater(v.id) ? "Remove from Watch later" : "Save to Watch later"}</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setSelectedRelatedVideo(v); setShowPlaylistDialog(true); }}><ListPlus className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><Share className="h-5 w-5" /> Share</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setSelectedRelatedVideo(v); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
-              </div>
+              </aside>
             )}
           </div>
         </div>
 
         {/* Related Videos – Mobile */}
         {isMobile && (
-          <div className="px-3 mt-6">
-            <h3 className="font-semibold text-base mb-4">Related Videos</h3>
+          <section className="mt-6 px-3" aria-labelledby="related-heading-mobile">
+            <h2 id="related-heading-mobile" className="mb-3 text-base font-medium">Related videos</h2>
             <div className="space-y-3">
               {relatedVideos.map((v) => (
-                <div key={v.id} className="flex gap-3 group py-2 border-b last:border-0">
-                  <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-40 aspect-video flex-shrink-0">
+                <div key={v.id} className="flex gap-3">
+                  <Link href={`/videos/${v.channel}/${v.videoId}`} className="relative w-40 aspect-video flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                     {/* Lazy on purpose: preloading the first one measured worse (it competes with the YouTube player) */}
-                    <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover rounded-lg" />
-                    <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded font-medium">{v.duration}</div>
+                    <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
+                    <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
                   </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-1">
-                      <Link href={`/videos/${v.channel}/${v.videoId}`} className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary">{v.title}</h4>
-                      </Link>
-                      <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); }}>
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{v.channel}</p>
-                    <p className="text-xs text-muted-foreground">{v.views} • {v.timeAgo}</p>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/videos/${v.channel}/${v.videoId}`} className="block">
+                      <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
+                    </Link>
+                    <p className="mt-1 truncate text-[13px] leading-[18px] text-muted-foreground">{v.channel}</p>
+                    <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{v.views} • {v.timeAgo}</p>
                   </div>
+                  <MoreButton onClick={(e) => { e.stopPropagation(); setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); }} className="-mr-2 -mt-1.5" />
                 </div>
               ))}
             </div>
             {/* Single Drawer outside map — uses separate state from main video drawer */}
             <Drawer open={relatedDrawerOpen} onOpenChange={(o) => { if (!o) { setRelatedDrawerOpen(false); setSelectedRelatedVideo(null); } }}>
-              <DrawerContent className="px-0 max-h-[70vh]">
+              <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
                 <div className="mt-2 pb-6">
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setRelatedDrawerOpen(false); if (selectedRelatedVideo) { if (isInWatchLater(selectedRelatedVideo.id)) { removeFromWatchLater(selectedRelatedVideo.id); toast.success("Removed from Watch Later"); } else { addToWatchLater({ id: selectedRelatedVideo.id, title: selectedRelatedVideo.title, channel: selectedRelatedVideo.channel, channelAvatar: selectedRelatedVideo.channelAvatar || "", thumbnail: `https://img.youtube.com/vi/${selectedRelatedVideo.videoId}/hqdefault.jpg`, views: selectedRelatedVideo.views, timeAgo: selectedRelatedVideo.timeAgo, duration: selectedRelatedVideo.duration, addedAt: Date.now() }); toast.success("Saved to Watch Later"); } } }}><Clock className="h-5 w-5" /> {selectedRelatedVideo && isInWatchLater(selectedRelatedVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}</div>
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowPlaylistDialog(true); }, 150); }}><Bookmark className="h-5 w-5" /> Save to playlist</div>
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowReportDialog(true); }, 150); }}><Flag className="h-5 w-5" /> Report</div>
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer" onClick={() => { setRelatedDrawerOpen(false); setShowShareModal(true); }}><Share className="h-5 w-5" /> Share</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); if (selectedRelatedVideo) toggleWatchLater(selectedRelatedVideo); }}><Clock className="h-6 w-6" /> {selectedRelatedVideo && isInWatchLater(selectedRelatedVideo.id) ? "Remove from Watch later" : "Save to Watch later"}</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowPlaylistDialog(true); }, 150); }}><ListPlus className="h-6 w-6" /> Save to playlist</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setShowShareModal(true); }}><Share className="h-6 w-6" /> Share</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowReportDialog(true); }, 150); }}><Flag className="h-6 w-6" /> Report</div>
                 </div>
               </DrawerContent>
             </Drawer>
-          </div>
+          </section>
         )}
       </div>
 

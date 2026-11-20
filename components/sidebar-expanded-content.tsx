@@ -33,22 +33,26 @@ interface SidebarItemProps {
 }
 
 export function SidebarItem({ href, icon, label, active, collapsed, onClick }: SidebarItemProps) {
+  // YouTube guide sizes: 40px rows with 24px icons; the mini guide uses 74px tiles with 10px labels
   return (
     <Link
       href={href}
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-4 px-3 mx-1 py-2 rounded-lg text-sm hover:bg-muted transition-all duration-200",
-        active && "font-semibold bg-muted",
-        collapsed && "flex-col gap-1 px-2 py-3 justify-center mx-1"
+        "flex items-center rounded-[10px] transition-colors duration-150 hover:bg-muted active:bg-accent [&_svg]:h-6 [&_svg]:w-6",
+        collapsed
+          ? "mx-1 flex-col justify-center gap-1.5 px-1 pb-3.5 pt-4"
+          : "mx-3 h-10 gap-6 px-3 text-sm",
+        active && "bg-muted font-medium hover:bg-accent"
       )}
       title={label}
     >
       <span className="flex-shrink-0">{icon}</span>
       <span
         className={cn(
-          "transition-all duration-200 whitespace-nowrap truncate",
-          collapsed ? "text-[10px] leading-tight w-full text-center" : "text-sm"
+          "whitespace-nowrap truncate",
+          collapsed ? "w-full text-center text-[10px] leading-[14px]" : "text-sm"
         )}
       >
         {label}
@@ -91,15 +95,15 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
       <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={isActivePath(pathname, "/shorts")} collapsed={false} onClick={onLinkClick} />
 
       {/* Browse */}
-      <div className="border-t pt-2 mt-2">
+      <div className="border-t mt-3 pt-3">
         <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={isActivePath(pathname, "/channels")} collapsed={false} onClick={onLinkClick} />
         <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={isActivePath(pathname, "/scholars")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* You */}
-      <div className="border-t py-2 mt-2">
-        <div className="px-4 mb-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">You</h3>
+      <div className="border-t mt-3 pt-3">
+        <div className="px-6 pb-1 pt-1.5">
+          <h3 className="text-base font-medium whitespace-nowrap">You</h3>
         </div>
         <SidebarItem href="/you" icon={<UserIcon className="h-5 w-5 flex-shrink-0" />} label="Your account" active={isActivePath(pathname, "/you")} collapsed={false} onClick={onLinkClick} />
         <SidebarItem href="/history" icon={<History className="h-5 w-5 flex-shrink-0" />} label="History" active={isActivePath(pathname, "/history")} collapsed={false} onClick={onLinkClick} />
@@ -111,30 +115,30 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
       </div>
 
       {/* Explore */}
-      <div className="border-t py-2 mt-2">
-        <div className="px-4 mb-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">Explore</h3>
+      <div className="border-t mt-3 pt-3">
+        <div className="px-6 pb-1 pt-1.5">
+          <h3 className="text-base font-medium whitespace-nowrap">Explore</h3>
         </div>
         <SidebarItem href="/categories" icon={<FolderOpen className="h-5 w-5 flex-shrink-0" />} label="Categories" active={isActivePath(pathname, "/categories")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* More from Deeni.tube */}
-      <div className="border-t py-2 mt-2">
-        <div className="px-4 mb-2">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">More from Deeni.tube</h3>
+      <div className="border-t mt-3 pt-3">
+        <div className="px-6 pb-1 pt-1.5">
+          <h3 className="text-base font-medium whitespace-nowrap">More from Deeni.tube</h3>
         </div>
         <SidebarItem href="/more" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="More" active={isActivePath(pathname, "/more")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Settings */}
-      <div className="border-t py-2 mt-2">
+      <div className="border-t mt-3 pt-3">
         <SidebarItem href="/settings" icon={<Settings className="h-5 w-5 flex-shrink-0" />} label="Settings" active={isActivePath(pathname, "/settings")} collapsed={false} onClick={onLinkClick} />
         <SidebarItem href="/help" icon={<HelpCircle className="h-5 w-5 flex-shrink-0" />} label="Help" active={isActivePath(pathname, "/help")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Footer — mt-auto pins copyright to the very bottom of the sidebar */}
-      <div className="px-4 py-3 mt-auto border-t">
-        <p className="text-xs text-center leading-tight tracking-wide text-muted-foreground">
+      <div className="px-6 py-4 mt-auto border-t">
+        <p className="text-xs leading-tight text-muted-foreground">
           © 2026 Deeni.tube All rights reserved.
         </p>
       </div>

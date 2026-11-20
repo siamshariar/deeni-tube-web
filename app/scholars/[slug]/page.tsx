@@ -7,7 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
-  MoreVertical,
   Share,
   Flag,
   Ban,
@@ -16,6 +15,9 @@ import {
   Bookmark,
   ListVideo,
 } from "lucide-react";
+import ShortCard from "@/components/short-card";
+import { youtubeThumb } from "@/lib/media-lookup";
+import { MoreButton } from "@/components/more-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +42,7 @@ import { toast } from "sonner";
 
 import { useDontRecommend } from "@/hooks/useDontRecommend";
 import type { ChannelShort } from "@/lib/types";
-import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
+import VideoGrid from "@/components/video-grid";
 const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
     { id: "sh1", videoId: "MBxDbbkk0gQ", title: "একমাত্র আল্লাহর রাজত্বই চিরস্থায়ী", views: "15K", timeAgo: "2 weeks ago", duration: "0:58" },
@@ -77,16 +79,18 @@ const mockShortsByChannel: Record<string, ChannelShort[]> = {
 function ScholarSkeleton() {
   return (
     <div className="min-h-screen bg-background pt-14">
-      <div className="px-3 py-4 border-b">
-        <div className="flex items-start gap-4">
-          <Skeleton className="h-16 w-16 md:h-20 md:w-20 rounded-full" />
-          <div className="flex-1 space-y-2 mt-2">
-            <Skeleton className="h-7 w-48" />
+      <div className="px-4 md:px-6 pt-5 md:pt-8 pb-4">
+        <div className="flex items-center gap-4 md:gap-6">
+          <Skeleton className="h-20 w-20 md:h-40 md:w-40 rounded-full" />
+          <div className="flex-1 space-y-3">
+            <Skeleton className="h-8 md:h-10 w-48 md:w-72" />
             <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-9 w-24 rounded-full" />
           </div>
         </div>
       </div>
-      <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+      <div className="h-12 border-b" />
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-10 px-6 py-6">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i}>
             <Skeleton className="aspect-video w-full rounded-xl" />
@@ -118,13 +122,11 @@ export default function ScholarDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
-  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [selectedShort, setSelectedShort] = useState<ChannelShort | null>(null);
   const [shortDrawerOpen, setShortDrawerOpen] = useState(false);
   const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
+  const { addToWatchLater, isInWatchLater } = useWatchLater();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -164,33 +166,31 @@ export default function ScholarDetailPage() {
       )}
 
       {/* Profile section — no banner, avatar sits at top */}
-      <div className="px-3 py-4 border-b">
-        <div className="flex flex-col md:flex-row md:items-start md:gap-4">
-          <Avatar className="flex-shrink-0 ring-4 ring-background relative z-10 h-16 w-16 md:h-20 md:w-20">
+      <div className="px-4 md:px-6 pt-5 md:pt-8 pb-4">
+        <div className="flex flex-row items-center gap-4 md:gap-6">
+          <Avatar className="flex-shrink-0 h-20 w-20 md:h-40 md:w-40">
             <AvatarImage src={scholar.avatar} alt={scholar.name} className="object-cover" />
             <AvatarFallback className="text-lg">{scholar.name.charAt(0)}</AvatarFallback>
           </Avatar>
 
-          <div className="flex-1 min-w-0 mt-3 md:mt-0 md:pt-1">
-            <h1 className="text-xl md:text-2xl font-bold">{scholar.name}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{scholar.designation}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-4xl font-bold leading-tight">{scholar.name}</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">{scholar.designation}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
               {allVideos.length} videos · {shorts.length} shorts
             </p>
 
             <div className="flex items-center gap-2 mt-3">
-              <Button variant="outline" className="rounded-full h-9" onClick={() => { setShareUrl(window.location.href); setShareModalOpen(true); }}>
-                <Share className="h-4 w-4 mr-2" /> Share
+              <Button variant="secondary" className="rounded-full h-9 px-4 bg-muted hover:bg-accent font-medium" onClick={() => { setShareUrl(window.location.href); setShareModalOpen(true); }}>
+                <Share className="h-5 w-5 mr-2" /> Share
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button aria-label="More actions" variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
+                  <MoreButton />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-4 w-4 mr-3" /> Report</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => dontRecommend(scholar.channelId, scholar.name)}><Ban className="h-4 w-4 mr-3" /> Don&apos;t recommend</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-4 w-4" /> Report</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => dontRecommend(scholar.channelId, scholar.name)}><Ban className="h-4 w-4" /> Don&apos;t recommend</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -200,19 +200,19 @@ export default function ScholarDetailPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-3 border-b rounded-none">
-          <TabsTrigger value="videos" className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+        <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-2 md:px-4 border-b rounded-none p-0">
+          <TabsTrigger value="videos" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Videos
           </TabsTrigger>
-          <TabsTrigger value="shorts" className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="shorts" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Shorts
           </TabsTrigger>
-          <TabsTrigger value="playlists" className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="playlists" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Playlists
           </TabsTrigger>
           <TabsTrigger
             value="about"
-            className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             onClick={(e) => { e.preventDefault(); router.push(`/scholars/${slug}/about`); }}
           >
             About
@@ -221,7 +221,7 @@ export default function ScholarDetailPage() {
 
         {/* ── Videos tab ── */}
         {activeTab === "videos" && (
-          <div className="px-3 py-4">
+          <div className="px-4 md:px-6 py-6">
             {allVideos.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
@@ -231,83 +231,7 @@ export default function ScholarDetailPage() {
               </div>
             ) : (
               <>
-                {/* Desktop grid */}
-                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {allVideos.map((video, index) => (
-                    <div key={video.id} className="flex flex-col group">
-                      <Link href={`/videos/${video.channel}/${video.videoId}`} className="relative aspect-video w-full rounded-xl overflow-hidden">
-                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill {...imagePriorityProps(priorityForIndex(index))} className="object-cover" />
-                        <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">{video.duration}</div>
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
-                          <div className="bg-black/60 rounded-full p-2"><Play className="h-5 w-5 text-white fill-white" /></div>
-                        </div>
-                      </Link>
-                      <div className="flex mt-2 gap-2">
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarImage src={video.channelAvatar} />
-                          <AvatarFallback>{video.channel.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <Link href={`/videos/${video.channel}/${video.videoId}`}>
-                              <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">{video.title}</h3>
-                            </Link>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                                <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                                  if (isInWatchLater(video.id)) { removeFromWatchLater(video.id); toast.success("Removed from Watch Later"); }
-                                  else { addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar, thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
-                                }}><Clock className="h-4 w-4 mr-2" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}</DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}><Bookmark className="h-4 w-4 mr-2" /> Save to playlist</DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowReportDialog(true); }}><Flag className="h-4 w-4 mr-2" /> Report</DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`); setShareModalOpen(true); }}><Share className="h-4 w-4 mr-2" /> Share</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{video.views} · {video.timeAgo}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Mobile list */}
-                <div className="flex flex-col md:hidden">
-                  {allVideos.map((video, index) => (
-                    <div key={video.id} className="flex gap-3 py-2.5 group">
-                      <Link href={`/videos/${video.channel}/${video.videoId}`} className="relative w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden">
-                        <Image src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`} alt={video.title} fill {...imagePriorityProps(priorityForIndex(index))} className="object-cover" />
-                        <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 py-0.5 rounded">{video.duration}</div>
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-1">
-                          <Link href={`/videos/${video.channel}/${video.videoId}`}>
-                            <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">{video.title}</h3>
-                          </Link>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted flex-shrink-0"><MoreVertical className="h-4 w-4 text-muted-foreground" /></button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                                if (isInWatchLater(video.id)) { removeFromWatchLater(video.id); toast.success("Removed from Watch Later"); }
-                                else { addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar, thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
-                              }}><Clock className="h-4 w-4 mr-2" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}><Bookmark className="h-4 w-4 mr-2" /> Save to playlist</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowReportDialog(true); }}><Flag className="h-4 w-4 mr-2" /> Report</DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/videos/${video.channel}/${video.videoId}`); setShareModalOpen(true); }}><Share className="h-4 w-4 mr-2" /> Share</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{video.views} · {video.timeAgo}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <VideoGrid videos={allVideos} className="-mx-4 md:mx-0" />
               </>
             )}
           </div>
@@ -315,7 +239,7 @@ export default function ScholarDetailPage() {
 
         {/* ── Shorts tab ── */}
         {activeTab === "shorts" && (
-          <div className="px-3 py-4">
+          <div className="px-4 md:px-6 py-6">
             {shorts.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
@@ -325,54 +249,38 @@ export default function ScholarDetailPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 md:gap-x-4 gap-y-6">
                   {shorts.map((short: ChannelShort) => (
-                    <div key={short.id} className="group">
-                      <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted">
-                        <Link href={`/shorts?v=${short.videoId}`} className="block w-full h-full">
-                          <Image src={`https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`} alt={short.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded">{short.duration}</div>
-                          <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors rounded-xl" />
-                        </Link>
-                      </div>
-                      {/* Title row with 3-dot aligned to the right */}
-                      <div className="flex items-start justify-between mt-1.5 gap-1">
-                        <Link href={`/shorts?v=${short.videoId}`} className="flex-1 min-w-0">
-                          <p className="text-xs font-medium line-clamp-2 group-hover:text-primary transition-colors">{short.title}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{short.views} · {short.timeAgo}</p>
-                        </Link>
-                        {isMobile ? (
-                          <button aria-label="More actions"
-                            className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5"
-                            onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }}
-                          >
-                            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button aria-label="More actions" className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
-                                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                                if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); }
-                                else { addToWatchLater({ id: short.id, title: short.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
-                              }}>
-                                <Clock className="h-4 w-4 mr-2" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
-                                <Bookmark className="h-4 w-4 mr-2" /> Save to Playlist
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
-                                <Share className="h-4 w-4 mr-2" /> Share
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
-                    </div>
+                    <ShortCard
+                      key={short.id}
+                      href={`/shorts?v=${short.videoId}`}
+                      title={short.title}
+                      views={`${short.views} views`}
+                      thumbnail={youtubeThumb(short.videoId)}
+                      menu={isMobile ? (
+                        <MoreButton onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }} />
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <MoreButton />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => {
+                              if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); }
+                              else { addToWatchLater({ id: short.id, title: short.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
+                            }}>
+                              <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
+                              <Bookmark className="h-4 w-4" /> Save to Playlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
+                              <Share className="h-4 w-4" /> Share
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    />
                   ))}
                 </div>
 
@@ -414,7 +322,7 @@ export default function ScholarDetailPage() {
 
         {/* ── Playlists tab ── */}
         {activeTab === "playlists" && (
-          <div className="px-3 py-4">
+          <div className="px-4 md:px-6 py-6">
             {playlists.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-14 h-14 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
@@ -423,7 +331,7 @@ export default function ScholarDetailPage() {
                 <p className="text-sm text-muted-foreground">No playlists available</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8">
                 {playlists.map((pl) => {
                   const thumbs = pl.videoIds
                     .slice(0, 4)
@@ -433,8 +341,8 @@ export default function ScholarDetailPage() {
                     })
                     .filter(Boolean) as string[];
                   return (
-                    <Link key={pl.id} href={`/playlists/${pl.slug}/${pl.id}?source=channel`} className="group block border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-card">
-                      <div className="relative aspect-video w-full bg-muted overflow-hidden">
+                    <Link key={pl.id} href={`/playlists/${pl.slug}/${pl.id}?source=channel`} className="group block">
+                      <div className="relative aspect-video w-full bg-muted overflow-hidden rounded-xl">
                         {thumbs.length >= 2 ? (
                           <div className="grid grid-cols-2 gap-0.5 w-full h-full">
                             {[0, 1, 2, 3].map((i) => (
@@ -459,24 +367,22 @@ export default function ScholarDetailPage() {
                           {pl.videoIds.length}
                         </div>
                       </div>
-                      <div className="p-3">
+                      <div className="pt-3">
                         <div className="flex items-start justify-between gap-1">
-                          <h3 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors flex-1 min-w-0">{pl.name}</h3>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base font-medium leading-snug line-clamp-2">{pl.name}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">View full playlist</p>
+                          </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button aria-label="More actions"
-                                className="p-1 rounded-full hover:bg-muted transition-colors -mr-1 flex-shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
+                              <MoreButton onClick={(e) => e.stopPropagation()} className="-mr-2" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 rounded-xl">
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/playlists/${pl.slug}/${pl.id}?source=channel`); }}>
-                                <Play className="h-4 w-4 mr-2" /> Play all
+                                <Play className="h-4 w-4" /> Play all
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareUrl(`${window.location.origin}/playlists/${pl.slug}/${pl.id}`); setShareModalOpen(true); }}>
-                                <Share className="h-4 w-4 mr-2" /> Share
+                                <Share className="h-4 w-4" /> Share
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -494,12 +400,7 @@ export default function ScholarDetailPage() {
       {/* About tab navigates to /scholars/[slug]/about, so no tab content needed */}
 
       <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
-      {selectedVideo && (
-        <>
-          <AddToPlaylistDialog video={{ id: selectedVideo.id, title: selectedVideo.title, channel: selectedVideo.channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
-          <ReportDialog videoTitle={selectedVideo.title} videoId={selectedVideo.id} open={showReportDialog} onOpenChange={setShowReportDialog} />
-        </>
-      )}
+      <ReportDialog videoTitle={scholar.name} videoId={scholar.channelId} open={showReportDialog} onOpenChange={setShowReportDialog} />
       {selectedShort && (
         <AddToPlaylistDialog
           video={{ id: selectedShort.id, title: selectedShort.title, channel: scholar.name }}

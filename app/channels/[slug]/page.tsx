@@ -6,7 +6,6 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft,
-  MoreVertical,
   Share,
   Ban,
   Flag,
@@ -15,6 +14,9 @@ import {
   Clock,
   Bookmark,
 } from "lucide-react";
+import ShortCard from "@/components/short-card";
+import { youtubeThumb } from "@/lib/media-lookup";
+import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import VideoCard from "@/components/video-card";
+import VideoGrid from "@/components/video-grid";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { channelData, ChannelItem } from "@/lib/channel-data";
@@ -40,7 +42,6 @@ import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
 
 import { useDontRecommend } from "@/hooks/useDontRecommend";
 import type { ChannelShort } from "@/lib/types";
-import { priorityForIndex } from "@/lib/image-priority";
 // Mock shorts data - combine from shorts-data.ts and add more
 const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
@@ -174,11 +175,6 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
     ? channel.banner.replace(/=.*$/, "=w1920")
     : "/vibrant-health-cover.png";
 
-  // Navigate to shorts page with specific video
-  const handleShortClick = (videoId: string) => {
-    router.push(`/shorts?v=${videoId}`);
-  };
-
   const formatNumber = (num: number) => {
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
     if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
@@ -220,7 +216,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
           Mobile uses the original fcrop64 strip (~6:1, natural height); desktop uses the full
           =w1920 banner at a fixed height. Eager because it's at the top; not high priority because
           on mobile the main image is the first video, and they would compete for bandwidth. */}
-      <div className="relative md:h-52 xl:h-64">
+      <div className="relative md:mx-6 md:mt-4 md:h-44 lg:h-52 xl:h-56 md:overflow-hidden md:rounded-2xl">
         <picture>
           <source media="(min-width: 768px)" srcSet={fullBannerUrl} />
           <img
@@ -238,18 +234,18 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
       </div>
 
       {/* Channel info header */}
-      <div className="px-3 py-4 border-b">
-        <div className="flex flex-col md:flex-row md:items-start md:gap-4">
-          <Avatar className="flex-shrink-0 ring-4 ring-background -mt-10 md:-mt-16 relative z-10 h-16 w-16 md:h-20 md:w-20">
+      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-4">
+        <div className="flex flex-row items-center gap-4 md:gap-6">
+          <Avatar className="flex-shrink-0 h-20 w-20 md:h-40 md:w-40">
             <AvatarImage src={channel.avatar} />
             <AvatarFallback className="text-lg">
               {channel.name.charAt(0)}
             </AvatarFallback>
           </Avatar>
 
-          <div className="flex-1 min-w-0 mt-3 md:mt-0 md:pt-1">
-            <div className="flex items-start gap-1 flex-wrap">
-              <h1 className="text-xl md:text-2xl font-bold">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="text-xl md:text-4xl font-bold leading-tight">
                 {channel.name}
               </h1>
               {channel.verified && (
@@ -264,44 +260,39 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                 </svg>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">@{channel.slug}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="font-medium text-foreground">@{channel.slug}</span>
+              <span aria-hidden="true"> · </span>
               {formatNumber(channel.subscribers)} subscribers •{" "}
               {channelVideos.length} videos
             </p>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2 mt-4 flex-wrap">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               <Button
-                variant="outline"
-                className="rounded-full h-9 flex-shrink-0"
+                variant="secondary"
+                className="rounded-full h-9 px-4 flex-shrink-0 bg-muted hover:bg-accent font-medium"
                 onClick={handleShare}
               >
-                <Share className="h-4 w-4 mr-2" /> Share
+                <Share className="h-5 w-5 mr-2" /> Share
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button aria-label="More actions"
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                  >
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
+                  <MoreButton />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-xl">
                   <DropdownMenuItem
                     className="cursor-pointer"
                     onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}
                   >
-                    <Flag className="h-4 w-4 mr-3" /> Report
+                    <Flag className="h-4 w-4" /> Report
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="cursor-pointer"
                     onClick={() => dontRecommend(channel.id, channel.name)}
                   >
-                    <Ban className="h-4 w-4 mr-3" /> Don&apos;t recommend channel
+                    <Ban className="h-4 w-4" /> Don&apos;t recommend channel
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -322,28 +313,28 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
           className="w-full"
           onValueChange={setActiveTab}
         >
-          <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-3">
+          <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-2 md:px-4 rounded-none p-0">
             <TabsTrigger
               value="videos"
-              className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Videos
             </TabsTrigger>
             <TabsTrigger
               value="shorts"
-              className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Shorts
             </TabsTrigger>
             <TabsTrigger
               value="playlists"
-              className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Playlists
             </TabsTrigger>
             <TabsTrigger
               value="about"
-              className="px-4 py-1 data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               About
             </TabsTrigger>
@@ -356,42 +347,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
         <>
           {channelVideos.length > 0 ? (
             <>
-              <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-                {channelVideos.map((video, index) => (
-                  <VideoCard
-                    key={video.id}
-                    videoId={video.videoId}
-                    title={video.title}
-                    channel={video.channel}
-                    channelId={video.channelId}
-                    channelAvatar={video.channelAvatar}
-                    views={video.views}
-                    timestamp={video.timeAgo}
-                    duration={video.duration}
-                    thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                    isHorizontal={false}
-                    imagePriority={priorityForIndex(index)}
-                  />
-                ))}
-              </div>
-              <div className="flex flex-col md:hidden">
-                {channelVideos.map((video, index) => (
-                  <VideoCard
-                    key={video.id}
-                    videoId={video.videoId}
-                    title={video.title}
-                    channel={video.channel}
-                    channelId={video.channelId}
-                    channelAvatar={video.channelAvatar}
-                    views={video.views}
-                    timestamp={video.timeAgo}
-                    duration={video.duration}
-                    thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                    isHorizontal={true}
-                    imagePriority={priorityForIndex(index)}
-                  />
-                ))}
-              </div>
+              <VideoGrid videos={channelVideos} className="md:px-6 py-4 md:py-6" />
             </>
           ) : (
             <div className="text-center py-16 px-3">
@@ -409,67 +365,35 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
       {activeTab === "shorts" && (
         <>
           {channelShorts.length > 0 ? (
-            <div className="grid gap-3 p-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid gap-x-2 md:gap-x-4 gap-y-6 px-4 md:px-6 py-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {channelShorts.map((short) => (
-                <div key={short.id} className="flex flex-col group">
-                  <div
-                    className="relative aspect-[9/16] w-full rounded-xl overflow-hidden bg-muted shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleShortClick(short.videoId)}
-                  >
-                    <Image
-                      src={`https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`}
-                      alt={short.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
-                      {short.duration}
-                    </div>
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-black/60 rounded-full p-2">
-                        <Play className="h-5 w-5 text-white fill-white" />
-                      </div>
-                    </div>
-                  </div>
-                  {/* Title row with 3-dot aligned to the right */}
-                  <div className="flex items-start justify-between mt-2 gap-1">
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleShortClick(short.videoId)}>
-                      <h3 className="font-medium text-xs sm:text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                        {short.title}
-                      </h3>
-                      <p className="text-muted-foreground text-[10px] sm:text-xs mt-0.5">
-                        {short.views} views • {short.timeAgo}
-                      </p>
-                    </div>
-                    {isMobile ? (
-                      <button aria-label="More actions"
-                        className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5"
-                        onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }}
-                      >
-                        <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button aria-label="More actions" className="flex-shrink-0 p-1 rounded-full hover:bg-muted transition-colors mt-0.5">
-                            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => { if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); } else { addToWatchLater({ id: short.id, title: short.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); } }}>
-                            <Clock className="h-4 w-4 mr-2" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
-                            <Bookmark className="h-4 w-4 mr-2" /> Save to Playlist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
-                            <Share className="h-4 w-4 mr-2" /> Share
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
+                <ShortCard
+                  key={short.id}
+                  href={`/shorts?v=${short.videoId}`}
+                  title={short.title}
+                  views={`${short.views} views`}
+                  thumbnail={youtubeThumb(short.videoId)}
+                  menu={isMobile ? (
+                    <MoreButton onClick={(e) => { e.stopPropagation(); setSelectedShort(short); setShortDrawerOpen(true); }} />
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <MoreButton />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => { if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); } else { addToWatchLater({ id: short.id, title: short.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); } }}>
+                          <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
+                          <Bookmark className="h-4 w-4" /> Save to Playlist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
+                          <Share className="h-4 w-4" /> Share
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                />
               ))}
             </div>
           ) : (
@@ -522,20 +446,20 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
 
       {/* Tab content - Playlists */}
       {activeTab === "playlists" && (
-        <div className="p-4">
+        <div className="px-4 md:px-6 py-6">
           {channelPlaylists.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8">
               {channelPlaylists.map((playlist) => {
                 const thumbs = getPlaylistThumbs(playlist);
                 return (
                   <div
                     key={playlist.id}
-                    className="group cursor-pointer border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-card"
+                    className="group cursor-pointer"
                     onClick={() =>
                       router.push(`/playlists/${playlist.slug}/${playlist.id}?source=channel`)
                     }
                   >
-                    <div className="relative aspect-video w-full bg-muted overflow-hidden">
+                    <div className="relative aspect-video w-full bg-muted overflow-hidden rounded-xl">
                       {thumbs.length >= 2 ? (
                         <div className="grid grid-cols-2 gap-0.5 w-full h-full">
                           {[0, 1, 2, 3].map((i) => (
@@ -564,26 +488,24 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                       </div>
                     </div>
 
-                    <div className="p-3">
+                    <div className="pt-3">
                       <div className="flex items-start justify-between gap-1">
-                        <h3 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors flex-1 min-w-0">
-                          {playlist.name}
-                        </h3>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base font-medium leading-snug line-clamp-2">
+                            {playlist.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1">View full playlist</p>
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button aria-label="More actions"
-                              className="p-1 rounded-full hover:bg-muted transition-colors -mr-1 flex-shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                            </button>
+                            <MoreButton onClick={(e) => e.stopPropagation()} className="-mr-2" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48 rounded-xl">
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/playlists/${playlist.slug}/${playlist.id}?source=channel`); }}>
-                              <Play className="h-4 w-4 mr-2" /> Play all
+                              <Play className="h-4 w-4" /> Play all
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareUrl(`${window.location.origin}/playlists/${playlist.slug}/${playlist.id}`); setShareModalOpen(true); }}>
-                              <Share className="h-4 w-4 mr-2" /> Share
+                              <Share className="h-4 w-4" /> Share
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

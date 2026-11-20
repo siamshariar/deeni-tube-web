@@ -120,13 +120,13 @@ export default function DesktopSidebar() {
   return (
     <aside
       className={cn(
-        "desktop-sidebar hidden md:flex flex-col fixed left-0 border-r bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out sidebar-scrollbar",
+        "desktop-sidebar hidden md:flex flex-col fixed left-0 bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out sidebar-scrollbar",
         isCollapsed ? "w-[72px]" : "w-[240px]",
         top,
         height
       )}
     >
-      <div className="w-full py-1.5 flex flex-col flex-1">
+      <div className="w-full py-3 flex flex-col flex-1">
         {isCollapsed ? (
           <>
             {/* Mini collapsed items — order: Home, Shorts, Channels, Scholars, You, Playlists, Categories */}

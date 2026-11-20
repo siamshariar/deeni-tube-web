@@ -3,9 +3,11 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Search, MoreVertical, Clock, Bookmark, Share, Play,
+  Search, Clock, Bookmark, Share,
   SlidersHorizontal, Check, ChevronDown, X,
 } from "lucide-react";
+import { MoreButton } from "@/components/more-button";
+import { youtubeThumb } from "@/lib/media-lookup";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -180,68 +182,61 @@ function ResultList({
   const [drawerVideo, setDrawerVideo] = useState<VideoItem | null>(null);
 
   return (
-    <div className="divide-y divide-border/50">
+    <div className="flex flex-col gap-4">
       {results.map(video => (
-        <div key={video.id} className="flex gap-3 py-4 group">
+        <div key={video.id} className="flex gap-3 md:gap-4 group">
           <Link
             href={`/videos/${video.channel}/${video.videoId}`}
-            className="relative w-40 md:w-48 aspect-video flex-shrink-0 rounded-xl overflow-hidden"
+            className="relative w-40 sm:w-60 md:w-80 lg:w-[360px] aspect-video flex-shrink-0 rounded-xl overflow-hidden bg-muted"
           >
             <Image
-              src={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-              alt={video.title} fill className="object-cover"
+              src={youtubeThumb(video.videoId)}
+              alt={video.title} fill
+              sizes="(min-width: 1024px) 360px, (min-width: 768px) 320px, (min-width: 640px) 240px, 160px"
+              className="object-cover"
             />
-            <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+            <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1 py-px rounded font-medium">
               {video.duration}
             </div>
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="bg-black/60 rounded-full p-2">
-                <Play className="h-5 w-5 text-white fill-white" />
-              </div>
-            </div>
           </Link>
-          <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <Link href={`/videos/${video.channel}/${video.videoId}`}>
-                  <h3 className="font-medium text-sm md:text-[15px] line-clamp-2 leading-snug hover:text-primary transition-colors">
+                  <h3 className="line-clamp-2 text-[15px] font-medium leading-5 md:text-base md:leading-[22px]">
                     {video.title}
                   </h3>
                 </Link>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Avatar className="h-4 w-4">
-                    <AvatarImage src={video.channelAvatar} />
-                    <AvatarFallback className="text-[8px]">{video.channel.charAt(0)}</AvatarFallback>
+                <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">{video.views} · {video.timeAgo}</p>
+                <div className="flex items-center gap-2 mt-1 md:mt-3">
+                  <Avatar className="hidden md:flex h-6 w-6">
+                    <AvatarImage src={video.channelAvatar} alt="" />
+                    <AvatarFallback className="text-[11px]">{video.channel.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <span className="text-xs text-muted-foreground">{video.channel}</span>
+                  <span className="truncate text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">{video.channel}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{video.views} · {video.timeAgo}</p>
+                {video.description && (
+                  <p className="hidden md:block text-[13px] leading-[18px] text-muted-foreground mt-2 line-clamp-2">{video.description}</p>
+                )}
               </div>
 
               {/* Mobile: plain button → single Drawer below */}
               {isMobile ? (
-                <button aria-label="More actions"
-                  className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0"
-                  onClick={(e) => { e.stopPropagation(); setDrawerVideo(video); setDrawerOpen(true); }}
-                >
-                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <MoreButton onClick={(e) => { e.stopPropagation(); setDrawerVideo(video); setDrawerOpen(true); }} />
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button aria-label="More actions" className="p-1.5 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                    <MoreButton />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52 rounded-xl">
                     <DropdownMenuItem onSelect={() => onWatchLaterToggle(video)}>
-                      <Clock className="h-4 w-4 mr-2" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                      <Clock className="h-4 w-4" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch Later"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onPlaylist(video); }}>
-                      <Bookmark className="h-4 w-4 mr-2" /> Save to playlist
+                      <Bookmark className="h-4 w-4" /> Save to playlist
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onShare(video); }}>
-                      <Share className="h-4 w-4 mr-2" /> Share
+                      <Share className="h-4 w-4" /> Share
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -256,20 +251,20 @@ function ResultList({
         <DrawerContent className="px-0 max-h-[70vh]">
           <div className="mt-2 pb-6">
             <div
-              className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer"
+              className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer"
               onClick={() => { setDrawerOpen(false); if (drawerVideo) onWatchLaterToggle(drawerVideo); }}
             >
               <Clock className="h-5 w-5" />
               {drawerVideo && isInWatchLater(drawerVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}
             </div>
             <div
-              className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer"
+              className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer"
               onClick={() => { setDrawerOpen(false); setTimeout(() => { if (drawerVideo) onPlaylist(drawerVideo); }, 150); }}
             >
               <Bookmark className="h-5 w-5" /> Save to playlist
             </div>
             <div
-              className="flex items-center gap-3 px-4 py-3 hover:bg-muted cursor-pointer"
+              className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer"
               onClick={() => { setDrawerOpen(false); if (drawerVideo) onShare(drawerVideo); }}
             >
               <Share className="h-5 w-5" /> Share
@@ -386,7 +381,9 @@ function SearchPageContent() {
         filtered = filtered.filter(v =>
           v.title.toLowerCase().includes(lower) ||
           v.channel.toLowerCase().includes(lower) ||
-          v.description.toLowerCase().includes(lower)
+          v.description.toLowerCase().includes(lower) ||
+          // Most titles are in Bangla, so also match the English category ("quran", "dua", …)
+          (v.category ?? "").toLowerCase().includes(lower)
         );
       }
       if (f.langs.length > 0)
@@ -458,7 +455,7 @@ function SearchPageContent() {
       {/* ══════════════════════════════════════════════════════════
           DESKTOP — inline search bar + collapsible filter panel
       ══════════════════════════════════════════════════════════ */}
-      <div className="hidden md:block max-w-4xl mx-auto px-6 py-8">
+      <div className="hidden md:block max-w-5xl mx-auto px-6 py-6">
 
         {!hasSearched ? (
           <div className="flex flex-col items-center justify-center py-28 text-center">

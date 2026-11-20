@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Search,
   X,
-  MoreVertical,
   History,
   Play,
   Trash2,
@@ -16,9 +15,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { MoreButton } from "@/components/more-button";
+import ShortCard from "@/components/short-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,11 +49,11 @@ const categories = [
 
 function VideoSkeleton() {
   return (
-    <div className="flex gap-3 py-3">
-      <Skeleton className="w-36 sm:w-44 md:w-60 aspect-video rounded-lg flex-shrink-0" />
-      <div className="flex-1 min-w-0 space-y-2">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-3 w-3/4" />
+    <div className="flex gap-3 py-2 md:gap-4">
+      <Skeleton className="aspect-video w-40 flex-shrink-0 rounded-lg md:w-[246px] md:rounded-xl" />
+      <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+        <Skeleton className="h-4 w-full md:h-5" />
+        <Skeleton className="h-4 w-2/3 md:h-5" />
         <Skeleton className="h-3 w-1/2" />
       </div>
     </div>
@@ -127,70 +127,55 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
       {/* Shorts Container - draggable on mobile */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-2 overflow-x-auto scrollbar-none pb-2 px-0.5 touch-pan-x"
+        className="flex gap-2 overflow-x-auto scrollbar-none pb-2 touch-pan-x md:gap-3"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {shorts.map((short, index) => (
-          <div key={short.id} className="flex-shrink-0 w-[140px] sm:w-[150px] md:w-[170px] group/card">
-            <Link href={`/shorts?v=${short.videoId}`} className="block">
-              <div className="relative w-full aspect-[9/16] rounded-xl overflow-hidden">
-                <Image src={short.thumbnail} alt={short.title} fill {...imagePriorityProps(prioritize ? priorityForIndex(index, 1) : undefined)} className="object-cover" />
-                <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity">
-                  <div className="bg-black/60 rounded-full p-2"><Play className="h-5 w-5 text-white fill-white" /></div>
-                </div>
-                <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">{short.duration}</div>
-              </div>
-            </Link>
-            <div className="flex items-start justify-between mt-1.5 gap-1">
-              <Link href={`/shorts?v=${short.videoId}`} className="flex-1 min-w-0">
-                <h4 className="text-xs sm:text-sm font-medium line-clamp-2 group-hover/card:text-primary transition-colors">{short.title}</h4>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{short.views} • {short.timeAgo}</p>
-              </Link>
-              {isMobile ? (
-                <button aria-label="More actions"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDrawerShort(short); setDrawerOpen(true); }}
-                  className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0"
-                >
-                  <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button aria-label="More actions" className="p-1 rounded-full hover:bg-muted transition-colors flex-shrink-0">
-                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                    <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onClick={() => {
-                      if (isInWatchLater(short.id)) {
-                        toast.success("Already in Watch Later");
-                      } else {
-                        addToWatchLater({ id: short.id, title: short.title, channel: short.channel, channelAvatar: short.channelAvatar || "", thumbnail: short.thumbnail, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() });
-                        toast.success("Added to Watch Later");
-                      }
-                    }}>
-                      <Clock className="h-3.5 w-3.5 mr-2" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onSelect={(e) => { e.preventDefault(); setDrawerShort(short); setShowShortPlaylistDialog(true); }}>
-                      <Bookmark className="h-3.5 w-3.5 mr-2" /> Save to Playlist
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onClick={() => onShare(short)}>
-                      <Share className="h-3.5 w-3.5 mr-2" /> Share
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </div>
+          <ShortCard
+            key={short.id}
+            className="w-[150px] flex-shrink-0 sm:w-[170px] lg:w-[190px]"
+            href={`/shorts?v=${short.videoId}`}
+            title={short.title}
+            views={short.views}
+            thumbnail={short.thumbnail}
+            imagePriority={prioritize ? priorityForIndex(index, 1) : undefined}
+            menu={isMobile ? (
+              <MoreButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDrawerShort(short); setDrawerOpen(true); }} />
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <MoreButton />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => {
+                    if (isInWatchLater(short.id)) {
+                      toast.success("Already in Watch Later");
+                    } else {
+                      addToWatchLater({ id: short.id, title: short.title, channel: short.channel, channelAvatar: short.channelAvatar || "", thumbnail: short.thumbnail, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() });
+                      toast.success("Added to Watch Later");
+                    }
+                  }}>
+                    <Clock className="h-5 w-5" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onSelect={(e) => { e.preventDefault(); setDrawerShort(short); setShowShortPlaylistDialog(true); }}>
+                    <Bookmark className="h-5 w-5" /> Save to Playlist
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => onShare(short)}>
+                    <Share className="h-5 w-5" /> Share
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          />
         ))}
       </div>
 
       {/* Mobile Drawer - single instance outside map */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
-          <div className="p-4 pb-8 space-y-1">
+          <div className="px-2 pt-2 pb-6">
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
                 if (drawerShort) {
                   if (isInWatchLater(drawerShort.id)) {
@@ -203,19 +188,19 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
                 setDrawerOpen(false);
               }}
             >
-              <Clock className="h-4 w-4 flex-shrink-0" /> {drawerShort && isInWatchLater(drawerShort.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerShort && isInWatchLater(drawerShort.id) ? "Saved to Watch Later" : "Save to Watch Later"}
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { setShowShortPlaylistDialog(true); setDrawerOpen(false); }}
             >
-              <Bookmark className="h-4 w-4 flex-shrink-0" /> Save to Playlist
+              <Bookmark className="h-5 w-5 flex-shrink-0" /> Save to Playlist
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { if (drawerShort) onShare(drawerShort); setDrawerOpen(false); }}
             >
-              <Share className="h-4 w-4 flex-shrink-0" /> Share
+              <Share className="h-5 w-5 flex-shrink-0" /> Share
             </button>
           </div>
         </DrawerContent>
@@ -319,161 +304,186 @@ export default function HistoryPage() {
     count: cat.id === "all" ? videos.length : cat.id === "shorts" ? videos.filter((v) => v.type === "short").length : videos.filter((v) => v.type === "video").length,
   }));
 
+  const hrefFor = (video: HistoryItem) =>
+    video.type === "short" ? `/shorts?v=${video.videoId}` : `/videos/${video.channel}/${video.videoId || video.id}`;
+
+  // YouTube history row: large thumbnail, 18px title, muted channel/views underneath
   const renderVideoItem = (video: HistoryItem, priority?: ImagePriority) => (
-    <div key={video.id} className="flex gap-2 sm:gap-3 group py-2 hover:bg-muted/30 rounded-lg px-2 -mx-2 transition-colors w-full">
-      <Link href={video.type === "short" ? `/shorts?v=${video.videoId}` : `/videos/${video.channel}/${video.videoId || video.id}`} className="relative w-36 sm:w-44 md:w-48 lg:w-60 aspect-video flex-shrink-0 rounded-lg overflow-hidden">
+    <div key={video.id} className="group flex w-full gap-3 py-2 md:gap-4">
+      <Link href={hrefFor(video)} className="relative aspect-video w-40 flex-shrink-0 overflow-hidden rounded-lg bg-muted md:w-[246px] md:rounded-xl">
         <Image src={video.thumbnail} alt={video.title} fill {...imagePriorityProps(priority)} className="object-cover" />
-        <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">{video.duration}</div>
-        <div className="absolute inset-0 bg-black/20 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="bg-black/60 rounded-full p-2"><Play className="h-5 w-5 text-white fill-white" /></div>
-        </div>
+        <div className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{video.duration}</div>
       </Link>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <Link href={video.type === "short" ? `/shorts?v=${video.videoId}` : `/videos/${video.channel}/${video.videoId || video.id}`}>
-              <h3 className="font-medium text-xs sm:text-sm line-clamp-2 hover:text-primary transition-colors break-words">{video.title}</h3>
-            </Link>
-            <div className="flex items-center gap-2 mt-1">
-              <Link href={getChannelHref(video.channelId)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground min-w-0">
-                <Avatar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0">
-                  <AvatarImage src={video.channelAvatar} />
-                  <AvatarFallback className="text-[10px]">{video.channel.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <span className="text-[10px] sm:text-xs truncate">{video.channel}</span>
-              </Link>
-            </div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{video.views} • {video.timeAgo}</p>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {isMobile ? (
-              <button aria-label="More actions"
-                className="p-1.5 rounded-full hover:bg-muted transition-colors"
-                onClick={() => { setDrawerVideo(video); setHistoryDrawerOpen(true); }}
-              >
-                <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-              </button>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button aria-label="More actions" className="p-1.5 rounded-full hover:bg-muted transition-colors">
-                    <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 sm:w-56 rounded-xl">
-                  <DropdownMenuItem onClick={() => router.push(video.type === "short" ? `/shorts?v=${video.videoId}` : `/videos/${video.channel}/${video.videoId || video.id}`)} className="text-xs sm:text-sm">
-                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 sm:mr-3" /> Play now
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onClick={() => {
-                    if (isInWatchLater(video.id)) {
-                      toast.success("Already in Watch Later");
-                    } else {
-                      addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar || "", thumbnail: video.thumbnail, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() });
-                      toast.success("Added to Watch Later");
-                    }
-                  }}>
-                    <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 sm:mr-3" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}>
-                    <Bookmark className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 sm:mr-3" /> Save to playlist
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer text-xs sm:text-sm" onClick={() => handleShare(video)}>
-                    <Share className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 sm:mr-3" /> Share
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleRemove(video.id)} className="text-red-600 dark:text-red-400 text-xs sm:text-sm">
-                    <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 sm:mr-3" /> Remove from History
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+      <div className="flex min-w-0 flex-1 items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <Link href={hrefFor(video)}>
+            <h3 className="line-clamp-2 break-words text-[15px] font-medium leading-5 md:text-base md:leading-[22px]">{video.title}</h3>
+          </Link>
+          <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">
+            <Link href={getChannelHref(video.channelId)} className="transition-colors hover:text-foreground">{video.channel}</Link>
+            <span aria-hidden="true"> · </span>{video.views}
+          </p>
+          <p className="hidden text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5 md:block">{video.timeAgo}</p>
+        </div>
+        <div className="-mr-2 flex flex-shrink-0 flex-col-reverse items-center md:-mt-1.5 md:flex-row">
+          {/* Always visible (phones have no hover) */}
+          <button
+            type="button"
+            aria-label={`Remove "${video.title}" from history`}
+            title="Remove from watch history"
+            onClick={() => handleRemove(video.id)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {isMobile ? (
+            <MoreButton onClick={() => { setDrawerVideo(video); setHistoryDrawerOpen(true); }} className="-mt-1" />
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <MoreButton />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60 rounded-xl py-2">
+                <DropdownMenuItem onClick={() => router.push(hrefFor(video))} className="cursor-pointer gap-3 py-2 text-sm">
+                  <Play className="h-5 w-5" /> Play now
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => {
+                  if (isInWatchLater(video.id)) {
+                    toast.success("Already in Watch Later");
+                  } else {
+                    addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar || "", thumbnail: video.thumbnail, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() });
+                    toast.success("Added to Watch Later");
+                  }
+                }}>
+                  <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}>
+                  <Bookmark className="h-5 w-5" /> Save to playlist
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => handleShare(video)}>
+                  <Share className="h-5 w-5" /> Share
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleRemove(video.id)} className="cursor-pointer gap-3 py-2 text-sm text-red-600 dark:text-red-400">
+                  <Trash2 className="h-5 w-5" /> Remove from History
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </div>
   );
 
+  const searchBox = (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+      <input
+        type="text"
+        aria-label="Search watch history"
+        placeholder="Search watch history"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="h-10 w-full rounded-full border border-transparent bg-muted pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-input focus:bg-background"
+      />
+      {searchQuery && (
+        <button type="button" aria-label="Clear search" onClick={() => setSearchQuery("")} className="absolute right-1 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">
+          <X className="h-5 w-5" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="px-3 md:px-6 py-4 md:py-6">
+      <div className="mt-14 px-3 pb-8 pt-4 md:mt-16 md:px-6 md:pt-6">
         {isLoading || !hydrated ? (
-          <div className="mt-14 sm:mt-16">
-            <Skeleton className="h-8 w-48 mb-4" />
-            <div className="flex gap-2 mb-4">
-              <Skeleton className="h-8 w-16 rounded-full" />
-              <Skeleton className="h-8 w-16 rounded-full" />
-              <Skeleton className="h-8 w-16 rounded-full" />
+          <div className="max-w-[880px]">
+            <Skeleton className="mb-4 h-8 w-48" />
+            <div className="mb-4 flex gap-3">
+              <Skeleton className="h-8 w-20 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
             </div>
-            <Skeleton className="h-10 w-full max-w-md rounded-full mb-4" />
+            <Skeleton className="mb-6 h-10 w-full max-w-md rounded-full lg:hidden" />
             <VideoSkeleton />
             <VideoSkeleton />
             <VideoSkeleton />
           </div>
         ) : videos.length === 0 ? (
-          <div className="text-center py-16 mt-14 sm:mt-16">
-            <History className="h-12 sm:h-16 w-12 sm:w-16 mx-auto text-muted-foreground/30 mb-4" />
-            <h2 className="text-lg sm:text-xl font-semibold mb-2">History is empty</h2>
+          <div className="flex flex-col items-center px-6 py-20 text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <History className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h2 className="mb-2 text-xl font-bold">History is empty</h2>
             <p className="text-sm text-muted-foreground">Videos you watch will appear here</p>
-            <Button className="mt-4 rounded-full text-sm" onClick={() => router.push("/")}>Browse videos</Button>
+            <Button className="mt-5 rounded-full" onClick={() => router.push("/")}>Browse videos</Button>
           </div>
         ) : (
-          <div className="mt-14 sm:mt-16">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h1 className="text-2xl font-bold">Watch history</h1>
-              <Button variant="ghost" size="sm" className="rounded-full gap-1.5 text-muted-foreground" onClick={handleClearAll}>
-                <Trash2 className="h-4 w-4" /> Clear all
-              </Button>
-            </div>
-
-            {/* Category chips */}
-            <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 scrollbar-none">
-              {liveCategories.map((cat) => (
-                <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={cn(
-                  "px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors",
-                  activeCategory === cat.id ? "bg-foreground text-background" : "bg-muted hover:bg-muted/80 text-foreground"
-                )}>
-                  {cat.label} <span className="text-xs opacity-70">({cat.count})</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Search bar */}
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                <input type="text" placeholder="Search watch history" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 bg-muted/50 rounded-full text-xs sm:text-sm outline-none focus:bg-muted transition-colors" />
-                {searchQuery && (
-                  <button type="button" aria-label="Clear search" onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </button>
-                )}
+          <div className="lg:grid lg:grid-cols-[minmax(0,880px)_300px] lg:gap-12 xl:gap-16">
+            <div className="min-w-0">
+              {/* Header */}
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h1 className="text-xl font-bold md:text-2xl">Watch history</h1>
+                <Button variant="ghost" className="h-9 gap-2 rounded-full px-3 text-sm font-medium lg:hidden" onClick={handleClearAll}>
+                  <Trash2 className="h-5 w-5" /> Clear all
+                </Button>
               </div>
-            </div>
 
-            {/* Content */}
-            {filteredVideos.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">{searchQuery ? "No results found" : "No videos in this list"}</p>
-              </div>
-            ) : (
-              <div className="space-y-5 sm:space-y-6">
-                {Object.entries(groupedVideos).map(([dateGroup, { shorts, videos: dateVideos }], groupIndex) => (
-                  <div key={dateGroup}>
-                    <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2 sm:mb-3 px-2">{dateGroup}</h3>
-                    <ShortsRow shorts={shorts} onShare={handleShare} prioritize={groupIndex === 0} />
-                    {dateVideos.length > 0 && (
-                      <div className={`space-y-0.5 sm:space-y-1 ${shorts.length > 0 ? 'mt-3 sm:mt-4' : ''}`}>
-                        {/* Top group without shorts: its first rows are the main images */}
-                        {dateVideos.map((video, i) =>
-                          renderVideoItem(video, groupIndex === 0 && shorts.length === 0 ? priorityForIndex(i) : undefined)
-                        )}
-                      </div>
+              {/* Category chips */}
+              <div className="mb-4 flex gap-3 overflow-x-auto scrollbar-none">
+                {liveCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    aria-pressed={activeCategory === cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={cn(
+                      "h-8 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors",
+                      activeCategory === cat.id ? "bg-foreground text-background" : "bg-muted text-foreground hover:bg-accent"
                     )}
-                  </div>
+                  >
+                    {cat.label} <span className="font-normal opacity-70">{cat.count}</span>
+                  </button>
                 ))}
               </div>
-            )}
+
+              {/* Search (phones and tablets; desktop has it in the side panel) */}
+              <div className="mb-5 max-w-md lg:hidden">{searchBox}</div>
+
+              {/* Content */}
+              {filteredVideos.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-sm text-muted-foreground">{searchQuery ? "No results found" : "No videos in this list"}</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {Object.entries(groupedVideos).map(([dateGroup, { shorts, videos: dateVideos }], groupIndex) => (
+                    <section key={dateGroup} aria-label={dateGroup}>
+                      <h2 className="mb-3 text-lg font-bold md:mb-4 md:text-xl">{dateGroup}</h2>
+                      <ShortsRow shorts={shorts} onShare={handleShare} prioritize={groupIndex === 0} />
+                      {dateVideos.length > 0 && (
+                        <div className={cn("space-y-1 md:space-y-2", shorts.length > 0 && "mt-4 md:mt-6")}>
+                          {/* Top group without shorts: its first rows are the main images */}
+                          {dateVideos.map((video, i) =>
+                            renderVideoItem(video, groupIndex === 0 && shorts.length === 0 ? priorityForIndex(i) : undefined)
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop side panel: search and history controls, like YouTube */}
+            <aside className="hidden lg:block">
+              <div className="sticky top-[88px] space-y-4 pt-1">
+                {searchBox}
+                <Button variant="ghost" className="h-10 w-full justify-start gap-3 rounded-full px-3 text-sm font-medium" onClick={handleClearAll}>
+                  <Trash2 className="h-5 w-5" /> Clear all watch history
+                </Button>
+              </div>
+            </aside>
           </div>
         )}
       </div>
@@ -481,18 +491,18 @@ export default function HistoryPage() {
       {/* Mobile Drawer for video list items */}
       <Drawer open={historyDrawerOpen} onOpenChange={setHistoryDrawerOpen}>
         <DrawerContent>
-          <div className="p-4 pb-8 space-y-1">
+          <div className="px-2 pt-2 pb-6">
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
                 if (drawerVideo) router.push(drawerVideo.type === "short" ? `/shorts?v=${drawerVideo.videoId}` : `/videos/${drawerVideo.channel}/${drawerVideo.videoId || drawerVideo.id}`);
                 setHistoryDrawerOpen(false);
               }}
             >
-              <Play className="h-4 w-4 flex-shrink-0" /> Play now
+              <Play className="h-5 w-5 flex-shrink-0" /> Play now
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
                 if (drawerVideo) {
                   if (isInWatchLater(drawerVideo.id)) {
@@ -505,25 +515,25 @@ export default function HistoryPage() {
                 setHistoryDrawerOpen(false);
               }}
             >
-              <Clock className="h-4 w-4 flex-shrink-0" /> {drawerVideo && isInWatchLater(drawerVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerVideo && isInWatchLater(drawerVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { if (drawerVideo) { setSelectedVideo(drawerVideo); setShowPlaylistDialog(true); } setHistoryDrawerOpen(false); }}
             >
-              <Bookmark className="h-4 w-4 flex-shrink-0" /> Save to playlist
+              <Bookmark className="h-5 w-5 flex-shrink-0" /> Save to playlist
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { if (drawerVideo) handleShare(drawerVideo); setHistoryDrawerOpen(false); }}
             >
-              <Share className="h-4 w-4 flex-shrink-0" /> Share
+              <Share className="h-5 w-5 flex-shrink-0" /> Share
             </button>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left text-red-600 dark:text-red-400"
+              className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left text-red-600 dark:text-red-400"
               onClick={() => { if (drawerVideo) handleRemove(drawerVideo.id); setHistoryDrawerOpen(false); }}
             >
-              <Trash2 className="h-4 w-4 flex-shrink-0" /> Remove from History
+              <Trash2 className="h-5 w-5 flex-shrink-0" /> Remove from History
             </button>
           </div>
         </DrawerContent>

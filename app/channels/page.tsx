@@ -136,10 +136,10 @@ export default function ChannelsPage() {
               key={lang.code}
               onClick={() => toggleLanguage(lang.code)}
               className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
                 selectedLanguages.includes(lang.code)
                   ? "bg-foreground text-background"
-                  : "bg-muted hover:bg-muted/80 text-foreground"
+                  : "bg-muted hover:bg-accent text-foreground"
               )}
             >
               {lang.name}
@@ -177,7 +177,7 @@ export default function ChannelsPage() {
                     href={`/channels/${channel.slug}`}
                     className="flex-shrink-0"
                   >
-                    <Avatar className="h-10 w-10 md:h-14 md:w-14 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
+                    <Avatar className="h-12 w-12 md:h-14 md:w-14 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
                       <AvatarImage src={channel.avatar} />
                       <AvatarFallback>
                         {channel.name.charAt(0)}
@@ -191,13 +191,13 @@ export default function ChannelsPage() {
                       className="hover:underline"
                     >
                       <div className="flex items-center gap-1">
-                        <h3 className="font-medium text-xs md:text-base truncate group-hover:text-primary transition-colors">
+                        <h3 className="font-medium text-[15px] md:text-base truncate">
                           {channel.name}
                         </h3>
                         {channel.verified && (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground flex-shrink-0"
+                            className="w-4 h-4 text-muted-foreground flex-shrink-0"
                             viewBox="0 0 24 24"
                             fill="currentColor"
                             aria-label="Verified"
@@ -207,7 +207,7 @@ export default function ChannelsPage() {
                         )}
                       </div>
                     </Link>
-                    <p className="text-[10px] md:text-sm text-muted-foreground truncate">
+                    <p className="text-[13px] md:text-sm text-muted-foreground truncate">
                       {formatSubscribers(channel.subscribers)}
                     </p>
                   </div>

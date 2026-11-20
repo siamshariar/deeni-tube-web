@@ -121,10 +121,10 @@ export default function ScholarsPage() {
               key={lang.code}
               onClick={() => toggleLanguage(lang.code)}
               className={cn(
-                "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
                 selectedLanguages.includes(lang.code)
                   ? "bg-foreground text-background"
-                  : "bg-muted hover:bg-muted/80 text-foreground"
+                  : "bg-muted hover:bg-accent text-foreground"
               )}
             >
               {lang.name}
@@ -161,10 +161,10 @@ export default function ScholarsPage() {
                   <AvatarFallback>{scholar.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm md:text-base truncate group-hover:text-primary transition-colors">
+                  <h3 className="font-medium text-[15px] md:text-base truncate">
                     {scholar.name}
                   </h3>
-                  <p className="text-xs md:text-sm text-muted-foreground truncate">
+                  <p className="text-[13px] md:text-sm text-muted-foreground truncate">
                     {scholar.designation}
                   </p>
                 </div>

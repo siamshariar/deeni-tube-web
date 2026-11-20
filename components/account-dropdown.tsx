@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
+  ArrowLeft,
   ChevronRight,
   LogOut,
   Moon,
@@ -13,11 +14,11 @@ import {
   HelpCircle,
   MessageSquare,
   User,
+  Users,
   Monitor,
   Sun,
   Check,
   Send,
-  X,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -26,18 +27,16 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import LanguagePrompt from "@/components/language-prompt";
 import { toast } from "sonner";
 import { readLanguagePrefs, signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
+import { mockLanguages } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 
 function getInitials(name: string): string {
   return name
@@ -50,20 +49,27 @@ function getInitials(name: string): string {
 
 type ThemeMode = "system" | "light" | "dark";
 
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Monitor }[] = [
+  { value: "system", label: "Use device theme", icon: Monitor },
+  { value: "dark", label: "Dark theme", icon: Moon },
+  { value: "light", label: "Light theme", icon: Sun },
+];
+
 export default function AccountDropdown() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const isMobile = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
+  // YouTube-style in-place sub-page instead of a side submenu (works the same on phones)
+  const [view, setView] = useState<"main" | "appearance">("main");
   const [userData, setUserData] = useState({
     name: "Guest",
     email: "",
     avatar: "",
     initials: "G",
   });
+  const [languageLabel, setLanguageLabel] = useState("English");
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
-  const [showAppearanceDialog, setShowAppearanceDialog] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
 
@@ -83,10 +89,14 @@ export default function AccountDropdown() {
     } catch {}
   }, []);
 
-  const handleThemeChange = (newTheme: ThemeMode) => {
-    setTheme(newTheme);
-    if (isMobile) {
-      setShowAppearanceDialog(false);
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      const codes = readLanguagePrefs().languages ?? ["en"];
+      const names = codes.map((c) => mockLanguages.find((l) => l.code === c)?.name ?? c.toUpperCase());
+      setLanguageLabel(names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", "));
+    } else {
+      setView("main");
     }
   };
 
@@ -112,222 +122,132 @@ export default function AccountDropdown() {
     }, 1500);
   };
 
-  const getThemeLabel = () => {
-    switch (theme) {
-      case "light": return "Light theme";
-      case "dark": return "Dark theme";
-      default: return "Device theme";
-    }
-  };
+  const currentTheme = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[0];
+  const themeLabel = currentTheme.value === "system" ? "Device theme" : currentTheme.label;
 
-  const getThemeIcon = () => {
-    switch (theme) {
-      case "light": return <Sun className="h-5 w-5" />;
-      case "dark": return <Moon className="h-5 w-5" />;
-      default: return <Monitor className="h-5 w-5" />;
-    }
-  };
-
-  const handleAppearanceClick = () => {
-    if (isMobile) {
-      setOpen(false);
-      setTimeout(() => setShowAppearanceDialog(true), 100);
-    }
-  };
+  const avatar = (size: string, text: string) => (
+    <Avatar className={size}>
+      {userData.avatar ? (
+        <AvatarImage src={userData.avatar} alt="" />
+      ) : (
+        <AvatarFallback className={cn("bg-[#5c6bc0] text-white font-medium", text)}>
+          {userData.initials}
+        </AvatarFallback>
+      )}
+    </Avatar>
+  );
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange} modal={false}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label="Account menu"
-            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="flex h-10 w-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-background hover:ring-primary/20 transition-all">
-              {userData.avatar ? (
-                <AvatarImage src={userData.avatar} alt={userData.name} />
-              ) : (
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                  {userData.initials}
-                </AvatarFallback>
-              )}
-            </Avatar>
+            {avatar("h-8 w-8", "text-sm")}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-80 p-2 mr-4" align="end" sideOffset={8}>
-          {/* User info header */}
-          <div className="flex items-center gap-3 p-4 border-b">
-            <Avatar className="h-10 w-10">
-              {userData.avatar ? (
-                <AvatarImage src={userData.avatar} alt={userData.name} />
-              ) : (
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                  {userData.initials}
-                </AvatarFallback>
-              )}
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{userData.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{userData.email}</p>
-            </div>
-          </div>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={4}
+          className="w-[300px] max-w-[calc(100vw-16px)] max-h-[calc(100dvh-72px)] overflow-y-auto rounded-xl py-2"
+        >
+          {view === "main" ? (
+            <>
+              {/* Profile header */}
+              <div className="flex gap-4 px-4 pb-3 pt-2">
+                {avatar("h-10 w-10 flex-shrink-0", "text-base")}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-medium leading-[22px]">{userData.name}</p>
+                  {userData.email && (
+                    <p className="truncate text-sm leading-5 text-muted-foreground">{userData.email}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate("/you")}
+                    className="mt-2 text-sm font-medium text-[#065fd4] hover:underline dark:text-[#3ea6ff]"
+                  >
+                    View your account
+                  </button>
+                </div>
+              </div>
 
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => handleNavigate("/you")}>
-              <User className="mr-3 h-5 w-5" />
-              <span>Preferences</span>
-            </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleNavigate("/you")}>
+                  <User /> Your account
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleNavigate("/channels")}>
+                  <Users /> Channel preferences
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleSignOut}>
+                  <LogOut /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
 
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => handleNavigate("/channels")}>
-              <Settings className="mr-3 h-5 w-5" />
-              <span>Channel Preferences</span>
-              <ChevronRight className="ml-auto h-4 w-4" />
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setView("appearance"); }}>
+                  <currentTheme.icon />
+                  <span className="flex-1 truncate">Appearance: {themeLabel}</span>
+                  <ChevronRight className="text-muted-foreground" />
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => { setOpen(false); setShowLanguagePrompt(true); }}>
+                  <Globe />
+                  <span className="flex-1 truncate">Language: {languageLabel}</span>
+                  <ChevronRight className="text-muted-foreground" />
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
-
-          <DropdownMenuGroup>
-            {/* Appearance — submenu on desktop, dialog on mobile */}
-            {isMobile ? (
-              <DropdownMenuItem className="py-3 cursor-pointer" onClick={handleAppearanceClick}>
-                {getThemeIcon()}
-                <span className="ml-3">Appearance: {getThemeLabel()}</span>
-                <ChevronRight className="ml-auto h-4 w-4" />
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuItem onSelect={() => handleNavigate("/settings")}>
+                <Settings /> Settings
               </DropdownMenuItem>
-            ) : (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="py-3 cursor-pointer">
-                  {getThemeIcon()}
-                  <span className="ml-3">Appearance: {getThemeLabel()}</span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-48">
-                  <DropdownMenuItem onClick={() => handleThemeChange("system")} className="py-2.5 cursor-pointer">
-                    <Monitor className="mr-2 h-4 w-4" />
-                    <span>Device theme</span>
-                    {theme === "system" && <Check className="ml-auto h-4 w-4" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleThemeChange("light")} className="py-2.5 cursor-pointer">
-                    <Sun className="mr-2 h-4 w-4" />
-                    <span>Light theme</span>
-                    {theme === "light" && <Check className="ml-auto h-4 w-4" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleThemeChange("dark")} className="py-2.5 cursor-pointer">
-                    <Moon className="mr-2 h-4 w-4" />
-                    <span>Dark theme</span>
-                    {theme === "dark" && <Check className="ml-auto h-4 w-4" />}
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
 
-            {/* Language */}
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => { setOpen(false); setShowLanguagePrompt(true); }}>
-              <Globe className="mr-3 h-5 w-5" />
-              <span>Language</span>
-              <ChevronRight className="ml-auto h-4 w-4" />
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => handleNavigate("/settings")}>
-              <Settings className="mr-3 h-5 w-5" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => handleNavigate("/help")}>
-              <HelpCircle className="mr-3 h-5 w-5" />
-              <span>Help</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={() => { setOpen(false); setShowFeedbackDialog(true); }}>
-              <MessageSquare className="mr-3 h-5 w-5" />
-              <span>Send feedback</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="py-3 cursor-pointer" onClick={handleSignOut}>
-              <LogOut className="mr-3 h-5 w-5" />
-              <span>Sign out</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleNavigate("/help")}>
+                  <HelpCircle /> Help
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => { setOpen(false); setShowFeedbackDialog(true); }}>
+                  <MessageSquare /> Send feedback
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
+          ) : (
+            <>
+              {/* Appearance sub-page */}
+              <div className="flex items-center gap-2 px-2 pb-2">
+                <button
+                  type="button"
+                  aria-label="Back"
+                  onClick={() => setView("main")}
+                  className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent"
+                >
+                  <ArrowLeft className="h-6 w-6" />
+                </button>
+                <span className="text-base">Appearance</span>
+              </div>
+              <DropdownMenuSeparator className="mb-2" />
+              <p className="px-4 pb-2 text-xs text-muted-foreground">Setting applies to this browser only</p>
+              {THEME_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  role="menuitemradio"
+                  aria-checked={theme === opt.value}
+                  onSelect={(e) => { e.preventDefault(); setTheme(opt.value); setView("main"); }}
+                >
+                  <opt.icon />
+                  <span className="flex-1">{opt.label}</span>
+                  {theme === opt.value && <Check className="text-[#065fd4] dark:text-[#3ea6ff]" />}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      {/* Appearance Dialog — Mobile only */}
-      <Dialog open={showAppearanceDialog} onOpenChange={setShowAppearanceDialog}>
-        <DialogContent className="sm:max-w-md [&>button.absolute]:hidden">
-          <button
-            onClick={() => setShowAppearanceDialog(false)}
-            className="rounded-full p-1 hover:bg-muted transition-colors z-10"
-            style={{ position: "absolute", top: "12px", right: "12px" }}
-            aria-label="Close"
-          >
-            <X className="h-7 w-7" />
-          </button>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Monitor className="h-5 w-5" /> Appearance
-            </DialogTitle>
-            <DialogDescription>
-              Choose how Deeni.tube looks to you
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-4">
-            <button
-              onClick={() => handleThemeChange("system")}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                theme === "system" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-              }`}
-            >
-              <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                <Monitor className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Device theme</p>
-                <p className="text-xs text-muted-foreground">Follow your device settings</p>
-              </div>
-              {theme === "system" && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
-            </button>
-
-            <button
-              onClick={() => handleThemeChange("light")}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                theme === "light" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-              }`}
-            >
-              <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                <Sun className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Light theme</p>
-                <p className="text-xs text-muted-foreground">Always use light mode</p>
-              </div>
-              {theme === "light" && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
-            </button>
-
-            <button
-              onClick={() => handleThemeChange("dark")}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-              }`}
-            >
-              <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                <Moon className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Dark theme</p>
-                <p className="text-xs text-muted-foreground">Always use dark mode</p>
-              </div>
-              {theme === "dark" && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Language Prompt */}
       <LanguagePrompt
