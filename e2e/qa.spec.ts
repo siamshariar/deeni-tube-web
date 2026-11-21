@@ -123,6 +123,31 @@ test.describe('Phones', () => {
   });
 });
 
+test.describe('Phones: Shorts thumbnail', () => {
+  test.skip(({ isMobile }) => !isMobile, 'phones only');
+
+  test("a short's thumbnail is framed like its video: 9:16, covering the screen (no side strips, no zoom when it plays)", async ({ page }) => {
+    await seed(page);
+    await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort()); // only the thumbnail
+    await page.goto('/shorts?v=o38RKuY_AUU'); // YouTube's thumbnail has black strips at both sides
+    const box = page.locator('.shorts-player-box').nth(3);
+    const poster = box.locator('.shorts-poster');
+    await expect(poster.locator('img')).toBeVisible();
+    const [b, p] = [(await box.boundingBox())!, (await poster.boundingBox())!];
+    expect(p.width / p.height).toBeCloseTo(9 / 16, 2);
+    expect(p.x).toBeLessThanOrEqual(b.x + 0.5);
+    expect(p.x + p.width).toBeGreaterThanOrEqual(b.x + b.width - 0.5);
+    expect(p.y).toBeLessThanOrEqual(b.y + 0.5);
+    expect(p.y + p.height).toBeGreaterThanOrEqual(b.y + b.height - 0.5);
+    // A square video sits in the middle, as YouTube's player shows it
+    await page.goto('/shorts?v=PUwTf64igQk');
+    const square = page.locator('.shorts-player-box').nth(5).locator('.shorts-poster img').locator('..'); // the 6th short
+    await expect(square).toBeVisible();
+    const sq = (await square.boundingBox())!;
+    expect(Math.abs(sq.width - sq.height)).toBeLessThan(1);
+  });
+});
+
 test.describe('Everywhere', () => {
   test('History: the channel name opens the video; YouTube text sizes', async ({ page, isMobile }) => {
     await seed(page);

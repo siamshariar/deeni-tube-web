@@ -52,6 +52,17 @@ import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame
 
 import type { CommentReply, VideoComment } from "@/lib/types"
 // ============ SHORTS DATA ============
+// Shorts that aren't 9:16 videos (measured from YouTube's original-shape thumbnails, oar2.jpg): YouTube shows
+// them letterboxed in the 9:16 player, so their thumbnail is framed the same way (see the poster below)
+const SHORT_SHAPE: Record<string, "square" | "wide"> = {
+  PUwTf64igQk: "square",
+  ihdO_G6Yk0E: "square",
+  _zCnmnCd7CU: "square",
+  "hHpoYE-v6og": "wide",
+  "Kk1_-T-8MFU": "wide",
+  rTrh9VHgdwo: "wide",
+}
+
 const shortsData = [
   {
     id: "s1",
@@ -1511,7 +1522,7 @@ function ShortsPageContent() {
         /* Mobile: the 9:16 player covers the whole box (cropping the overflow), so there are no black bars at
            the sides when the screen is wider than 9:16, which it is on most phones once the nav bar is counted */
         @media (max-width: 767px) {
-          .shorts-video-iframe {
+          .shorts-video-iframe, .shorts-poster {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -1523,7 +1534,7 @@ function ShortsPageContent() {
           }
           @supports (width: 1cqw) {
             .shorts-player-box { container-type: size; }
-            .shorts-video-iframe {
+            .shorts-video-iframe, .shorts-poster {
               aspect-ratio: auto;
               min-width: 0;
               width: max(100cqw, 100cqh * 9 / 16);
@@ -1533,7 +1544,7 @@ function ShortsPageContent() {
         }
         /* Desktop: iframe fills the already-9:16 container — no bars needed */
         @media (min-width: 768px) {
-          .shorts-video-iframe {
+          .shorts-video-iframe, .shorts-poster {
             position: absolute;
             top: 0;
             left: 0;
@@ -1819,16 +1830,24 @@ function ShortsPageContent() {
                         onLoad={() => registerPlayer(short.id)}
                       />
                     )}
-                    {/* Thumbnail on top of the player until it's actually playing, so switching never shows a black frame */}
+                    {/* Thumbnail on top of the player until it's actually playing, so switching never shows a black frame.
+                        Framed exactly like the video: in the same 9:16 box that covers this one (.shorts-poster), where
+                        YouTube's landscape thumbnail shows just the short (its black side strips fall outside), so it
+                        doesn't look smaller and then zoom when the video takes over. Square and landscape videos
+                        sit in the middle, as YouTube shows them */}
                     <div className={cn("absolute inset-0 pointer-events-none transition-opacity duration-200", posterHidden ? "opacity-0" : "opacity-100")}>
-                      <Image
-                        src={short.thumbnail}
-                        alt={short.title}
-                        fill
-                        className="object-cover"
-                        // The opening short's thumbnail is the main image until its player starts, so only it loads early
-                        {...(index === initialIndex ? imagePriorityProps("lcp") : { loading: "lazy" as const })}
-                      />
+                      <div className="shorts-poster">
+                        <div className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2", SHORT_SHAPE[short.videoId] === "square" ? "aspect-square" : SHORT_SHAPE[short.videoId] === "wide" ? "aspect-video" : "h-full")}>
+                          <Image
+                            src={short.thumbnail}
+                            alt={short.title}
+                            fill
+                            className="object-cover"
+                            // The opening short's thumbnail is the main image until its player starts, so only it loads early
+                            {...(index === initialIndex ? imagePriorityProps("lcp") : { loading: "lazy" as const })}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
