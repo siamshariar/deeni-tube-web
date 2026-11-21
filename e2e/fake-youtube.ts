@@ -7,10 +7,11 @@ import { Page } from '@playwright/test';
 // the video it shows (videoData.video_id) and takes loadVideoById, like the real one.
 // `ios`: Safari's rule — sound is never allowed for a player started on its own, but an unMute that reaches a
 // player already playing (the tap on a video, lib/player-host.ts) gives it sound for good.
+// `clock`: time runs while it plays (reported every 250ms), as in a real player; otherwise it only moves on seeks.
 // In the frame: window.__player() → { playing, muted, videoId }, window.__end() ends the video,
 // window.__commands lists the commands received (window.__log: with their arguments).
 
-const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean) => `<!doctype html><html><body><script>
+const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, clock: boolean) => `<!doctype html><html><body><script>
   const params = new URLSearchParams(location.search);
   let muted = params.get('mute') === '1', state = -1, listening = false, dropFirstPlay = ${dropFirstPlay}, time = 0, rate = 1, volume = 100;
   let videoId = location.pathname.split('/').pop();
@@ -65,14 +66,21 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean) =
       setState(1, time >= 30 ? 0 : time);
     }
   });
-  window.__player = () => ({ playing: state === 1, muted, videoId });
+  if (${clock}) setInterval(() => {
+    if (state !== 1 || time >= 30) return;
+    time = Math.min(30, time + 0.25 * rate);
+    send({ event: 'infoDelivery', info: { currentTime: time } });
+  }, 250);
+  // A start= in the URL (inline previews going on from where a video was left)
+  if (params.get('start')) time = Number(params.get('start'));
+  window.__player = () => ({ playing: state === 1, muted, videoId, time });
   window.__end = () => setState(0, 30);
 </script></body></html>`;
 
-export async function useFakeYouTube(page: Page, options: { allowSound?: () => boolean; dropFirstPlay?: boolean; ios?: boolean } = {}) {
+export async function useFakeYouTube(page: Page, options: { allowSound?: () => boolean; dropFirstPlay?: boolean; ios?: boolean; clock?: boolean } = {}) {
   const allowSound = options.allowSound ?? (() => !options.ios);
   // Shorts use www.youtube.com, the watch pages the privacy-enhanced www.youtube-nocookie.com
   for (const host of ['https://www.youtube.com', 'https://www.youtube-nocookie.com'])
     await page.route(`${host}/embed/**`, (route) =>
-      route.fulfill({ contentType: 'text/html', body: fakePlayer(allowSound(), !!options.dropFirstPlay, !!options.ios) }));
+      route.fulfill({ contentType: 'text/html', body: fakePlayer(allowSound(), !!options.dropFirstPlay, !!options.ios, !!options.clock) }));
 }

@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import {
   ArrowLeft,
   Share,
@@ -894,6 +895,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                       <Link href={videoPath(v)} className="relative aspect-video w-[46%] min-w-[168px] max-w-[236px] flex-shrink-0 self-start overflow-hidden rounded-lg bg-muted">
                         <Image src={youtubeThumb(v.videoId)} alt={v.title} fill className="object-cover" />
                         <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
+                        <WatchedBar videoId={v.videoId} />
                       </Link>
                       <div className="min-w-0 flex-1 pr-7">
                         <Link href={videoPath(v)} className="block">
@@ -937,6 +939,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                     {/* Lazy on purpose: preloading the first one measured worse (it competes with the YouTube player) */}
                     <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
                     <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
+                        <WatchedBar videoId={v.videoId} />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link href={videoPath(v)} className="block">

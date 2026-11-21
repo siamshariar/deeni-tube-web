@@ -32,6 +32,7 @@ import {
 import { MoreButton } from "@/components/more-button";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -1153,6 +1154,7 @@ export default function PlaylistDetailPage() {
                         <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 text-xs font-medium leading-4 text-white">
                           {video.duration}
                         </span>
+                        <WatchedBar videoId={video.videoId} />
                         {isCurrent && (
                           <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/30">
                             <div className="h-full bg-red-600" style={{ width: "60%" }} />

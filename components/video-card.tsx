@@ -4,6 +4,7 @@
 import { Clock, Bookmark, Share, UserX, Flag, BookmarkCheck, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
@@ -203,6 +204,7 @@ export default function VideoCard({
             <div className="relative aspect-video w-full bg-muted sm:overflow-hidden sm:rounded-xl">
               <Image src={thumbnail} alt={title} fill sizes="100vw" {...imagePriorityProps(imagePriority)} className="object-cover" />
               {durationBadge}
+              <WatchedBar videoId={videoId} />
             </div>
           </Link>
         </InlinePreview>
@@ -238,6 +240,7 @@ export default function VideoCard({
               className="object-cover"
             />
             {durationBadge}
+            <WatchedBar videoId={videoId} />
           </div>
         </Link>
       </InlinePreview>

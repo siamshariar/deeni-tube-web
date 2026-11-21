@@ -1,9 +1,10 @@
 import { test, expect, devices, Page, Frame } from '@playwright/test';
 import { useFakeYouTube } from './fake-youtube';
 
-// iPhone: a tap on a video starts it WITH SOUND (lib/player-host.ts). Safari only allows sound when a playing
-// player is unmuted inside the tap, which the fake player models (ios: true): a player started on its own
-// stays muted. WebKit with an iPhone profile; runs once (in the mobile project).
+// iPhone: a tap on a video or a short starts it WITH SOUND (lib/player-host.ts), and swiping to the next short
+// keeps the sound. Safari only allows sound when a playing player is unmuted inside the tap, which the fake
+// player models (ios: true): a player started on its own stays muted. WebKit with an iPhone profile; runs once
+// (in the mobile project).
 
 test.use({ ...devices['iPhone 13'] });
 test.beforeEach(({}, testInfo) => {
@@ -92,6 +93,20 @@ test.describe('iPhone: tap to play with sound', () => {
     await expect.poll(() => fake(frame), { timeout: 10_000 }).toMatchObject({ playing: true, muted: true, videoId: PLACEHOLDER });
   });
 
+  test('a tap on a video watched before goes on from where it was left, with sound', async ({ page }) => {
+    await seed(page);
+    await page.addInitScript(() => localStorage.setItem('deeni-watch-progress', JSON.stringify({ UugARckPloo: { t: 12, d: 30, at: Date.now() } })));
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(true);
+    const card = page.locator('a[href$="/UugARckPloo"]:visible').first();
+    await expect(card.locator('[data-watched]')).toHaveAttribute('data-watched', '40');
+    await card.tap();
+    await expect.poll(() => frame.evaluate(() => (window as unknown as { __player: () => FakeState & { time: number } }).__player()))
+      .toMatchObject({ playing: true, muted: false, videoId: 'UugARckPloo', time: 12 });
+  });
+
   test('opened from a link (no tap in the app): plays muted, and "Tap to unmute" gives it sound', async ({ page }) => {
     await seed(page);
     await useFakeYouTube(page, { ios: true });
@@ -117,5 +132,95 @@ test.describe('iPhone: tap to play with sound', () => {
     await expect.poll(() => fake(frame).then((s) => s.playing && !s.muted)).toBe(true);
     // Hidden (faded out) after about 3 seconds of playing, as in YouTube's app
     await expect(time.locator('xpath=ancestor::div[contains(@class,"transition-opacity")][1]')).toHaveCSS('opacity', '0', { timeout: 6000 });
+  });
+});
+
+const FIRST_SHORT = 'MBxDbbkk0gQ';
+const SECOND_SHORT = 'goHfO28fE-A';
+const THIRD_SHORT = '8YfQCDjlQsc';
+
+// The shared player covers the short on screen: its box exactly, with the 9:16 video filling it (no side bars)
+async function expectHostOver(page: Page, index: number) {
+  const box = page.locator('.shorts-player-box').nth(index);
+  const host = page.locator('[data-player-host]');
+  await expect(host).toHaveCSS('opacity', '1');
+  await expect.poll(async () => {
+    const [b, h] = [(await box.boundingBox())!, (await host.boundingBox())!];
+    return Math.max(Math.abs(b.x - h.x), Math.abs(b.y - h.y), Math.abs(b.width - h.width), Math.abs(b.height - h.height));
+  }).toBeLessThan(1);
+  const b = (await box.boundingBox())!;
+  const f = (await page.locator('[data-player-host] iframe').boundingBox())!;
+  // The frame is the video plus YouTube's bars above and below it (120px each), which fall outside the box
+  const video = { x: f.x, y: f.y + 120, width: f.width, height: f.height - 240 };
+  expect(video.width / video.height).toBeCloseTo(9 / 16, 2);
+  expect(video.x).toBeLessThanOrEqual(b.x + 0.5);
+  expect(video.x + video.width).toBeGreaterThanOrEqual(b.x + b.width - 0.5);
+  expect(video.y).toBeLessThanOrEqual(b.y + 0.5);
+  expect(video.y + video.height).toBeGreaterThanOrEqual(b.y + b.height - 0.5);
+}
+
+test.describe('iPhone: Shorts with sound', () => {
+  test('a tap on Shorts plays the first short with sound in the shared player; the next short keeps the sound', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: true, videoId: PLACEHOLDER });
+
+    await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Shorts' }).tap();
+    await expect(page).toHaveURL(/\/shorts$/);
+    const sent = await log(frame);
+    const load = sent.lastIndexOf(`loadVideoById:${FIRST_SHORT}`);
+    expect(load).toBeGreaterThan(-1);
+    expect(sent.slice(load, load + 3)).toEqual([`loadVideoById:${FIRST_SHORT}`, 'unMute', 'playVideo']);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: FIRST_SHORT });
+    await expect(page.getByRole('button', { name: /to unmute/ })).toHaveCount(0);
+    // One player for the whole feed, over the short on screen
+    await expect(page.locator('iframe')).toHaveCount(1);
+    await expectHostOver(page, 0);
+
+    // Next short: the same player loads it, still with sound
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: SECOND_SHORT });
+    await expect(page.locator('iframe')).toHaveCount(1);
+    await expectHostOver(page, 1);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: THIRD_SHORT });
+    await expect(page.getByRole('button', { name: /to unmute/ })).toHaveCount(0);
+
+    // Leaving Shorts: hidden, and back to the muted placeholder
+    await page.goto('/');
+    await expect(page.locator('[data-player-host]')).toBeHidden();
+  });
+
+  test('a tap on a short card plays that short with sound', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/channels/monzur');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(true);
+    await page.getByRole('tab', { name: 'Shorts' }).tap();
+    const card = page.locator('a[href^="/shorts?v="]:visible').first();
+    const id = new URL((await card.getAttribute('href'))!, 'http://x').searchParams.get('v')!;
+    await card.tap();
+    await expect(page).toHaveURL(new RegExp(`/shorts\\?v=${id}`));
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: id });
+    await expect(page.getByRole('button', { name: /to unmute/ })).toHaveCount(0);
+  });
+
+  test('opened from a link (no tap in the app): muted with "Tap to unmute"; after that tap, swiping keeps the sound', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto(`/shorts?v=${SECOND_SHORT}`);
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: true, videoId: SECOND_SHORT });
+    const unmute = page.getByRole('button', { name: /to unmute/ });
+    await expect(unmute).toBeVisible();
+    await unmute.tap();
+    await expect.poll(() => fake(frame).then((s) => s.muted)).toBe(false);
+    await expect(unmute).toHaveCount(0);
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: THIRD_SHORT });
+    await expect(unmute).toHaveCount(0);
   });
 });

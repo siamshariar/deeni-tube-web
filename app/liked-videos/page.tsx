@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLikedVideos, LikedVideo } from "@/hooks/useLikedVideos";
@@ -247,6 +248,7 @@ export default function LikedVideosPage() {
                             <div className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-4 text-white">
                               {video.duration}
                             </div>
+                            <WatchedBar videoId={ytId(video)} />
                           </Link>
 
                           {/* Info */}

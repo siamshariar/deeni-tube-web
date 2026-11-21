@@ -2,10 +2,16 @@
 // The playing video of a card's inline preview (see components/inline-preview.tsx, which explains the
 // behaviour): the YouTube embed, the volume button, the time left and the seekable progress bar. Loaded only
 // when a preview starts, so pages with cards don't carry it in their first JavaScript.
+// Like YouTube's inline playback, it starts where the video was left (lib/watch-progress), saves how far it
+// gets, and adds the video to History once it has played HISTORY_AFTER_S seconds.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { progressSaver, resumeTime } from "@/lib/watch-progress";
+import { recordWatch } from "@/hooks/useWatchHistory";
+import { findVideo } from "@/lib/media-lookup";
+import { historyEntryForVideo } from "@/lib/history-entry";
 
 export type PreviewMode = "mouse" | "touch";
 
@@ -22,6 +28,8 @@ const BAR = {
 } as const;
 // While dragging, the video follows at most this often (allowSeekAhead off), then seeks fully on release
 const LIVE_SEEK_MS = 250;
+// Played this many seconds in the card: it goes into History
+const HISTORY_AFTER_S = 5;
 
 function formatTime(seconds: number) {
   const s = Math.max(0, Math.floor(seconds || 0));
@@ -65,9 +73,12 @@ export default function PreviewLayer({
   });
   // Fixed for this preview: it's in the URL, and changing that would reload the player
   const [initialMuted] = useState(startMuted);
+  // Where the video was left last time (watched before): the preview goes on from there
+  const [startAt] = useState(() => resumeTime(videoId));
+  const [saver] = useState(() => progressSaver(videoId, startAt));
   const [muted, setMuted] = useState(initialMuted);
   const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
+  const [time, setTime] = useState(startAt ?? 0);
   const [duration, setDuration] = useState(0);
   const [loaded, setLoaded] = useState(0);
   // Progress bar: the hovered (mouse) and dragged positions, 0-1
@@ -80,6 +91,14 @@ export default function PreviewLayer({
   const liveSeekRef = useRef(0);
   // After a seek, YouTube reports the old time for a moment: don't jump back
   const seekRef = useRef<{ to: number; until: number } | null>(null);
+  // Seconds actually played (not skipped by seeking), for History
+  const watchRef = useRef({ played: false, last: null as number | null, total: 0, recorded: false, duration: 0 });
+
+  // The card's own time starts where the video was left (opening the video goes on from there)
+  useEffect(() => {
+    if (startAt) timeRef.current = startAt;
+    return () => saver.flush();
+  }, [saver, startAt, timeRef]);
 
   const command = (func: string, args: unknown[] = []) =>
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), ORIGIN);
@@ -135,17 +154,39 @@ export default function PreviewLayer({
           seekRef.current = null;
           timeRef.current = info.currentTime;
           setTime(info.currentTime);
+          const w = watchRef.current;
+          if (w.played) {
+            const t = info.currentTime;
+            if (w.last !== null && t > w.last && t - w.last < 2) w.total += t - w.last;
+            w.last = t;
+            if (!w.recorded && w.total >= HISTORY_AFTER_S) {
+              w.recorded = true;
+              const video = findVideo(videoId);
+              if (video) recordWatch(historyEntryForVideo(video));
+            }
+            saver.update(t, w.duration);
+          }
         }
       }
-      if (typeof info.duration === "number" && info.duration > 0) setDuration(info.duration);
+      if (typeof info.duration === "number" && info.duration > 0) {
+        watchRef.current.duration = info.duration;
+        setDuration(info.duration);
+      }
       if (typeof info.videoLoadedFraction === "number") setLoaded(info.videoLoadedFraction);
-      if (info.playerState === PLAYING) setPlaying(true);
-      // At the end, go back to the thumbnail (YouTube's end screen never shows)
-      else if (info.playerState === ENDED) onDoneRef.current();
+      if (info.playerState === PLAYING) {
+        watchRef.current.played = true;
+        setPlaying(true);
+      }
+      // At the end, go back to the thumbnail (YouTube's end screen never shows); watched to the end
+      else if (info.playerState === ENDED) {
+        const d = watchRef.current.duration;
+        saver.update(d, d, true);
+        onDoneRef.current();
+      }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [timeRef]);
+  }, [timeRef, saver, videoId]);
 
   const toggleMute = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -203,7 +244,7 @@ export default function PreviewLayer({
       <div className={cn("absolute inset-0 overflow-hidden", rounded)}>
         <iframe
           ref={iframeRef}
-          src={`${ORIGIN}/embed/${videoId}?autoplay=1&mute=${initialMuted ? 1 : 0}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&cc_load_policy=0&enablejsapi=1`}
+          src={`${ORIGIN}/embed/${videoId}?autoplay=1${startAt ? `&start=${Math.floor(startAt)}` : ""}&mute=${initialMuted ? 1 : 0}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&cc_load_policy=0&enablejsapi=1`}
           title={`Preview: ${title}`}
           allow="autoplay; encrypted-media; picture-in-picture"
           tabIndex={-1}

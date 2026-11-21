@@ -15,6 +15,8 @@
 // Also: the video's thumbnail shows until it plays (no black box), and if the browser blocks sound it plays
 // muted with a "Click to unmute" button. Keyboard: space/k play, j/l ±10s, ←/→ ±5s, f full screen, m mute,
 // c captions. On touch screens the controls hide 3s after the video starts or after a tap, as in YouTube's app.
+// How far the video has been watched is saved (lib/watch-progress: the red bar on its thumbnails), and the video
+// goes on from there next time, as on YouTube (from History too); a finished video starts again.
 //
 // On iPhone, iPad and Safari the video plays in the app's one shared player (lib/player-host.ts) instead of a
 // frame of its own: the tap that opened the page already started it there, with sound, which Safari only
@@ -29,11 +31,13 @@ import { youtubeThumb } from "@/lib/media-lookup";
 import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
 import { takePreviewResume } from "@/components/inline-preview";
+import { progressSaver, resumeTime } from "@/lib/watch-progress";
 import {
   armHost,
   attachHost,
   detachHost,
   hostFrame,
+  hostInfo,
   hostLoad,
   hostMuted,
   hostReady,
@@ -94,8 +98,11 @@ export function YouTubePlayer({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // iPhone/iPad/Safari: play in the shared player (decided after hydration; the server renders a frame)
   const hosted = useSyncExternalStore(noSubscribe, hostWanted, () => false);
-  // Opened from a card's preview: where to go on from once the video plays (shared player)
+  // Where to go on from once the video plays (shared player): the card preview's time, or where it was left
   const resumeRef = useRef<number | null>(null);
+  // Saves how far it has been watched, once it has played
+  const saverRef = useRef<ReturnType<typeof progressSaver> | null>(null);
+  const playedRef = useRef(false);
   const readyRef = useRef(false);
   const lastStateRef = useRef<number | null>(null);
   const timeRef = useRef({ time: 0, duration: 0 });
@@ -205,8 +212,9 @@ export function YouTubePlayer({
         if (hosted && hostRequested() !== videoId) hostLoad(videoId);
         // Be told when the browser blocks playback, then start (autoplay=0 in the URL, so nothing is missed)
         command("addEventListener", ["onAutoplayBlocked"]);
-        // Opened from a card's hover preview: go on from where the preview was, as on YouTube
-        const resumeAt = takePreviewResume(videoId);
+        // Go on from where the card's preview was, or from where it was left last time, as on YouTube
+        const resumeAt = takePreviewResume(videoId) ?? resumeTime(videoId);
+        saverRef.current = progressSaver(videoId, resumeAt);
         if (resumeAt) command("seekTo", [resumeAt, true]);
         command("playVideo");
         return;
@@ -229,6 +237,7 @@ export function YouTubePlayer({
         timeRef.current.duration = info.duration;
         setDuration(info.duration);
       }
+      if (playedRef.current && typeof info.currentTime === "number") saverRef.current?.update(info.currentTime, timeRef.current.duration);
       if (typeof info.videoLoadedFraction === "number") setLoaded(info.videoLoadedFraction);
       if (typeof info.muted === "boolean") {
         setMuted(info.muted);
@@ -242,7 +251,9 @@ export function YouTubePlayer({
       const wasEnded = lastStateRef.current === ENDED;
       lastStateRef.current = state;
       setPlayerState(state);
+      if (state === PAUSED) saverRef.current?.update(timeRef.current.time, timeRef.current.duration, true);
       if (state === PLAYING) {
+        playedRef.current = true;
         setStarted(true);
         // Touch screens: the controls go away a moment after playback starts, as in YouTube's app
         if (!overControlsRef.current) scheduleHide();
@@ -259,6 +270,8 @@ export function YouTubePlayer({
         }
       } else if (state === ENDED) {
         setEnded(true);
+        // Watched to the end: a full bar, and next time it starts from the beginning
+        saverRef.current?.update(timeRef.current.duration, timeRef.current.duration, true);
         const { upNext: next, onNext: goNext, autoplayOn: auto, controlled } = latest.current;
         if (next && goNext && auto) {
           if (controlled) goNext(); // playlist: straight on to the next video
@@ -285,7 +298,8 @@ export function YouTubePlayer({
     const token = attachHost(root);
     if (hostReady()) {
       readyRef.current = true;
-      resumeRef.current = takePreviewResume(videoId);
+      resumeRef.current = takePreviewResume(videoId) ?? resumeTime(videoId);
+      saverRef.current = progressSaver(videoId, resumeRef.current);
       command("addEventListener", ["onAutoplayBlocked"]);
       if (hostRequested() !== videoId) {
         // Not started by a tap on its link (e.g. Up next): load it here; it has sound if the player had it
@@ -297,6 +311,13 @@ export function YouTubePlayer({
         }
       }
       command("playVideo");
+      // A tap started it already and YouTube won't say "playing" again (it only reports changes): resume now
+      const info = hostInfo();
+      if (resumeRef.current !== null && hostShowing() === videoId && info.playerState === PLAYING) {
+        command("seekTo", [resumeRef.current, true]);
+        resumeRef.current = null;
+        playedRef.current = true;
+      }
     }
     return () => {
       detachHost(token);
@@ -310,6 +331,23 @@ export function YouTubePlayer({
   useEffect(() => {
     if (hosted) setHostFullscreen(pseudoFullscreen);
   }, [hosted, pseudoFullscreen]);
+
+  // Save how far it got when leaving the video, the page or the tab
+  useEffect(() => {
+    const flush = () => saverRef.current?.flush();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      flush();
+      saverRef.current = null;
+      playedRef.current = false;
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [videoId]);
 
   // If the player doesn't start (e.g. even muted autoplay is blocked), show our paused controls
   useEffect(() => {

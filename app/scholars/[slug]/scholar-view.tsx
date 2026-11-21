@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import {
   ArrowLeft,
   Share,
@@ -228,6 +229,7 @@ export default function ScholarView() {
                     <div className="relative w-40 aspect-video flex-shrink-0 rounded-lg overflow-hidden bg-muted">
                       <Image src={youtubeThumb(video.videoId, "small")} alt={video.title} fill sizes="160px" className="object-cover" />
                       <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{video.duration}</span>
+                      <WatchedBar videoId={video.videoId} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-medium leading-5 line-clamp-2 [overflow-wrap:anywhere]">{video.title}</p>

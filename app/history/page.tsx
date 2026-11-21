@@ -28,6 +28,7 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ShareModal } from "@/components/share-modal";
@@ -315,6 +316,7 @@ export default function HistoryPage() {
       <Link href={hrefFor(video)} className="relative aspect-video w-40 flex-shrink-0 overflow-hidden rounded-lg bg-muted md:w-[246px] md:rounded-xl">
         <Image src={video.thumbnail} alt={video.title} fill {...imagePriorityProps(priority)} className="object-cover" />
         <div className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{video.duration}</div>
+        <WatchedBar videoId={video.videoId || video.id} />
       </Link>
       <div className="flex min-w-0 flex-1 items-start gap-1">
         <Link href={hrefFor(video)} className="min-w-0 flex-1">

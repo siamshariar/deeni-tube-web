@@ -21,7 +21,6 @@ export function useDontRecommend() {
     }
     setChannelFeed(channelId, false);
     toast(`${channelName} won't be recommended`, {
-      description: "You can turn it back on from Channels.",
       action: { label: "Undo", onClick: () => setChannelFeed(channelId, true) },
     });
   };

@@ -96,7 +96,8 @@ test.describe('Phones', () => {
     await seed(page);
     await page.goto('/channels');
     const nav = (await page.getByRole('navigation', { name: 'Mobile navigation' }).boundingBox())!;
-    await page.getByRole('switch').first().click();
+    await page.getByRole('button', { name: /on your Home feed$/ }).first().click();
+    await page.getByRole('menuitemradio', { name: /Hide from Home/ }).click();
     const toast = page.locator('[data-sonner-toast]').first();
     await expect(toast).toBeVisible();
     // Once it has slid in: just above the nav
@@ -155,17 +156,30 @@ test.describe('Everywhere', () => {
     await expect(page.getByText('Keep at least one language')).toBeVisible();
   });
 
-  test("Channels: the Home feed switch hides a channel's videos from Home, with Undo", async ({ page }) => {
+  test("Channels: the Home feed button hides a channel's videos from Home, with Undo", async ({ page }) => {
     await seed(page);
     await page.goto('/channels');
-    await expect(page.getByText(/channels on your Home feed/)).toBeVisible({ timeout: 10_000 });
-    const sw = page.getByRole('switch').first();
-    await expect(sw).toHaveAttribute('aria-checked', 'true');
-    await sw.click();
-    await expect(sw).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByText('Hidden from Home').first()).toBeVisible();
+    await expect(page.getByText('All 10 channels show on your Home feed')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('switch')).toHaveCount(0);
+    const button = page.getByRole('button', { name: /on your Home feed$/ }).first();
+    await expect(button).toHaveText('On Home');
+    const name = (await button.getAttribute('aria-label'))!.split(':')[0];
+    await button.click();
+    // The menu says what each choice does, with a check on the current one
+    await expect(page.getByRole('menuitemradio', { name: /Show on Home/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByText('Still here, on its page and in search')).toBeVisible();
+    await page.getByRole('menuitemradio', { name: /Hide from Home/ }).click();
+
+    const hidden = page.getByRole('button', { name: `${name}: hidden from your Home feed` });
+    await expect(hidden).toHaveText('Hidden');
+    await expect(page.getByText('9 of 10 channels show on your Home feed')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('feed-visible-channels')!).length)).toBeGreaterThan(0);
+    // The Hidden filter lists it
+    await page.getByRole('button', { name: /^Hidden 1$/ }).click();
+    await expect(page.locator('main li')).toHaveCount(1);
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByText('All 10 channels show on your Home feed')).toBeVisible();
+    await expect(page.locator('main li')).toHaveCount(10);
   });
 
   test("cards show the video's real length", async ({ page }) => {

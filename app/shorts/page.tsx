@@ -1,7 +1,7 @@
 // app/shorts/page.tsx
 "use client"
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, Suspense } from "react"
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, useSyncExternalStore, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { imagePriorityProps } from "@/lib/image-priority"
@@ -48,6 +48,7 @@ import { openShareIntent } from "@/lib/share"
 import { recordWatch } from "@/hooks/useWatchHistory"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
 import { useWatchLater } from "@/hooks/useWatchLater"
+import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, setHostCropped, setHostVisible } from "@/lib/player-host"
 
 import type { CommentReply, VideoComment } from "@/lib/types"
 // ============ SHORTS DATA ============
@@ -437,7 +438,11 @@ const actionLabelClass =
 
 // ============ YOUTUBE PLAYER MESSAGING ============
 // Players are YouTube embeds driven through YouTube's postMessage protocol (enablejsapi=1).
+// On iPhone, iPad and Safari the page uses the app's one shared player instead (lib/player-host.ts, on
+// youtube-nocookie.com): one player for every short, so once a tap gave it sound, swiping keeps the sound.
 const YT_ORIGIN = "https://www.youtube.com"
+const HOST_ORIGIN = "https://www.youtube-nocookie.com"
+const noSubscribe = () => () => {}
 // infoDelivery.playerState values
 const YT_PLAYING = 1
 const YT_PAUSED = 2
@@ -446,12 +451,14 @@ const YT_BUFFERING = 3
 // so switching to them starts playback at once instead of showing a black frame
 const PRELOAD_RANGE = 1
 
-function ytPost(iframe: HTMLIFrameElement | undefined, message: Record<string, unknown>) {
+function ytPost(iframe: HTMLIFrameElement | null | undefined, message: Record<string, unknown>) {
   iframe?.contentWindow?.postMessage(JSON.stringify(message), YT_ORIGIN)
 }
 
-function ytCommand(iframe: HTMLIFrameElement | undefined, func: string, args: unknown[] = []) {
-  ytPost(iframe, { event: "command", func, args })
+function ytCommand(iframe: HTMLIFrameElement | null | undefined, func: string, args: unknown[] = []) {
+  // The shared player: through lib/player-host (it keeps its own state, e.g. a muted video stays muted)
+  if (iframe && iframe === hostFrame()) hostCommand(func, args)
+  else ytPost(iframe, { event: "command", func, args })
 }
 
 // Mock comments use a grey placeholder image; show the commenter's initial instead
@@ -794,6 +801,10 @@ function ShortsPageContent() {
   const commentsTimerRef = useRef<NodeJS.Timeout | null>(null)
   const descTimerRef = useRef<NodeJS.Timeout | null>(null)
   const videoRefs = useRef<Map<string, HTMLIFrameElement>>(new Map())
+  // iPhone, iPad, Safari: the shared player plays the short on screen (known after hydration)
+  const hosted = useSyncExternalStore(noSubscribe, hostWanted, () => false)
+  const boxRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const hostTokenRef = useRef(0)
   // The ?v= value already shown (later changes, e.g. from a notification, scroll to the new short)
   const shownVideoParamRef = useRef(searchParams.get("v"))
   // Set while a keyboard/arrow-button scroll is animating towards this index
@@ -998,6 +1009,9 @@ function ShortsPageContent() {
   const startPlayer = useCallback((id: string) => {
     const iframe = videoRefs.current.get(id)
     if (!iframe) return
+    // The shared player before any tap (opened from a link): Safari would stop it if asked for sound, so play
+    // it muted with "Tap to unmute" (that tap gives it sound for the rest of the visit)
+    if (iframe === hostFrame() && !isMutedRef.current && !hostSoundAllowed()) muteAutomatically()
     ytCommand(iframe, isMutedRef.current ? "mute" : "unMute")
     ytCommand(iframe, "setVolume", [volumeRef.current])
     if (captionsRef.current) ytCommand(iframe, "loadModule", ["captions"])
@@ -1014,7 +1028,8 @@ function ShortsPageContent() {
       if (state === YT_PLAYING) return
       attempts++
       if (state !== YT_BUFFERING) {
-        if (attempts >= 3 && !isMutedRef.current) {
+        // (Not the shared player: muted there, every later short would stay muted until a tap)
+        if (attempts >= 3 && !isMutedRef.current && iframe !== hostFrame()) {
           muteAutomatically()
           ytCommand(iframe, "mute")
         }
@@ -1029,9 +1044,10 @@ function ShortsPageContent() {
 
   useEffect(() => () => { if (playWatchRef.current) clearTimeout(playWatchRef.current) }, [])
 
-  // Turn the sound back on after it was muted automatically
+  // Turn the sound back on after it was muted automatically (inside a tap, click or key press)
   const restoreSound = useCallback(() => {
     if (!autoMutedRef.current) return false
+    allowHostSound()
     autoMutedRef.current = false
     setAutoMuted(false)
     isMutedRef.current = false
@@ -1082,7 +1098,7 @@ function ShortsPageContent() {
   // Listen to the YouTube players: readiness, progress and play state
   useEffect(() => {
     const onYTMessage = (e: MessageEvent) => {
-      if (e.origin !== YT_ORIGIN) return
+      if (e.origin !== YT_ORIGIN && e.origin !== HOST_ORIGIN) return
       let d
       try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data } catch { return }
       // Which short's player sent it?
@@ -1116,6 +1132,11 @@ function ShortsPageContent() {
       }
 
       if ((d?.event !== "infoDelivery" && d?.event !== "initialDelivery") || !d.info) return
+      // The shared player still reporting the short before (or the placeholder): not this short's state
+      if (iframe === hostFrame()) {
+        const showing = d.info.videoData?.video_id ?? hostShowing()
+        if (showing && showing !== shortsData[currentIndexRef.current]?.videoId) return
+      }
       const state = d.info.playerState
       if (typeof state === "number") playerStatesRef.current.set(iframe, state)
 
@@ -1151,6 +1172,14 @@ function ShortsPageContent() {
     return () => window.removeEventListener("message", onYTMessage)
   }, [startPlayer, scheduleNeighbors, muteAutomatically])
 
+  // The shared player: created with the opening short if no tap made it yet (before the effect below, which
+  // attaches it); let go when leaving Shorts
+  useEffect(() => {
+    if (!hosted) return
+    armHost(shortsData[currentIndexRef.current]?.videoId)
+    return () => detachHost(hostTokenRef.current)
+  }, [hosted])
+
   // Switching shorts: reset progress, pause the one that left, play the new one
   useEffect(() => {
     currentIndexRef.current = currentIndex
@@ -1164,6 +1193,40 @@ function ShortsPageContent() {
     userPausedRef.current = false
     activePlayedRef.current = false
     if (playWatchRef.current) clearTimeout(playWatchRef.current)
+    if (hosted) {
+      // The shared player moves to this short and loads it (keeping the sound if it has it)
+      const frame = hostFrame()
+      const box = activeId ? boxRefs.current.get(activeId) : undefined
+      videoRefs.current.clear()
+      if (!activeId || !frame || !box) return
+      videoRefs.current.set(activeId, frame)
+      playerStatesRef.current.delete(frame)
+      hostTokenRef.current = attachHost(box, "short")
+      setHostVisible(false)
+      hostLoad(shortsData[currentIndex].videoId, !isMutedRef.current)
+      // Not ready yet: its onReady message starts it
+      if (hostReady()) {
+        if (!readyPlayersRef.current.has(frame)) {
+          readyPlayersRef.current.add(frame)
+          ytCommand(frame, "addEventListener", ["onAutoplayBlocked"])
+        }
+        // A tap may have started this short already (YouTube only reports changes, so take what it said)
+        const info = hostInfo()
+        if (hostShowing() === shortsData[currentIndex].videoId) {
+          if (typeof info.duration === "number" && info.duration > 0) {
+            videoDurationRef.current = info.duration
+            setVideoDuration(info.duration)
+          }
+          if (info.playerState === YT_PLAYING) {
+            playerStatesRef.current.set(frame, YT_PLAYING)
+            activePlayedRef.current = true
+            setStartedId(activeId)
+          }
+        }
+        startPlayer(activeId)
+      }
+      return
+    }
     videoRefs.current.forEach((iframe, id) => {
       if (id === activeId) return
       // Rewind it too, so it starts from the beginning if you scroll back
@@ -1178,7 +1241,16 @@ function ShortsPageContent() {
     if (readyPlayersRef.current.has(iframe)) startPlayer(activeId)
     // Not ready yet: its onReady message starts it. Ping again in case an earlier handshake gave up.
     else registerPlayer(activeId)
-  }, [currentIndex, startPlayer, registerPlayer])
+  }, [currentIndex, startPlayer, registerPlayer, hosted])
+
+  // Shown once this short plays (the thumbnail covers the box until then); YouTube draws captions at its
+  // bottom edge, so no cropping while they're on
+  useEffect(() => {
+    if (hosted) setHostVisible(startedId === shortsData[currentIndex]?.id)
+  }, [hosted, startedId, currentIndex])
+  useEffect(() => {
+    if (hosted) setHostCropped(!captionsEnabled)
+  }, [hosted, captionsEnabled])
 
   // Keep muted ref in sync and send postMessage when mute changes
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted])
@@ -1187,10 +1259,7 @@ function ShortsPageContent() {
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
     if (!iframe?.contentWindow) return
-    iframe.contentWindow.postMessage(
-      JSON.stringify({ event: 'command', func: isMuted ? 'mute' : 'unMute', args: [] }),
-      'https://www.youtube.com'
-    )
+    ytCommand(iframe, isMuted ? 'mute' : 'unMute')
   // Only reacts to this setting; switching shorts re-applies it in the currentIndex effect
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMuted])
@@ -1202,10 +1271,7 @@ function ShortsPageContent() {
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
     if (!iframe?.contentWindow) return
-    iframe.contentWindow.postMessage(
-      JSON.stringify({ event: 'command', func: 'setVolume', args: [volume] }),
-      'https://www.youtube.com'
-    )
+    ytCommand(iframe, 'setVolume', [volume])
   // Only reacts to this setting; switching shorts re-applies it in the currentIndex effect
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume])
@@ -1271,7 +1337,7 @@ function ShortsPageContent() {
   const sendToActivePlayer = (func: string, args: unknown[] = []) => {
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
-    iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube.com')
+    ytCommand(iframe, func, args)
   }
   const toggleCaptions = () => {
     const next = !captionsEnabled
@@ -1303,6 +1369,7 @@ function ShortsPageContent() {
       if (Date.now() - lastScrollAtRef.current < 250) return
     }
     const newPlaying = !isPlaying
+    if (newPlaying && !isMuted) allowHostSound()
     setIsPlaying(newPlaying)
     userPausedRef.current = !newPlaying
     if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current)
@@ -1310,7 +1377,7 @@ function ShortsPageContent() {
     playFeedbackTimerRef.current = setTimeout(() => setShowPlayFeedback(false), 600)
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
-    iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: newPlaying ? 'playVideo' : 'pauseVideo', args: [] }), 'https://www.youtube.com')
+    ytCommand(iframe, newPlaying ? 'playVideo' : 'pauseVideo')
   }
 
   // ---- COMMENT ACTIONS ----
@@ -1687,12 +1754,16 @@ function ShortsPageContent() {
       )}
 
 
+      {/* The shared player (iPhone, iPad, Safari) lives under the feed, which is see-through where the short on
+          screen plays; black behind it on phones, as the feed is */}
+      {hosted && <div className="fixed inset-0 bg-black md:hidden" aria-hidden="true" />}
+
       {/* Main Shorts Content */}
       <div
         ref={containerRef}
         // overflow-x-hidden + touch-pan-y: the feed only moves up and down (the hidden action rails of the other
         // shorts slide in from the right and must not make it pannable sideways)
-        className="fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll overflow-x-hidden touch-pan-y snap-y snap-mandatory overscroll-contain scrollbar-none transition-all duration-300 ease-in-out"
+        className={cn(hosted && "z-[2]", "fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll overflow-x-hidden touch-pan-y snap-y snap-mandatory overscroll-contain scrollbar-none transition-all duration-300 ease-in-out")}
         style={{
           scrollSnapType: "y mandatory",
           left: isDesktopViewport ? `${desktopSidebarWidth}px` : "0px",
@@ -1705,22 +1776,32 @@ function ShortsPageContent() {
           const isActive = index === currentIndex
           const isHovered = hoveredVideoId === short.id
           // The active short and its neighbours get a live player; the rest only show a thumbnail
-          const hasPlayer = isActive || (preloadNeighbors && Math.abs(index - currentIndex) <= PRELOAD_RANGE)
+          // (With the shared player, no short has a player of its own)
+          const hasPlayer = !hosted && (isActive || (preloadNeighbors && Math.abs(index - currentIndex) <= PRELOAD_RANGE))
           const posterHidden = isActive && startedId === short.id
+          // The shared player shows through this short's box (it sits under the feed, see below)
+          const seeThrough = hosted && posterHidden
           const liked = isLikedShort(short.videoId)
           const saved = isShortSaved(short)
           return (
-            <section key={short.id} className="relative h-full md:h-[calc(100%-32px)] w-full overflow-x-clip snap-start snap-always flex items-center md:items-start justify-center bg-background">
+            <section key={short.id} className={cn("relative h-full md:h-[calc(100%-32px)] w-full overflow-x-clip snap-start snap-always flex items-center md:items-start justify-center", !seeThrough && "bg-background")}>
               {/* The video plus its action rail: side by side from lg up; on smaller screens the rail sits over the video */}
               <div className="relative w-full h-full md:w-auto md:h-[calc(100%-12px)] md:mt-2 flex items-end lg:gap-4">
                 <div
-                  className="relative w-full h-full md:w-auto md:flex-shrink-0 md:aspect-[9/16] md:rounded-2xl md:overflow-hidden bg-black"
+                  className={cn("relative w-full h-full md:w-auto md:flex-shrink-0 md:aspect-[9/16] md:rounded-2xl md:overflow-hidden", !seeThrough && "bg-black")}
                   onMouseEnter={() => setHoveredVideoId(short.id)}
                   onMouseLeave={() => { setHoveredVideoId(null); setShowVolumeSlider(false); setShowMoreMenu(false) }}
                 >
                   {/* Video Player — overflow-hidden only here so the progress bar scrubber isn't clipped */}
                   {/* Tapping a short that isn't the active one (e.g. the next one peeking in) moves to it */}
-                  <div className="shorts-player-box absolute inset-0 overflow-hidden md:rounded-2xl bg-black" onClick={isActive ? handleTogglePlay : () => scrollToVideo(index)}>
+                  <div
+                    ref={(el) => {
+                      if (el) boxRefs.current.set(short.id, el)
+                      else boxRefs.current.delete(short.id)
+                    }}
+                    className={cn("shorts-player-box absolute inset-0 overflow-hidden md:rounded-2xl", !seeThrough && "bg-black")}
+                    onClick={isActive ? handleTogglePlay : () => scrollToVideo(index)}
+                  >
                     {hasPlayer && (
                       <iframe
                         ref={(el) => {
@@ -1789,7 +1870,7 @@ function ShortsPageContent() {
                           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                         </button>
                         <div className="relative flex items-center" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) setIsMuted(!isMuted) }} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) { if (isMuted) allowHostSound(); setIsMuted(!isMuted) } }} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                             {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                           </button>
                           {showVolumeSlider && (
@@ -1856,8 +1937,9 @@ function ShortsPageContent() {
                     </button>
                   )}
 
-                  {/* Bottom info & actions (phones: room under the title, above the progress bar, as in YouTube Shorts) */}
-                  <div className={`absolute bottom-12 md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+                  {/* Bottom info (phones: room under the title, above the progress bar, as in the YouTube app: about 5% of
+                      the screen's height, so 24px on small phones up to 44px on tall ones) */}
+                  <div className={`absolute bottom-[clamp(24px,5svh,44px)] md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
                     <div className="flex items-center gap-2.5 mb-2">
                       <Avatar className="h-9 w-9 flex-shrink-0">
                         <AvatarImage src={short.channelAvatar} />
@@ -1890,7 +1972,7 @@ function ShortsPageContent() {
                             const t = pct * videoDurationRef.current
                             setVideoCurrentTime(t)
                             const iframe = videoRefs.current.get(short.id)
-                            iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [t, true] }), 'https://www.youtube.com')
+                            ytCommand(iframe, 'seekTo', [t, true])
                           }
                           doSeek(e.clientX)
                           const onMove = (ev: MouseEvent) => doSeek(ev.clientX)
@@ -1912,7 +1994,7 @@ function ShortsPageContent() {
                           const t = pct * videoDurationRef.current
                           setVideoCurrentTime(t)
                           const iframe = videoRefs.current.get(short.id)
-                          iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [t, true] }), 'https://www.youtube.com')
+                          ytCommand(iframe, 'seekTo', [t, true])
                         }}
                         onTouchMove={(e) => {
                           e.stopPropagation()
@@ -1922,7 +2004,7 @@ function ShortsPageContent() {
                           const t = pct * videoDurationRef.current
                           setVideoCurrentTime(t)
                           const iframe = videoRefs.current.get(short.id)
-                          iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [t, true] }), 'https://www.youtube.com')
+                          ytCommand(iframe, 'seekTo', [t, true])
                         }}
                         onTouchEnd={() => { isSeekingRef.current = false; setIsSeeking(false); setIsProgressTouch(false) }}
                       >

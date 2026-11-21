@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import Link from "next/link";
+import { WatchedBar } from "@/components/watched-bar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -202,6 +203,7 @@ function ResultList({
               <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-xs px-1 py-px rounded font-medium">
                 {video.duration}
               </div>
+              <WatchedBar videoId={video.videoId} />
             </Link>
           </InlinePreview>
           <div className="flex-1 min-w-0">
