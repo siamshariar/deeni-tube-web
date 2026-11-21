@@ -52,17 +52,6 @@ import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame
 
 import type { CommentReply, VideoComment } from "@/lib/types"
 // ============ SHORTS DATA ============
-// Shorts that aren't 9:16 videos (measured from YouTube's original-shape thumbnails, oar2.jpg): YouTube shows
-// them letterboxed in the 9:16 player, so their thumbnail is framed the same way (see the poster below)
-const SHORT_SHAPE: Record<string, "square" | "wide"> = {
-  PUwTf64igQk: "square",
-  ihdO_G6Yk0E: "square",
-  _zCnmnCd7CU: "square",
-  "hHpoYE-v6og": "wide",
-  "Kk1_-T-8MFU": "wide",
-  rTrh9VHgdwo: "wide",
-}
-
 const shortsData = [
   {
     id: "s1",
@@ -506,6 +495,37 @@ function FullscreenIcon({ className }: { className?: string }) {
     <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className={className}>
       <path d="M10 3H3v7c0 .265.105.52.293.707.187.188.442.293.707.293.265 0 .52-.105.707-.293C4.895 10.52 5 10.265 5 10V6.414l4.293 4.293.076.068c.192.155.435.233.68.22.247-.014.48-.118.654-.292.174-.174.278-.407.291-.653.014-.246-.064-.489-.219-.681l-.068-.076L6.414 5H10c.265 0 .52-.105.707-.293C10.895 4.52 11 4.265 11 4c0-.265-.105-.52-.293-.707C10.52 3.105 10.265 3 10 3Zm10 10c-.265 0-.52.105-.707.293-.188.187-.293.442-.293.707v3.586l-4.293-4.293-.076-.068c-.192-.155-.435-.233-.68-.22-.247.014-.48.118-.654.292-.174.174-.278.407-.291.653-.014.246.064.489.219.681l.068.076L17.586 19H14c-.265 0-.52.105-.707.293-.188.187-.293.442-.293.707 0 .265.105.52.293.707.187.188.442.293.707.293h7v-7c0-.265-.105-.52-.293-.707C20.52 13.105 20.265 13 20 13Z" fill="currentColor" />
     </svg>
+  )
+}
+
+// ============ COVER ============
+
+// YouTube answers a missing picture with a 120×90 grey one
+const MISSING = { width: 120, height: 90 }
+
+/**
+ * What a short shows in its box until its video plays: the video's first frame (YouTube's frame0.jpg, about
+ * 270×480, or 480×480 for a square video), fitted like YouTube's player fits the video (contain, in the same 9:16
+ * box), so the picture doesn't change when the video starts, as in YouTube's own apps and KinTube. If YouTube
+ * has no first frame, the thumbnail.
+ */
+function ShortCover({ videoId, thumbnail, title, priority }: { videoId: string; thumbnail: string; title: string; priority: boolean }) {
+  const [noFirstFrame, setNoFirstFrame] = useState(false)
+  const loading = priority ? imagePriorityProps("lcp") : { loading: "lazy" as const }
+  if (noFirstFrame) return <Image src={thumbnail} alt={title} fill className="object-cover" {...loading} />
+  return (
+    <Image
+      src={`https://img.youtube.com/vi/${videoId}/frame0.jpg`}
+      alt={title}
+      fill
+      className="object-contain"
+      onError={() => setNoFirstFrame(true)}
+      onLoad={(e) => {
+        const img = e.currentTarget
+        if (img.naturalWidth === MISSING.width && img.naturalHeight === MISSING.height) setNoFirstFrame(true)
+      }}
+      {...loading}
+    />
   )
 }
 
@@ -1832,23 +1852,13 @@ function ShortsPageContent() {
                         onLoad={() => registerPlayer(short.id)}
                       />
                     )}
-                    {/* Thumbnail on top of the player until it's actually playing, so switching never shows a black frame.
-                        Framed exactly like the video: in the same 9:16 box that covers this one (.shorts-poster), where
-                        YouTube's landscape thumbnail shows just the short (its black side strips fall outside), so it
-                        doesn't look smaller and then zoom when the video takes over. Square and landscape videos
-                        sit in the middle, as YouTube shows them */}
+                    {/* The video's first frame on top of the player until it's actually playing, so switching never shows
+                        a black frame and nothing changes when the video takes over (ShortCover). In the same 9:16 box
+                        that covers this one as the video (.shorts-poster), so it's framed exactly like the video */}
                     <div className={cn("absolute inset-0 pointer-events-none transition-opacity duration-200", posterHidden ? "opacity-0" : "opacity-100")}>
                       <div className="shorts-poster">
-                        <div className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2", SHORT_SHAPE[short.videoId] === "square" ? "aspect-square" : SHORT_SHAPE[short.videoId] === "wide" ? "aspect-video" : "h-full")}>
-                          <Image
-                            src={short.thumbnail}
-                            alt={short.title}
-                            fill
-                            className="object-cover"
-                            // The opening short's thumbnail is the main image until its player starts, so only it loads early
-                            {...(index === initialIndex ? imagePriorityProps("lcp") : { loading: "lazy" as const })}
-                          />
-                        </div>
+                        {/* The opening short's cover is the main image until its player starts, so only it loads early */}
+                        <ShortCover videoId={short.videoId} thumbnail={short.thumbnail} title={short.title} priority={index === initialIndex} />
                       </div>
                     </div>
                   </div>

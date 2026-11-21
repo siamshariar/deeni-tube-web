@@ -126,25 +126,31 @@ test.describe('Phones', () => {
 test.describe('Phones: Shorts thumbnail', () => {
   test.skip(({ isMobile }) => !isMobile, 'phones only');
 
-  test("a short's thumbnail is framed like its video: 9:16, covering the screen (no side strips, no zoom when it plays)", async ({ page }) => {
+  test("a short's cover is its video's first frame, framed like the video: 9:16, covering the screen", async ({ page }) => {
     await seed(page);
-    await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort()); // only the thumbnail
-    await page.goto('/shorts?v=o38RKuY_AUU'); // YouTube's thumbnail has black strips at both sides
+    await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort()); // only the cover
+    await page.goto('/shorts?v=o38RKuY_AUU');
     const box = page.locator('.shorts-player-box').nth(3);
     const poster = box.locator('.shorts-poster');
-    await expect(poster.locator('img')).toBeVisible();
+    const img = poster.locator('img');
+    await expect(img).toHaveAttribute('src', 'https://img.youtube.com/vi/o38RKuY_AUU/frame0.jpg');
+    await expect(img).toHaveCSS('object-fit', 'contain'); // as YouTube's player fits the video
     const [b, p] = [(await box.boundingBox())!, (await poster.boundingBox())!];
     expect(p.width / p.height).toBeCloseTo(9 / 16, 2);
     expect(p.x).toBeLessThanOrEqual(b.x + 0.5);
     expect(p.x + p.width).toBeGreaterThanOrEqual(b.x + b.width - 0.5);
     expect(p.y).toBeLessThanOrEqual(b.y + 0.5);
     expect(p.y + p.height).toBeGreaterThanOrEqual(b.y + b.height - 0.5);
-    // A square video sits in the middle, as YouTube's player shows it
-    await page.goto('/shorts?v=PUwTf64igQk');
-    const square = page.locator('.shorts-player-box').nth(5).locator('.shorts-poster img').locator('..'); // the 6th short
-    await expect(square).toBeVisible();
-    const sq = (await square.boundingBox())!;
-    expect(Math.abs(sq.width - sq.height)).toBeLessThan(1);
+  });
+
+  test('without a first frame from YouTube, the cover is the thumbnail', async ({ page }) => {
+    await seed(page);
+    await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort());
+    await page.route('**/vi/MBxDbbkk0gQ/frame0.jpg', (r) => r.fulfill({ status: 404 }));
+    await page.goto('/shorts');
+    const img = page.locator('.shorts-player-box').first().locator('.shorts-poster img');
+    await expect(img).toHaveAttribute('src', /\/vi\/MBxDbbkk0gQ\/hqdefault\.jpg$/);
+    await expect(img).toHaveCSS('object-fit', 'cover');
   });
 });
 
