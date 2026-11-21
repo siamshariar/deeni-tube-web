@@ -14,10 +14,14 @@
 // - at the end, our own end screen covers YouTube's: "Up next" with an Autoplay countdown, or Replay.
 // Also: the video's thumbnail shows until it plays (no black box), and if the browser blocks sound it plays
 // muted with a "Click to unmute" button. Keyboard: space/k play, j/l ±10s, ←/→ ±5s, f full screen, m mute,
-// c captions.
+// c captions. On touch screens the controls hide 3s after the video starts or after a tap, as in YouTube's app.
+//
+// On iPhone, iPad and Safari the video plays in the app's one shared player (lib/player-host.ts) instead of a
+// frame of its own: the tap that opened the page already started it there, with sound, which Safari only
+// allows inside a tap. The shared player is placed over this box and these controls drive it.
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Captions, Check, ChevronLeft, ChevronRight, Maximize, Minimize, Pause, Play, RotateCcw, Settings, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
@@ -25,6 +29,25 @@ import { youtubeThumb } from "@/lib/media-lookup";
 import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
 import { takePreviewResume } from "@/components/inline-preview";
+import {
+  armHost,
+  attachHost,
+  detachHost,
+  hostFrame,
+  hostLoad,
+  hostMuted,
+  hostReady,
+  hostRequested,
+  hostShowing,
+  hostWanted,
+  playFromTap,
+  setHostCropped,
+  setHostFullscreen,
+} from "@/lib/player-host";
+
+const noSubscribe = () => () => {};
+// Controls hide this long after the last mouse move (desktop) or tap / start of playback (touch)
+const HIDE_AFTER_MS = { mouse: 2500, touch: 3000 };
 
 // YouTube's privacy-enhanced embed: same player and postMessage API, but it doesn't show creators' end-screen
 // cards (video/playlist thumbnails over a video's last seconds), which the normal embed does
@@ -68,7 +91,11 @@ export function YouTubePlayer({
   onAutoplayChange?: (on: boolean) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  // iPhone/iPad/Safari: play in the shared player (decided after hydration; the server renders a frame)
+  const hosted = useSyncExternalStore(noSubscribe, hostWanted, () => false);
+  // Opened from a card's preview: where to go on from once the video plays (shared player)
+  const resumeRef = useRef<number | null>(null);
   const readyRef = useRef(false);
   const lastStateRef = useRef<number | null>(null);
   const timeRef = useRef({ time: 0, duration: 0 });
@@ -124,6 +151,18 @@ export function YouTubePlayer({
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), YT_ORIGIN);
   }, []);
 
+  // ── Controls: shown, then hidden after a moment while playing ──
+  const scheduleHide = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      if (!overControlsRef.current) setControlsShown(false);
+    }, pointerTypeRef.current === "mouse" ? HIDE_AFTER_MS.mouse : HIDE_AFTER_MS.touch);
+  }, []);
+  const showControls = useCallback(() => {
+    setControlsShown(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
   // ── Talking to the player ──
   // YouTube only talks to the page after it says it's listening; repeat until the player answers. Started on
   // mount as well as on load: the server-rendered frame can finish loading before React is ready to see its
@@ -145,8 +184,8 @@ export function YouTubePlayer({
     ping();
   }, [videoId]);
   useEffect(() => {
-    startHandshake();
-  }, [startHandshake]);
+    if (!hosted) startHandshake();
+  }, [startHandshake, hosted]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -157,8 +196,13 @@ export function YouTubePlayer({
       } catch {
         return;
       }
+      // The shared player can still be reporting the video it played before this one: not ours
+      const reported = d?.info?.videoData?.video_id ?? (hosted ? hostShowing() : null);
+      if (hosted && reported && reported !== videoId) return;
       if ((d?.event === "onReady" || d?.event === "initialDelivery") && !readyRef.current) {
         readyRef.current = true;
+        // The shared player came up with its placeholder: switch it to this video
+        if (hosted && hostRequested() !== videoId) hostLoad(videoId);
         // Be told when the browser blocks playback, then start (autoplay=0 in the URL, so nothing is missed)
         command("addEventListener", ["onAutoplayBlocked"]);
         // Opened from a card's hover preview: go on from where the preview was, as on YouTube
@@ -200,6 +244,13 @@ export function YouTubePlayer({
       setPlayerState(state);
       if (state === PLAYING) {
         setStarted(true);
+        // Touch screens: the controls go away a moment after playback starts, as in YouTube's app
+        if (!overControlsRef.current) scheduleHide();
+        // Shared player: go on from where the card's preview was, now that the video has loaded
+        if (resumeRef.current !== null) {
+          command("seekTo", [resumeRef.current, true]);
+          resumeRef.current = null;
+        }
         // Right after the end YouTube can briefly report "playing" while still at the end: keep the end screen
         const { time: t, duration: dur } = timeRef.current;
         if (!(wasEnded && dur > 0 && dur - t < 1)) {
@@ -220,7 +271,45 @@ export function YouTubePlayer({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [command, videoId]);
+  }, [command, videoId, hosted, scheduleHide]);
+
+  // ── The shared player (iPhone, iPad, Safari) ──
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!hosted || !root) return;
+    // First video page with no shared player yet (opened from a link elsewhere): create it with this video
+    armHost(videoId);
+    iframeRef.current = hostFrame();
+    readyRef.current = false;
+    lastStateRef.current = null;
+    const token = attachHost(root);
+    if (hostReady()) {
+      readyRef.current = true;
+      resumeRef.current = takePreviewResume(videoId);
+      command("addEventListener", ["onAutoplayBlocked"]);
+      if (hostRequested() !== videoId) {
+        // Not started by a tap on its link (e.g. Up next): load it here; it has sound if the player had it
+        hostLoad(videoId);
+        if (hostMuted()) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the shared player, an outside system
+          setMuted(true);
+          setMutedByBrowser(true);
+        }
+      }
+      command("playVideo");
+    }
+    return () => {
+      detachHost(token);
+      iframeRef.current = null;
+      readyRef.current = false;
+    };
+  }, [hosted, videoId, command]);
+  useEffect(() => {
+    if (hosted) setHostCropped(cropped);
+  }, [hosted, cropped]);
+  useEffect(() => {
+    if (hosted) setHostFullscreen(pseudoFullscreen);
+  }, [hosted, pseudoFullscreen]);
 
   // If the player doesn't start (e.g. even muted autoplay is blocked), show our paused controls
   useEffect(() => {
@@ -242,13 +331,6 @@ export function YouTubePlayer({
   }, [countdownStart]);
 
   // ── Actions ──
-  const showControls = useCallback(() => {
-    setControlsShown(true);
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => {
-      if (!overControlsRef.current) setControlsShown(false);
-    }, 2500);
-  }, []);
   useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
 
   const flash = (label: "play" | "pause" | "back" | "forward") => setFeedback({ label, key: Date.now() });
@@ -339,6 +421,21 @@ export function YouTubePlayer({
   const toggleFullscreen = () => {
     const el = rootRef.current as (HTMLDivElement & { webkitRequestFullscreen?: () => void }) | null;
     const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
+    if (hosted) {
+      // The video is the shared player's frame, outside this element: fill the window with both, and make the
+      // whole page full screen where the browser can (iPad, Mac; iPhone can't)
+      const page = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
+      if (pseudoFullscreen) {
+        setPseudoFullscreen(false);
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        else if (doc.webkitFullscreenElement) doc.webkitExitFullscreen?.();
+      } else {
+        setPseudoFullscreen(true);
+        if (page.requestFullscreen) page.requestFullscreen().catch(() => {});
+        else page.webkitRequestFullscreen?.();
+      }
+      return;
+    }
     if (document.fullscreenElement || doc.webkitFullscreenElement) {
       if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
       else doc.webkitExitFullscreen?.();
@@ -365,6 +462,8 @@ export function YouTubePlayer({
       const doc = document as Document & { webkitFullscreenElement?: Element };
       const el = document.fullscreenElement || doc.webkitFullscreenElement;
       setFullscreen(!!el && el === rootRef.current);
+      // Shared player: leaving the page's full screen (Esc) also leaves the player's
+      if (!el) setPseudoFullscreen((on) => (on && hostWanted() ? false : on));
     };
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
@@ -454,6 +553,12 @@ export function YouTubePlayer({
     setScrubTime(null);
   };
 
+  // The next video, started inside the tap (shared player: with sound)
+  const goNext = () => {
+    if (upNext && hosted) playFromTap(upNext.videoId);
+    onNext?.();
+  };
+
   const played = duration ? Math.min(100, (shownTime / duration) * 100) : 0;
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   const canGoNext = !!(upNext && onNext);
@@ -466,14 +571,16 @@ export function YouTubePlayer({
       role="region"
       aria-label="Video player"
       className={cn(
-        "select-none overflow-hidden bg-black text-white [-webkit-tap-highlight-color:transparent]",
-        pseudoFullscreen ? "fixed inset-0 z-[100]" : "absolute inset-0"
+        // Its own layer (z-index), above the shared player's frame on iPhone/iPad/Safari, which is then the video
+        "select-none overflow-hidden text-white [-webkit-tap-highlight-color:transparent]",
+        hosted ? "bg-transparent" : "bg-black",
+        pseudoFullscreen ? "fixed inset-0 z-[100]" : "absolute inset-0 z-[2]"
       )}
       onMouseMove={() => { if (pointerTypeRef.current === "mouse") showControls(); }}
       onMouseLeave={() => { if (isPlaying && menu === null) setControlsShown(false); }}
       onPointerDown={(e) => { pointerTypeRef.current = e.pointerType; }}
     >
-      <iframe
+      {!hosted && <iframe
         ref={iframeRef}
         src={`${YT_ORIGIN}/embed/${videoId}?autoplay=0&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1`}
         title={title}
@@ -484,7 +591,7 @@ export function YouTubePlayer({
         className={cn("pointer-events-none absolute left-0 w-full transition-opacity duration-200", started ? "opacity-100" : "opacity-0")}
         style={cropped ? { top: -CROP, height: `calc(100% + ${CROP * 2}px)` } : { top: 0, height: "100%" }}
         onLoad={startHandshake}
-      />
+      />}
 
       {/* Takes every click and hover over the video, so YouTube's own hover/pause UI never shows */}
       <div
@@ -541,8 +648,9 @@ export function YouTubePlayer({
       {/* ── Controls ── */}
       <div
         className={cn("absolute inset-x-0 bottom-0 z-20 transition-opacity duration-200", controlsVisible ? "opacity-100" : "pointer-events-none opacity-0")}
-        onMouseEnter={() => { overControlsRef.current = true; }}
-        onMouseLeave={() => { overControlsRef.current = false; }}
+        // Mouse only: a tap on a phone also sends mouseenter, which would keep the controls up for good
+        onPointerEnter={(e) => { if (e.pointerType === "mouse") overControlsRef.current = true; }}
+        onPointerLeave={(e) => { if (e.pointerType === "mouse") overControlsRef.current = false; }}
       >
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
 
@@ -616,7 +724,7 @@ export function YouTubePlayer({
               {isPlaying ? <Pause className="fill-current" /> : <Play className="fill-current" />}
             </button>
             {canGoNext && (
-              <button type="button" aria-label="Next" title="Next" onClick={onNext} className={cn(btn, "hidden sm:flex")}>
+              <button type="button" aria-label="Next" title="Next" onClick={goNext} className={cn(btn, "hidden sm:flex")}>
                 <SkipForward className="fill-current" />
               </button>
             )}
@@ -675,7 +783,7 @@ export function YouTubePlayer({
           <Image src={youtubeThumb(videoId)} alt="" fill sizes="50vw" className="object-cover opacity-25 blur-sm" />
           {secondsLeft !== null && upNext ? (
             <div className="relative flex max-w-[92%] items-center gap-4 sm:gap-6">
-              <UpNextThumb video={upNext} onNext={onNext} />
+              <UpNextThumb video={upNext} onNext={goNext} />
               <div className="min-w-0">
                 <p className="text-xs text-white/75 sm:text-sm">Up next in {secondsLeft}</p>
                 <p className="mt-1 line-clamp-2 text-sm font-medium leading-5 sm:text-lg sm:leading-6">{upNext.title}</p>
@@ -684,7 +792,7 @@ export function YouTubePlayer({
                   <button type="button" onClick={() => setCountdownStart(null)} className="h-9 rounded-full bg-white/15 px-4 text-sm font-medium transition-colors hover:bg-white/25">
                     Cancel
                   </button>
-                  <button type="button" onClick={() => { setCountdownStart(null); onNext?.(); }} className="h-9 rounded-full bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85">
+                  <button type="button" onClick={() => { setCountdownStart(null); goNext(); }} className="h-9 rounded-full bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85">
                     Play now
                   </button>
                 </div>
@@ -701,7 +809,7 @@ export function YouTubePlayer({
               {upNext && (
                 <div className="flex flex-col items-start">
                   <span className="text-xs font-medium uppercase tracking-wide text-white/70">Up next</span>
-                  <UpNextThumb video={upNext} onNext={onNext} className="mt-1.5" />
+                  <UpNextThumb video={upNext} onNext={goNext} className="mt-1.5" />
                   <span className="mt-1.5 line-clamp-2 w-28 text-sm font-medium leading-5 sm:w-48">{upNext.title}</span>
                 </div>
               )}

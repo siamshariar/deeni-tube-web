@@ -1,6 +1,7 @@
 // app/channels/[slug]/page.tsx
 "use client";
 
+import { playPlaylistFromTap } from "@/lib/play-playlist";
 import { useState, useEffect, useMemo } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -317,25 +318,25 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
           <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-2 md:px-4 rounded-none p-0">
             <TabsTrigger
               value="videos"
-              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Videos
             </TabsTrigger>
             <TabsTrigger
               value="shorts"
-              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Shorts
             </TabsTrigger>
             <TabsTrigger
               value="playlists"
-              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Playlists
             </TabsTrigger>
             <TabsTrigger
               value="about"
-              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               About
             </TabsTrigger>
@@ -456,9 +457,10 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                   <div
                     key={playlist.id}
                     className="group cursor-pointer"
-                    onClick={() =>
-                      router.push(`/playlists/${playlist.slug}/${playlist.id}?source=channel`)
-                    }
+                    onClick={() => {
+                      playPlaylistFromTap(playlist.videoIds);
+                      router.push(`/playlists/${playlist.slug}/${playlist.id}?source=channel`);
+                    }}
                   >
                     <div className="relative aspect-video w-full bg-muted overflow-hidden rounded-xl">
                       {thumbs.length >= 2 ? (

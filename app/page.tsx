@@ -186,7 +186,6 @@ export default function Home() {
           style={{
             WebkitOverflowScrolling: "touch",
             overscrollBehaviorX: "contain",
-            touchAction: "pan-x",
             scrollbarWidth: 'none', // Firefox
             msOverflowStyle: 'none', // IE/Edge
           }}

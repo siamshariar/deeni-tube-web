@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 // at the odd indexes.
 const TOKEN = /(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]}'"]|#[^\s#.,;:!?()[\]{}"']+)/g;
 
-const LINK = "text-[#065fd4] hover:underline dark:text-[#3ea6ff]";
+const LINK = "text-[#065fd4] dark:text-[#3ea6ff]";
 
 /** Search link for a hashtag: "#ইসলামিক_আলোচনা" → /search?q=ইসলামিক আলোচনা */
 export function hashtagHref(tag: string) {

@@ -256,7 +256,7 @@ export default function MobileSearchModal() {
         </button>
         <span className="font-semibold flex-1">Search</span>
         {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
-          <button onClick={resetFilters} className="text-sm text-primary hover:underline">
+          <button onClick={resetFilters} className="text-sm text-primary">
             Clear filters
           </button>
         )}
@@ -309,7 +309,7 @@ export default function MobileSearchModal() {
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent</span>
               <button
                 onClick={() => { setRecentList([]); saveRecent([]); }}
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary"
               >
                 Clear all
               </button>

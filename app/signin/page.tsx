@@ -98,7 +98,7 @@ export default function SignInPage() {
       <header className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <button type="button" aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
         <Link href="/" aria-label="Deeni.tube home"><Logo height={28} className="h-7 w-auto object-contain" /></Link>
-        <button type="button" aria-label="Language" onClick={() => setShowLanguagePopup(true)} className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Language</span></button>
+        <button type="button" aria-label="Language" onClick={() => setShowLanguagePopup(true)} className="flex items-center gap-1.5 text-sm text-primary font-medium"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Language</span></button>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
@@ -116,7 +116,7 @@ export default function SignInPage() {
                 return <span key={code} className="px-3 py-1.5 rounded-full bg-background border text-sm font-medium shadow-sm">{lang?.name || code}</span>;
               })}
             </div>
-            <button onClick={() => setShowLanguagePopup(true)} className="text-xs text-primary hover:underline mt-3 font-medium">Change languages</button>
+            <button onClick={() => setShowLanguagePopup(true)} className="text-xs text-primary mt-3 font-medium">Change languages</button>
           </div>
 
           {!showEmailForm ? (
@@ -133,7 +133,7 @@ export default function SignInPage() {
             </div>
           ) : (
             <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleEmailSignIn(); }}>
-              <button type="button" onClick={() => setShowEmailForm(false)} className="flex items-center gap-1 text-sm text-primary hover:underline font-medium"><ChevronLeft className="h-4 w-4" /> Back</button>
+              <button type="button" onClick={() => setShowEmailForm(false)} className="flex items-center gap-1 text-sm text-primary font-medium"><ChevronLeft className="h-4 w-4" /> Back</button>
               <Input type="email" placeholder="Email address *" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-full" required />
               <div className="relative">
                 <Input type={showPassword ? "text" : "password"} placeholder="Password (optional)" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 rounded-full pr-12" />
@@ -143,7 +143,7 @@ export default function SignInPage() {
             </form>
           )}
 
-          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <Link href="/help/terms" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/help/privacy" className="text-primary hover:underline">Privacy Policy</Link></p>
+          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <Link href="/help/terms" className="text-primary">Terms of Service</Link> and <Link href="/help/privacy" className="text-primary">Privacy Policy</Link></p>
         </div>
       </main>
 

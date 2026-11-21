@@ -1597,7 +1597,7 @@ function ShortsPageContent() {
                       <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
                       {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
                     </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm hover:underline [overflow-wrap:anywhere]">{tag}</Link>)}</div>
+                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm [overflow-wrap:anywhere]">{tag}</Link>)}</div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full"><p className="text-muted-foreground text-sm">No description available</p></div>
@@ -1675,7 +1675,7 @@ function ShortsPageContent() {
                       <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
                       {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
                     </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm hover:underline [overflow-wrap:anywhere]">{tag}</Link>)}</div>
+                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm [overflow-wrap:anywhere]">{tag}</Link>)}</div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-32"><p className="text-muted-foreground text-sm">No description available</p></div>
@@ -1856,8 +1856,8 @@ function ShortsPageContent() {
                     </button>
                   )}
 
-                  {/* Bottom info & actions */}
-                  <div className={`absolute bottom-8 md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+                  {/* Bottom info & actions (phones: room under the title, above the progress bar, as in YouTube Shorts) */}
+                  <div className={`absolute bottom-12 md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
                     <div className="flex items-center gap-2.5 mb-2">
                       <Avatar className="h-9 w-9 flex-shrink-0">
                         <AvatarImage src={short.channelAvatar} />
@@ -1866,7 +1866,7 @@ function ShortsPageContent() {
                       <span className="text-white font-medium text-[15px] truncate">{short.channel}</span>
                     </div>
                     <button onClick={() => openPanel("description")} className="text-left w-full">
-                      <p className="text-white text-[15px] leading-snug line-clamp-2 [overflow-wrap:anywhere] hover:underline">{short.title}</p>
+                      <p className="text-white text-[15px] leading-snug line-clamp-2 [overflow-wrap:anywhere]">{short.title}</p>
                     </button>
                   </div>
 

@@ -167,7 +167,7 @@ export default function AccountDropdown() {
                   <button
                     type="button"
                     onClick={() => handleNavigate("/you")}
-                    className="mt-2 text-sm font-medium text-[#065fd4] hover:underline dark:text-[#3ea6ff]"
+                    className="mt-2 text-sm font-medium text-[#065fd4] dark:text-[#3ea6ff]"
                   >
                     View your account
                   </button>

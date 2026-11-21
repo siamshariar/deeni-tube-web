@@ -204,3 +204,25 @@ html:not([data-sidebar-ready]) main[data-has-sidebar] {
   0% { opacity: 1; transform: scale(0.9); }
   100% { opacity: 0; transform: scale(1.35); }
 }
+
+/* Bottom of the screen on phones (Chrome's edge-to-edge guide). --sab-max is the largest the bottom inset
+   (gesture bar / Back-Home-Recents bar, iPhone home indicator) gets; browsers without
+   safe-area-max-inset-bottom use the current inset. The bottom nav grows by it up front and is pulled down by
+   what's left (components/mobile-nav.tsx), so it always sits just above the phone's own navigation. */
+:root {
+  --sab-max: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+/* Toasts (app/layout.tsx): above the bottom nav when there is one (data-bottom-nav, set by the nav), else near
+   the bottom edge; desktop as before. Set on the toaster itself, not :root: a custom property changed on :root
+   makes the browser restyle the whole page, which cost the home feed ~100 ms (Lighthouse TBT) at load. */
+[data-sonner-toaster] {
+  --toast-bottom: 24px;
+}
+@media (max-width: 767px) {
+  [data-sonner-toaster] {
+    --toast-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  html[data-bottom-nav] [data-sonner-toaster] {
+    --toast-bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px));
+  }
+}

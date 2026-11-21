@@ -781,7 +781,7 @@ export default function PlaylistDetailPage() {
                         <button
                           type="button"
                           onClick={() => setDescriptionModalOpen(true)}
-                          className="mt-1 font-medium hover:underline"
+                          className="mt-1 font-medium"
                         >
                           ...more
                         </button>
@@ -975,7 +975,7 @@ export default function PlaylistDetailPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold leading-7 line-clamp-2">
-                      <Link href={`/playlists/${playlist.slug}/${playlist.id}`} className="hover:underline">
+                      <Link href={`/playlists/${playlist.slug}/${playlist.id}`} className="">
                         {playlist.name}
                       </Link>
                     </h2>

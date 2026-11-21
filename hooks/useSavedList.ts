@@ -24,7 +24,8 @@ export interface SavedVideo {
 /** Resolve an incoming item to one canonical id/type so the same video is never saved twice. */
 export function normalizeSaved(video: SavedVideo): SavedVideo {
   const v = findVideo(video.id);
-  if (v) return { ...video, id: v.id, videoId: v.videoId, type: "video" };
+  // The catalogue's duration (the video's real length) wins over a copy saved with an older catalogue
+  if (v) return { ...video, id: v.id, videoId: v.videoId, type: "video", duration: v.duration };
   const s = findShort(video.id);
   if (s) return { ...video, id: s.id, videoId: s.youtubeId, type: "short" };
   return {

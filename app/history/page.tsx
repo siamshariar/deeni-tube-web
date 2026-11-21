@@ -30,7 +30,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getChannelHref } from "@/lib/channel-data";
 import { ShareModal } from "@/components/share-modal";
 import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
@@ -128,7 +127,8 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
       {/* Shorts Container - draggable on mobile */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-2 overflow-x-auto scrollbar-none pb-2 touch-pan-x md:gap-3"
+        // No touch-action limit: a vertical swipe that starts on a short must still scroll the page
+        className="flex gap-2 overflow-x-auto overscroll-x-contain scrollbar-none pb-2 md:gap-3"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {shorts.map((short, index) => (
@@ -308,7 +308,8 @@ export default function HistoryPage() {
   const hrefFor = (video: HistoryItem) =>
     video.type === "short" ? `/shorts?v=${video.videoId}` : videoPath({ title: video.title, videoId: video.videoId || video.id });
 
-  // YouTube history row: large thumbnail, 18px title, muted channel/views underneath
+  // YouTube's history row (measured on youtube.com / m.youtube.com): a large thumbnail, the title (18px regular
+  // on desktop, 14px on phones) and grey 12px details. The whole text block opens the video, channel name included
   const renderVideoItem = (video: HistoryItem, priority?: ImagePriority) => (
     <div key={video.id} className="group flex w-full gap-3 py-2 md:gap-4">
       <Link href={hrefFor(video)} className="relative aspect-video w-40 flex-shrink-0 overflow-hidden rounded-lg bg-muted md:w-[246px] md:rounded-xl">
@@ -316,16 +317,15 @@ export default function HistoryPage() {
         <div className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{video.duration}</div>
       </Link>
       <div className="flex min-w-0 flex-1 items-start gap-1">
-        <div className="min-w-0 flex-1">
-          <Link href={hrefFor(video)}>
-            <h3 className="line-clamp-2 break-words text-[15px] font-medium leading-5 md:text-base md:leading-[22px]">{video.title}</h3>
-          </Link>
-          <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5">
-            <Link href={getChannelHref(video.channelId)} className="transition-colors hover:text-foreground">{video.channel}</Link>
-            <span aria-hidden="true"> · </span>{video.views}
+        <Link href={hrefFor(video)} className="min-w-0 flex-1">
+          <h3 className="line-clamp-2 break-words text-sm font-normal leading-5 text-foreground md:text-lg md:leading-[26px]">{video.title}</h3>
+          <p className="mt-1 line-clamp-2 text-xs leading-[18px] text-muted-foreground">
+            {video.channel}
+            <span aria-hidden="true"> · </span>
+            {video.views}
           </p>
-          <p className="hidden text-[13px] leading-[18px] text-muted-foreground md:text-sm md:leading-5 md:block">{video.timeAgo}</p>
-        </div>
+          <p className="hidden text-xs leading-[18px] text-muted-foreground md:block">{video.timeAgo}</p>
+        </Link>
         <div className="-mr-2 -mt-2 flex flex-shrink-0 items-center md:-mt-1.5">
           {/* As on YouTube: on phones there is no ✕ ("Remove from History" is in the ⋮ menu); on desktop the ✕
               shows while the row is hovered or focused (always on touch screens, which can't hover) */}

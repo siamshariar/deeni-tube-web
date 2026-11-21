@@ -9,8 +9,9 @@
 //   playhead and the time under the pointer; click or drag to seek (measured on youtube.com).
 // - On phones and tablets (YouTube's app and mobile site): once scrolling stops, the card nearest the middle of
 //   the screen with its thumbnail almost fully on screen plays; it stops when it's half off screen. Touching and
-//   holding a card plays it too. The progress bar is a 3px line flush with the card's bottom edge, with the red
-//   playhead on it; drag along it (or tap it) to seek. Thumbnails narrower than MIN_IN_VIEW_WIDTH (small search
+//   holding a card (a long press) plays it too. The progress bar is a 3px line flush with the card's bottom
+//   edge, with the red playhead on it; drag along it to seek (a tap there opens the video, like the rest of the
+//   card). Thumbnails narrower than MIN_IN_VIEW_WIDTH (small search
 //   rows) don't play on their own, nor does anything with the browser's data saver on. Nothing plays on its
 //   own until the visitor scrolls or touches the page, or a moment after the page has loaded, so the player
 //   never competes with the page's own loading.
@@ -51,8 +52,9 @@ const RESUME_KEY = "deeni-preview-resume";
 
 // Mouse: a quick pass over a card doesn't start it
 const HOVER_DELAY_MS = 300;
-// Touch: a touch held this long (without scrolling) plays the card
-const HOLD_MS = 250;
+// Touch: a touch held this long (without scrolling) plays the card. A long press, as on phones: a slow tap
+// (often 250-400ms) must still open the video on the first try
+const HOLD_MS = 500;
 // Touch: play once at least this much of the thumbnail is on screen (below the header, above the bottom
 // nav), stop when less than STOP_RATIO is
 const PLAY_RATIO = 0.75;
@@ -325,6 +327,7 @@ export function InlinePreview({
     <div
       ref={wrapperRef}
       // No text selection or iOS link menu on a thumbnail held to play it
+      data-inline-preview=""
       className={cn("relative select-none [-webkit-touch-callout:none]", className)}
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse" || getMode() !== "mouse" || !feedPlaybackOn()) return;

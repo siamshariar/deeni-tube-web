@@ -2,10 +2,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, X, Users, Eye, EyeOff } from "lucide-react";
+import { Search, X, Users, EyeOff, House } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { channelData, ChannelItem } from "@/lib/channel-data";
@@ -32,12 +33,19 @@ const sortOptions: SortOption[] = [
   { label: "Name (Z-A)", value: "name-desc" },
 ];
 
+// YouTube-style blue for "on", in both themes (as on the Settings page)
+const SWITCH_ON = "data-[state=checked]:bg-[#065fd4] dark:data-[state=checked]:bg-[#3ea6ff] [&>span]:bg-white";
+
+// Each channel has a "Home feed" switch: off hides that channel's videos from the Home feed only (the channel
+// stays here, in search and on its own page). Stored in 'feed-visible-channels' (hooks/useFeedPreferences),
+// the same list the cards' "Don't recommend channel" changes.
 export default function ChannelsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["bn", "en", "ar"]);
   const [sortValue, setSortValue] = useState("default");
-  const { followedChannels, toggleFollowChannel } = useFeedPreferences();
+  const { followedChannels, setChannelFeed } = useFeedPreferences();
+  const [onlyHidden, setOnlyHidden] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -54,11 +62,22 @@ export default function ChannelsPage() {
     );
   };
 
-  const toggleFollow = (channelId: string) => {
-    const nowVisible = !followedChannels.includes(channelId);
-    toggleFollowChannel(channelId);
+  const setOnHome = (channelId: string, on: boolean) => {
+    setChannelFeed(channelId, on);
     const channel = channelData.find((ch) => ch.id === channelId);
-    if (channel) toast.success(nowVisible ? `Showing ${channel.name} in feed` : `Hidden ${channel.name} from feed`);
+    if (!channel) return;
+    if (on) toast.success(`${channel.name} is back on your Home feed`);
+    else
+      toast(`${channel.name} hidden from your Home feed`, {
+        description: "Its videos won't show on Home. The channel is still here and in search.",
+        action: { label: "Undo", onClick: () => setChannelFeed(channelId, true) },
+      });
+  };
+  const hiddenIds = channelData.filter((ch) => !followedChannels.includes(ch.id)).map((ch) => ch.id);
+  const showAll = () => {
+    hiddenIds.forEach((id) => setChannelFeed(id, true));
+    setOnlyHidden(false);
+    toast.success("All channels are on your Home feed");
   };
 
   const sortChannels = (channels: ChannelItem[]) => {
@@ -74,7 +93,7 @@ export default function ChannelsPage() {
 
   const filteredChannels = sortChannels(
     channelData
-      .filter((ch) => selectedLanguages.includes(ch.language))
+      .filter((ch) => (onlyHidden ? !followedChannels.includes(ch.id) : selectedLanguages.includes(ch.language)))
       .filter(
         (ch) =>
           !searchQuery || ch.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -129,15 +148,40 @@ export default function ChannelsPage() {
           </div>
         </div>
 
-        {/* Language chips */}
+        {/* What the switches do */}
+        <div className="mb-4 flex items-start gap-3 rounded-xl bg-muted/60 px-4 py-3">
+          <House className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium leading-5">Choose what&apos;s on your Home feed</p>
+            <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
+              Turn a channel off to stop its videos showing on Home. You can still open the channel and find its
+              videos in search, and turn it back on any time.
+            </p>
+            <p className="mt-1.5 text-[13px] font-medium leading-5" aria-live="polite">
+              {channelData.length - hiddenIds.length} of {channelData.length} channels on your Home feed
+              {hiddenIds.length > 0 && (
+                <button type="button" onClick={showAll} className="ml-2 text-[#065fd4] dark:text-[#3ea6ff]">
+                  Show all
+                </button>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Language chips, and the hidden channels */}
         <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-none">
           {languageOptions.map((lang) => (
             <button
               key={lang.code}
-              onClick={() => toggleLanguage(lang.code)}
+              type="button"
+              aria-pressed={!onlyHidden && selectedLanguages.includes(lang.code)}
+              onClick={() => {
+                setOnlyHidden(false);
+                toggleLanguage(lang.code);
+              }}
               className={cn(
                 "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
-                selectedLanguages.includes(lang.code)
+                !onlyHidden && selectedLanguages.includes(lang.code)
                   ? "bg-foreground text-background"
                   : "bg-muted hover:bg-accent text-foreground"
               )}
@@ -145,6 +189,19 @@ export default function ChannelsPage() {
               {lang.name}
             </button>
           ))}
+          {hiddenIds.length > 0 && (
+            <button
+              type="button"
+              aria-pressed={onlyHidden}
+              onClick={() => setOnlyHidden((v) => !v)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors",
+                onlyHidden ? "bg-foreground text-background" : "bg-muted hover:bg-accent text-foreground"
+              )}
+            >
+              <EyeOff className="h-4 w-4" aria-hidden="true" /> Hidden {hiddenIds.length}
+            </button>
+          )}
         </div>
 
         {/* Channel list */}
@@ -186,10 +243,7 @@ export default function ChannelsPage() {
                   </Link>
 
                   <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/channels/${channel.slug}`}
-                      className="hover:underline"
-                    >
+                    <Link href={`/channels/${channel.slug}`}>
                       <div className="flex items-center gap-1">
                         <h3 className="font-medium text-[15px] md:text-base truncate">
                           {channel.name}
@@ -209,36 +263,24 @@ export default function ChannelsPage() {
                     </Link>
                     <p className="text-[13px] md:text-sm text-muted-foreground truncate">
                       {formatSubscribers(channel.subscribers)}
+                      {!isVisible && (
+                        <span className="text-foreground/80">
+                          <span aria-hidden="true"> · </span>Hidden from Home
+                        </span>
+                      )}
                     </p>
                   </div>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFollow(channel.id);
-                    }}
-                    className={cn(
-                      "flex items-center gap-1 rounded-full transition-colors",
-                      "h-8 md:h-9 px-2.5 md:px-3",
-                      isVisible
-                        ? "bg-primary/10 text-primary hover:bg-primary/20"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    )}
-                    title={
-                      isVisible
-                        ? "Visible in feed – click to hide"
-                        : "Hidden from feed – click to show"
-                    }
-                  >
-                    {isVisible ? (
-                      <Eye className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                    )}
-                    <span className="text-xs font-medium whitespace-nowrap">
-                      {isVisible ? "Visible" : "Hidden"}
-                    </span>
-                  </button>
+                  {/* On the Home feed: a labelled switch (the label shows from sm up; phones read it aloud) */}
+                  <label className="flex shrink-0 cursor-pointer items-center gap-2 pl-1">
+                    <span className="hidden text-[13px] font-medium text-muted-foreground sm:inline">Home feed</span>
+                    <Switch
+                      checked={isVisible}
+                      onCheckedChange={(on) => setOnHome(channel.id, on)}
+                      aria-label={`Show ${channel.name} on your Home feed`}
+                      className={SWITCH_ON}
+                    />
+                  </label>
                 </div>
               );
             })}

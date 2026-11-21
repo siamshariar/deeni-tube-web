@@ -617,7 +617,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                       <button
                         type="button"
                         onClick={() => setDescriptionModalOpen(true)}
-                        className="mt-1 font-medium hover:underline"
+                        className="mt-1 font-medium"
                       >
                         ...more
                       </button>
@@ -629,7 +629,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                         <button
                           type="button"
                           onClick={() => setShowFullDescription(false)}
-                          className="mt-3 font-medium hover:underline"
+                          className="mt-3 font-medium"
                         >
                           Show less
                         </button>
@@ -641,7 +641,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                       <button
                         type="button"
                         onClick={() => setShowFullDescription(true)}
-                        className="font-medium hover:underline"
+                        className="font-medium"
                       >
                         more
                       </button>

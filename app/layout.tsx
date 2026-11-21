@@ -69,8 +69,8 @@ export default function RootLayout({
             <MobileNav />
             <MobileSearchModal />
           </HeaderProvider>
-          {/* Mobile offset clears the 56px bottom nav */}
-          <Toaster position="bottom-center" mobileOffset={{ bottom: 72 }} />
+          {/* Above the phone's bottom nav when it shows, else near the bottom edge (--toast-bottom, globals.css) */}
+          <Toaster position="bottom-center" offset={{ bottom: "var(--toast-bottom)" }} mobileOffset={{ bottom: "var(--toast-bottom)" }} />
         </ThemeProvider>
       </body>
     </html>

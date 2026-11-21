@@ -18,20 +18,12 @@ import {
   Moon,
   MonitorPlay,
   Shield,
+  SkipForward,
   Smartphone,
   Sun,
   UserRound,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { readLanguagePrefs, updateLanguagePrefs } from "@/lib/language-prefs";
 import { useHydrated } from "@/lib/local-store";
@@ -43,6 +35,8 @@ import { cn } from "@/lib/utils";
 const settingsLanguages = mockLanguages.map((l) => ({ code: l.code, label: l.name, native: l.native }));
 
 const NOTIFICATIONS_KEY = "deeni-notification-prefs";
+// The watch player's Autoplay switch (components/youtube-player.tsx), saved per device
+const AUTOPLAY_KEY = "deeni-autoplay";
 
 type NotificationKey = "all" | "email" | "push";
 type ThemeValue = "system" | "light" | "dark";
@@ -63,6 +57,7 @@ const NOTIFICATION_ROWS: { key: NotificationKey; label: string; description: str
 const SWITCH_ON = "data-[state=checked]:bg-[#065fd4] dark:data-[state=checked]:bg-[#3ea6ff] [&>span]:bg-white";
 
 const languageLabel = (code: string) => settingsLanguages.find((l) => l.code === code)?.label ?? code;
+const listLabels = (codes: string[]) => settingsLanguages.filter((l) => codes.includes(l.code)).map((l) => l.label).join(", ");
 
 export default function SettingsPage() {
   const { theme: rawTheme, setTheme } = useTheme();
@@ -78,18 +73,18 @@ export default function SettingsPage() {
 
   const feedPlayback = useFeedPlaybackSetting();
 
-  const [showLanguageDialog, setShowLanguageDialog] = useState(false);
-  // Saved choice (shown in the row) vs. the draft being edited in the dialog
-  const [savedLanguages, setSavedLanguages] = useState<string[]>(["en"]);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["en"]);
+  // The Home feed's languages, chosen right in the list (no pop-up to open or scroll)
+  const [languages, setLanguages] = useState<string[]>(["en"]);
+  const [autoplay, setAutoplay] = useState(true);
 
   useEffect(() => {
     const langs = readLanguagePrefs().languages;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after hydration
-    if (langs?.length) setSavedLanguages(langs);
+    if (langs?.length) setLanguages(langs);
     try {
       const stored = JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || "null");
       if (stored) setNotifications((prev) => ({ ...prev, ...stored }));
+      if (localStorage.getItem(AUTOPLAY_KEY) === "false") setAutoplay(false);
     } catch {}
   }, []);
 
@@ -98,24 +93,24 @@ export default function SettingsPage() {
     toast.success(next === "system" ? "Using your device theme" : `${next === "light" ? "Light" : "Dark"} theme on`);
   };
 
-  const openLanguageDialog = () => {
-    setSelectedLanguages(savedLanguages);
-    setShowLanguageDialog(true);
+  const toggleLanguage = (code: string) => {
+    const on = languages.includes(code);
+    if (on && languages.length === 1) {
+      toast("Keep at least one language", { description: "Your Home feed needs a language to show videos in." });
+      return;
+    }
+    const next = on ? languages.filter((l) => l !== code) : [...languages, code];
+    setLanguages(next);
+    updateLanguagePrefs({ languages: next });
+    toast.success(on ? `${languageLabel(code)} removed from your Home feed` : `${languageLabel(code)} added to your Home feed`);
   };
 
-  const toggleDraftLanguage = (code: string) => {
-    setSelectedLanguages((prev) => {
-      if (!prev.includes(code)) return [...prev, code];
-      // Keep at least one language selected
-      return prev.length > 1 ? prev.filter((l) => l !== code) : prev;
-    });
-  };
-
-  const handleLanguageSave = () => {
-    setSavedLanguages(selectedLanguages);
-    updateLanguagePrefs({ languages: selectedLanguages });
-    toast.success("Language preferences updated");
-    setShowLanguageDialog(false);
+  const changeAutoplay = (on: boolean) => {
+    setAutoplay(on);
+    try {
+      localStorage.setItem(AUTOPLAY_KEY, String(on));
+    } catch {}
+    toast.success(`Autoplay turned ${on ? "on" : "off"}`);
   };
 
   const setNotification = (key: NotificationKey, value: boolean) => {
@@ -195,52 +190,76 @@ export default function SettingsPage() {
             </fieldset>
           </SettingsSection>
 
-          {/* Language & content */}
+          {/* Language & content: tick the languages right here (a list, not a pop-up, so nothing to scroll inside) */}
           <SettingsSection
             id="language"
             title="Language & content"
-            description="Your home feed shows videos in these languages."
+            description="Your Home feed shows videos in the languages you tick."
           >
-            <div className="flex items-start gap-4 px-4 py-4">
+            <div className="flex items-center gap-4 px-4 py-3">
               <RowIcon>
                 <Globe />
               </RowIcon>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] leading-5">Content languages</p>
-                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Selected languages">
-                  {savedLanguages.map((code) => (
-                    <li
-                      key={code}
-                      className="rounded-full bg-muted px-2.5 py-0.5 text-[13px] font-medium leading-5"
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] leading-5">Content languages</span>
+                <span className="block text-[13px] leading-5 text-muted-foreground" aria-live="polite">
+                  {hydrated ? listLabels(languages) : "\u00a0"}
+                </span>
+              </span>
+            </div>
+            <div role="group" aria-labelledby="language-heading">
+              {settingsLanguages.map((lang) => {
+                const checked = languages.includes(lang.code);
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={checked}
+                    onClick={() => toggleLanguage(lang.code)}
+                    className="flex min-h-[48px] w-full items-center gap-4 px-4 py-2.5 text-left transition-colors can-hover:hover:bg-muted/60 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    {/* Lines up with the text above (under the 40px icon) */}
+                    <span className="w-10 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 text-[15px] leading-5">
+                      {lang.label}
+                      {lang.native !== lang.label && <span className="ml-2 text-[13px] text-muted-foreground">{lang.native}</span>}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                        checked
+                          ? "border-[#065fd4] bg-[#065fd4] text-white dark:border-[#3ea6ff] dark:bg-[#3ea6ff] dark:text-[#0f0f0f]"
+                          : "border-muted-foreground/60"
+                      )}
                     >
-                      {languageLabel(code)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0 rounded-full px-4 font-medium"
-                onClick={openLanguageDialog}
-                aria-haspopup="dialog"
-              >
-                Change
-              </Button>
+                      {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </SettingsSection>
 
           {/* Playback */}
-          <SettingsSection id="playback" title="Playback">
+          <SettingsSection id="playback" title="Playback" description="How videos play on this device.">
             <SwitchRow
               icon={<MonitorPlay />}
               label="Playback in feeds"
-              description="Play videos muted in their cards: on hover with a mouse, and as you scroll on a phone or tablet"
+              description="Videos play muted in their cards as you scroll, or when you point at one with a mouse"
               checked={feedPlayback}
               onCheckedChange={(value) => {
                 setFeedPlayback(value);
                 toast.success(`Playback in feeds turned ${value ? "on" : "off"}`);
               }}
+            />
+            <SwitchRow
+              icon={<SkipForward />}
+              label="Autoplay"
+              description="When a video ends, the next one starts after a short countdown"
+              checked={autoplay}
+              onCheckedChange={changeAutoplay}
             />
           </SettingsSection>
 
@@ -277,61 +296,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Language dialog */}
-      <Dialog open={showLanguageDialog} onOpenChange={setShowLanguageDialog}>
-        <DialogContent className="w-[calc(100%-2rem)] gap-0 rounded-xl p-0 sm:max-w-md">
-          <DialogHeader className="px-6 pb-4 pt-6 text-left">
-            <DialogTitle className="text-lg font-medium">Content languages</DialogTitle>
-            <DialogDescription className="text-[13px]">
-              Choose one or more languages for your home feed.
-            </DialogDescription>
-          </DialogHeader>
-          <div role="group" aria-label="Languages" className="max-h-[50vh] overflow-y-auto px-3">
-            {settingsLanguages.map((lang) => {
-              const checked = selectedLanguages.includes(lang.code);
-              const isLast = checked && selectedLanguages.length === 1;
-              return (
-                <button
-                  key={lang.code}
-                  type="button"
-                  role="checkbox"
-                  aria-checked={checked}
-                  aria-disabled={isLast || undefined}
-                  title={isLast ? "Keep at least one language" : undefined}
-                  onClick={() => toggleDraftLanguage(lang.code)}
-                  className="flex w-full items-center gap-4 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
-                      checked
-                        ? "border-[#065fd4] bg-[#065fd4] text-white dark:border-[#3ea6ff] dark:bg-[#3ea6ff] dark:text-[#0f0f0f]"
-                        : "border-muted-foreground/60"
-                    )}
-                  >
-                    {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] leading-5">{lang.label}</span>
-                    {lang.native !== lang.label && (
-                      <span className="block text-[13px] leading-5 text-muted-foreground">{lang.native}</span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <DialogFooter className="flex-row justify-end gap-2 border-t px-6 py-4 sm:space-x-0">
-            <Button variant="ghost" className="rounded-full" onClick={() => setShowLanguageDialog(false)}>
-              Cancel
-            </Button>
-            <Button className="rounded-full px-6" onClick={handleLanguageSave}>
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -5,6 +5,7 @@
 // shows instantly, with no request or page load (also in dev, where routes compile on first visit).
 "use client";
 
+import { playPlaylistFromTap } from "@/lib/play-playlist";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -217,7 +218,7 @@ export default function ScholarView() {
                   <Video className="h-5 w-5" />
                   Recent videos
                 </h2>
-                <button type="button" onClick={showProfile} className="text-sm font-medium text-[#065fd4] dark:text-[#3ea6ff] hover:underline flex items-center gap-1">
+                <button type="button" onClick={showProfile} className="text-sm font-medium text-[#065fd4] dark:text-[#3ea6ff] flex items-center gap-1">
                   See all <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -313,18 +314,18 @@ export default function ScholarView() {
       {/* About opens the About page (instantly, see openAbout); the other tabs switch in place */}
       <Tabs value={activeTab} onValueChange={(value) => (value === "about" ? openAbout() : setActiveTab(value))}>
         <TabsList className="h-12 bg-background w-full justify-start overflow-x-auto scrollbar-none px-2 md:px-4 border-b rounded-none p-0">
-          <TabsTrigger value="videos" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="videos" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Videos
           </TabsTrigger>
-          <TabsTrigger value="shorts" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="shorts" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Shorts
           </TabsTrigger>
-          <TabsTrigger value="playlists" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+          <TabsTrigger value="playlists" className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
             Playlists
           </TabsTrigger>
           <TabsTrigger
             value="about"
-            className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            className="h-12 px-3 md:px-4 rounded-none border-b-2 border-transparent text-base font-medium text-muted-foreground hover:text-foreground can-hover:hover:border-muted-foreground/40 data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           >
             About
           </TabsTrigger>
@@ -452,7 +453,7 @@ export default function ScholarView() {
                     })
                     .filter(Boolean) as string[];
                   return (
-                    <Link key={pl.id} href={`/playlists/${pl.slug}/${pl.id}?source=channel`} className="group block">
+                    <Link key={pl.id} href={`/playlists/${pl.slug}/${pl.id}?source=channel`} onClick={() => playPlaylistFromTap(pl.videoIds)} className="group block">
                       <div className="relative aspect-video w-full bg-muted overflow-hidden rounded-xl">
                         {thumbs.length >= 2 ? (
                           <div className="grid grid-cols-2 gap-0.5 w-full h-full">

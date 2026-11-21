@@ -178,7 +178,7 @@ export default function AboutPage() {
               href="https://www.deeniinfotech.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline flex items-center gap-1"
+              className="text-sm text-primary flex items-center gap-1"
             >
               Deeni Info Tech
               <ExternalLink className="h-3 w-3" />

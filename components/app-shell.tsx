@@ -3,10 +3,14 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { bootPlayerHost } from "@/lib/player-host";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(240);
+
+  // iPhone, iPad and Safari: the shared player that lets a tap on a video start it with sound
+  useEffect(() => bootPlayerHost(), []);
 
   useEffect(() => {
     const syncSidebarWidth = () => {
@@ -47,10 +51,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ? "flex-1"
           : !hasDesktopSidebar
           ? // Video/playlist pages: room for the phone nav bar only on phones, so on desktop the page ends with its content
-            "flex-1 md:pl-0 pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0 min-h-screen transition-none"
+            "flex-1 md:pl-0 pb-[calc(56px+var(--sab-max))] md:pb-0 min-h-screen transition-none"
           : desktopSidebarWidth === 72
-          ? "flex-1 md:pl-[72px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-all duration-300 ease-in-out"
-          : "flex-1 md:pl-[240px] pb-[calc(56px+env(safe-area-inset-bottom,0px))] min-h-screen transition-all duration-300 ease-in-out"
+          ? "flex-1 md:pl-[72px] pb-[calc(56px+var(--sab-max))] min-h-screen transition-all duration-300 ease-in-out"
+          : "flex-1 md:pl-[240px] pb-[calc(56px+var(--sab-max))] min-h-screen transition-all duration-300 ease-in-out"
       }
     >
       {children}

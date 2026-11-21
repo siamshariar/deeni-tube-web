@@ -217,7 +217,7 @@ export default function AppHeader() {
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-xl shadow-lg z-50 overflow-hidden">
                     <div className="flex h-14 items-center justify-between px-4">
                       <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
-                      <button type="button" onClick={clearRecent} className="text-xs text-primary hover:underline">Clear all</button>
+                      <button type="button" onClick={clearRecent} className="text-xs text-primary">Clear all</button>
                     </div>
                     <div className="yt-scrollbar max-h-64 overflow-y-auto">
                       {recentSearches.map(search => (

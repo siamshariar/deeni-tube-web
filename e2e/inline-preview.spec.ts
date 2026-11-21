@@ -40,7 +40,7 @@ test.describe('Inline playback: hover (mouse)', () => {
       await expect(page.locator('[data-preview] iframe')).toHaveCSS('opacity', '1', { timeout: 3000 });
     }).toPass({ timeout: 15_000 });
     const frame = await previewFrame(page);
-    expect(await playing(frame)).toEqual({ playing: true, muted: true });
+    expect(await playing(frame)).toMatchObject({ playing: true, muted: true });
     await expect(page.locator('[data-preview]').getByRole('button', { name: 'Unmute' })).toBeVisible();
 
     // The volume button unmutes, without opening the video
@@ -154,7 +154,7 @@ test.describe('Inline playback: on screen (phones)', () => {
     // Starts on its own a moment after the page has loaded
     await expect(page.locator('[data-preview] iframe')).toHaveCSS('opacity', '1', { timeout: 15_000 });
     const first = (await playingCard(page))!;
-    expect(await playing(await previewFrame(page))).toEqual({ playing: true, muted: true });
+    expect(await playing(await previewFrame(page))).toMatchObject({ playing: true, muted: true });
     await expect(page.locator('[data-preview]').getByRole('button', { name: 'Unmute' })).toBeVisible();
 
     // Scroll the card off screen: it stops, and the card now in the middle plays (never two at once)

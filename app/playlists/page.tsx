@@ -1,6 +1,7 @@
 // app/playlists/page.tsx
 "use client";
 
+import { playPlaylistFromTap } from "@/lib/play-playlist";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -228,10 +229,14 @@ export default function PlaylistsPage() {
                   tabIndex={0}
                   aria-label={playlist.name}
                   className="group flex cursor-pointer gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-col sm:gap-0"
-                  onClick={() => router.push(`/playlists/${playlist.slug}/${playlist.id}`)}
+                  onClick={() => {
+                    playPlaylistFromTap(playlist.videoIds);
+                    router.push(`/playlists/${playlist.slug}/${playlist.id}`);
+                  }}
                   onKeyDown={(e) => {
                     if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
                       e.preventDefault();
+                      playPlaylistFromTap(playlist.videoIds);
                       router.push(`/playlists/${playlist.slug}/${playlist.id}`);
                     }
                   }}

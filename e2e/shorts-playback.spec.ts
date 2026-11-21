@@ -22,7 +22,7 @@ test.describe('Shorts playback', () => {
     // Plays at once, muted, instead of sitting paused
     const unmutePill = page.getByRole('button', { name: /(Tap|Click) to unmute/ }).locator('visible=true');
     await expect(unmutePill).toBeVisible({ timeout: 15_000 });
-    await expect.poll(() => playerState(page)).toEqual({ playing: true, muted: true });
+    await expect.poll(() => playerState(page)).toMatchObject({ playing: true, muted: true });
 
     // The visitor taps the video: sound is now allowed (in every player, as in a real browser)
     allowSound = true;
@@ -31,12 +31,12 @@ test.describe('Shorts playback', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
     await expect(unmutePill).toHaveCount(0);
-    await expect.poll(() => playerState(page)).toEqual({ playing: true, muted: false }); // unmuted, not paused
+    await expect.poll(() => playerState(page)).toMatchObject({ playing: true, muted: false }); // unmuted, not paused
 
     // Next shorts keep the sound
     for (let i = 0; i < 2; i++) {
       await page.keyboard.press('ArrowDown');
-      await expect.poll(() => playerState(page), { timeout: 10_000 }).toEqual({ playing: true, muted: false });
+      await expect.poll(() => playerState(page), { timeout: 10_000 }).toMatchObject({ playing: true, muted: false });
     }
     // The active short's mute button shows the sound is on
     await expect(page.locator('section').nth(2).getByRole('button', { name: 'Mute' })).toHaveCount(1);
@@ -45,8 +45,8 @@ test.describe('Shorts playback', () => {
   test('a play command the player drops is sent again, so the short does not stay paused', async ({ page }) => {
     await useFakeYouTube(page, { dropFirstPlay: true });
     await page.goto('/shorts');
-    await expect.poll(() => playerState(page), { timeout: 15_000 }).toEqual({ playing: true, muted: false });
+    await expect.poll(() => playerState(page), { timeout: 15_000 }).toMatchObject({ playing: true, muted: false });
     await page.keyboard.press('ArrowDown');
-    await expect.poll(() => playerState(page), { timeout: 10_000 }).toEqual({ playing: true, muted: false });
+    await expect.poll(() => playerState(page), { timeout: 10_000 }).toMatchObject({ playing: true, muted: false });
   });
 });

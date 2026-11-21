@@ -74,6 +74,9 @@ export default function PreviewLayer({
   const [hoverAt, setHoverAt] = useState<number | null>(null);
   const [dragAt, setDragAt] = useState<number | null>(null);
   const dragRef = useRef<number | null>(null);
+  // Touch: where the finger went down on the bar, until it moves sideways (then it's a drag that seeks)
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
+  const draggedRef = useRef(false);
   const liveSeekRef = useRef(0);
   // After a seek, YouTube reports the old time for a moment: don't jump back
   const seekRef = useRef<{ to: number; until: number } | null>(null);
@@ -293,28 +296,52 @@ export default function PreviewLayer({
             onPointerMove={(e) => {
               const at = positionAt(e);
               if (mouse) setHoverAt(at);
-              if (dragRef.current !== null) scrubTo(at);
+              const touch = touchRef.current;
+              if (touch && dragRef.current === null) {
+                // Touch: a sideways drag seeks; anything else is a tap or the page scrolling
+                const dx = Math.abs(e.clientX - touch.x);
+                if (dx < 8 || dx < Math.abs(e.clientY - touch.y)) return;
+                touchRef.current = null;
+                draggedRef.current = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                liveSeekRef.current = 0;
+              }
+              if (dragRef.current !== null || touch) scrubTo(at);
             }}
             onPointerLeave={mouse ? () => setHoverAt(null) : undefined}
             onPointerDown={(e) => {
               if (e.pointerType === "mouse" && e.button !== 0) return;
               e.stopPropagation();
-              if (e.pointerType === "mouse") e.preventDefault();
+              draggedRef.current = false;
+              if (e.pointerType !== "mouse") {
+                // Touch: wait to see whether it's a sideways drag (seek) or a tap (open the video)
+                touchRef.current = { x: e.clientX, y: e.clientY };
+                return;
+              }
+              e.preventDefault();
               e.currentTarget.setPointerCapture(e.pointerId);
               liveSeekRef.current = 0;
               scrubTo(positionAt(e));
             }}
             onPointerUp={(e) => {
+              touchRef.current = null;
               if (dragRef.current === null) return;
               e.stopPropagation();
               endDrag(true);
             }}
             // The page took the touch to scroll: no seek
-            onPointerCancel={() => endDrag(false)}
-            // It's outside the card's link, but never let a click here reach anything else
+            onPointerCancel={() => {
+              touchRef.current = null;
+              draggedRef.current = false;
+              endDrag(false);
+            }}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              // Touch: a tap here opens the video, as anywhere else on the card (a drag seeked instead)
+              if (!mouse && !draggedRef.current)
+                e.currentTarget.closest("[data-inline-preview]")?.querySelector<HTMLAnchorElement>("a[href]")?.click();
+              draggedRef.current = false;
             }}
             onContextMenu={(e) => e.preventDefault()}
           />

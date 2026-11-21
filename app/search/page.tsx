@@ -525,7 +525,7 @@ function SearchPageContent() {
                 <MultiSelect label="Channels"   options={channelOptions}  selected={selectedChannels}   onChange={setSelectedChannels}   searchable />
                 {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
                   <div className="flex justify-end border-t pt-2">
-                    <button onClick={resetFilters} className="text-sm text-primary hover:underline">
+                    <button onClick={resetFilters} className="text-sm text-primary">
                       Clear all filters
                     </button>
                   </div>
