@@ -207,6 +207,7 @@ export function playFromTap(videoId: string): boolean {
  */
 export function attachHost(el: HTMLElement, fit: HostFit = "video"): number {
   clearTimeout(resetTimer);
+  clearTimeout(presizeTimer);
   const token = nextToken++;
   attached = { el, token, fit };
   pending = null;
@@ -321,6 +322,50 @@ function applyCrop() {
   frame.style.height = cropped ? `calc(100% + ${CROP * 2}px)` : "100%";
 }
 
+// A short: the Shorts feed is fixed to the screen, so screen coordinates. The 9:16 video covers the box; YouTube's
+// bars live in the CROP bands above and below the video, outside the box (no bands while captions show, which
+// YouTube draws at its bottom edge)
+function layOutShort(rect: { left: number; top: number; width: number; height: number }, radius = "0") {
+  if (!wrapper) return;
+  const s = wrapper.style;
+  s.position = "fixed";
+  s.left = `${rect.left}px`;
+  s.top = `${rect.top}px`;
+  s.width = `${rect.width}px`;
+  s.height = `${rect.height}px`;
+  s.borderRadius = radius;
+  s.zIndex = "1";
+  if (!frame) return;
+  const w = Math.max(rect.width, (rect.height * 9) / 16);
+  const h = (w * 16) / 9;
+  const band = cropped ? CROP : 0;
+  sized(`${Math.round(w)}x${Math.round(h + band * 2)}`);
+  frame.style.width = `${w}px`;
+  frame.style.height = `${h + band * 2}px`;
+  frame.style.left = `${(rect.width - w) / 2}px`;
+  frame.style.top = `${(rect.height - h) / 2 - band}px`;
+}
+
+/**
+ * Phones, in the tap on a link to Shorts: lay the (still invisible) player out where the Shorts page will show
+ * it, over the whole screen above the bottom nav. YouTube redraws it at that size while the page loads, so the
+ * short can show the moment the page is there instead of after its thumbnail and a wait.
+ */
+let presizeTimer: ReturnType<typeof setTimeout> | undefined;
+function presizeForShorts() {
+  if (!wrapper || attached || window.innerWidth >= 768) return;
+  const nav = document.querySelector('nav[aria-label="Mobile navigation"]');
+  const bottom = nav ? nav.getBoundingClientRect().top : window.innerHeight - 56;
+  wrapper.style.opacity = "0";
+  wrapper.style.display = "block";
+  layOutShort({ left: 0, top: 0, width: window.innerWidth, height: bottom });
+  clearTimeout(presizeTimer);
+  // The page didn't come (the tap went nowhere): hide it again
+  presizeTimer = setTimeout(() => {
+    if (!attached && wrapper) wrapper.style.display = "none";
+  }, 8000);
+}
+
 // Over the page player's box, in page coordinates (so it scrolls with the page), with the box's rounding
 function place() {
   if (!wrapper || !attached) return;
@@ -336,29 +381,7 @@ function place() {
   }
   const box = attached.el;
   const rect = box.getBoundingClientRect();
-  if (attached.fit === "short") {
-    // The Shorts feed is fixed to the screen: screen coordinates. The 9:16 video covers the box; YouTube's
-    // bars live in the CROP bands above and below the video, outside the box (no bands while captions show,
-    // which YouTube draws at its bottom edge)
-    s.position = "fixed";
-    s.left = `${rect.left}px`;
-    s.top = `${rect.top}px`;
-    s.width = `${rect.width}px`;
-    s.height = `${rect.height}px`;
-    s.borderRadius = getComputedStyle(box).borderRadius;
-    s.zIndex = "1";
-    if (frame) {
-      const w = Math.max(rect.width, (rect.height * 9) / 16);
-      const h = (w * 16) / 9;
-      const band = cropped ? CROP : 0;
-      sized(`${Math.round(w)}x${Math.round(h + band * 2)}`);
-      frame.style.width = `${w}px`;
-      frame.style.height = `${h + band * 2}px`;
-      frame.style.left = `${(rect.width - w) / 2}px`;
-      frame.style.top = `${(rect.height - h) / 2 - band}px`;
-    }
-    return;
-  }
+  if (attached.fit === "short") return layOutShort(rect, getComputedStyle(box).borderRadius);
   s.position = "absolute";
   s.left = `${rect.left + window.scrollX}px`;
   s.top = `${rect.top + window.scrollY}px`;
@@ -376,8 +399,12 @@ function place() {
  * data-play-id on the link or a parent. Not Shorts links on the Shorts page, which switches shorts itself.
  */
 export function videoIdForLink(el: Element | null): string | null {
+  return linkTarget(el)?.videoId ?? null;
+}
+
+function linkTarget(el: Element | null): { videoId: string; short: boolean } | null {
   const tagged = el?.closest<HTMLElement>("[data-play-id]");
-  if (tagged?.dataset.playId) return tagged.dataset.playId;
+  if (tagged?.dataset.playId) return { videoId: tagged.dataset.playId, short: false };
   const link = el?.closest<HTMLAnchorElement>("a[href]");
   if (!link || (link.target && link.target !== "_self") || link.hasAttribute("download")) return null;
   let url: URL;
@@ -390,10 +417,10 @@ export function videoIdForLink(el: Element | null): string | null {
   if (/^\/shorts\/?$/.test(url.pathname)) {
     if (/^\/shorts\/?$/.test(location.pathname)) return null;
     const v = url.searchParams.get("v");
-    return v && /^[\w-]{11}$/.test(v) ? v : FIRST_SHORT_ID;
+    return { videoId: v && /^[\w-]{11}$/.test(v) ? v : FIRST_SHORT_ID, short: true };
   }
   const m = url.pathname.match(/^\/videos\/[^/]+\/([\w-]{11})\/?$/);
-  return m ? m[1] : null;
+  return m ? { videoId: m[1], short: false } : null;
 }
 
 let booted = false;
@@ -404,8 +431,8 @@ export function bootPlayerHost() {
   // A plain click (not a new tab), not stopped by the card (e.g. a touch-and-hold preview), on a video link
   window.addEventListener("click", (e) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const id = videoIdForLink(e.target as Element);
-    if (id) playFromTap(id);
+    const target = linkTarget(e.target as Element);
+    if (target && playFromTap(target.videoId) && target.short) presizeForShorts();
   });
   const arm = () => setTimeout(() => armHost(), 600);
   if (document.readyState === "complete") arm();

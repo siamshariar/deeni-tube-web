@@ -172,9 +172,10 @@ test.describe('iPhone: Shorts with sound', () => {
     // Record when the shared player is laid out (display) and shown (opacity)
     await page.evaluate(() => {
       const host = document.querySelector<HTMLElement>('[data-player-host]')!;
-      const log: [number, string, string][] = [];
+      const log: [number, string, string, boolean][] = [];
       (window as unknown as { __hostLog: typeof log }).__hostLog = log;
-      new MutationObserver(() => log.push([performance.now(), host.style.display, host.style.opacity])).observe(host, { attributes: true, attributeFilter: ['style'] });
+      new MutationObserver(() => log.push([performance.now(), host.style.display, host.style.opacity, !!document.querySelector('.shorts-player-box')]))
+        .observe(host, { attributes: true, attributeFilter: ['style'] });
     });
     await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Shorts' }).tap();
     await expect(page).toHaveURL(/\/shorts$/);
@@ -189,8 +190,11 @@ test.describe('iPhone: Shorts with sound', () => {
     await expectHostOver(page, 0);
     // Not shown the moment it's laid out at the short's size, but once YouTube has had time to redraw it there
     // (otherwise the video shows small, then zooms to fill the screen)
-    const hostLog = await page.evaluate(() => (window as unknown as { __hostLog: [number, string, string][] }).__hostLog);
-    const laidOut = hostLog.find(([, display]) => display === 'block')![0];
+    const hostLog = await page.evaluate(() => (window as unknown as { __hostLog: [number, string, string, boolean][] }).__hostLog);
+    // Laid out at the short's size in the tap itself, before the Shorts page exists (YouTube redraws it meanwhile)
+    const first = hostLog.find(([, display]) => display === 'block')!;
+    expect(first[3]).toBe(false);
+    const laidOut = first[0];
     const shown = hostLog.find(([t, display, opacity]) => t >= laidOut && display === 'block' && opacity === '1')![0];
     // (400ms in the player; the observer sees the first change only after the page's mount work, ~80ms late.
     // Shown at once, the gap would be near 0)

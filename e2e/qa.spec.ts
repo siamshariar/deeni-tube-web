@@ -148,6 +148,28 @@ test.describe('Phones: Shorts thumbnail', () => {
   });
 });
 
+test.describe('Phones: Shorts buttons', () => {
+  test.skip(({ isMobile }) => !isMobile, 'phones only');
+
+  for (const [w, h] of [[375, 548], [390, 664], [412, 839]] as const) {
+    test(`the like/comment/share/save/report column fits between the top buttons and the title (${w}×${h})`, async ({ page }) => {
+      await seed(page);
+      await page.setViewportSize({ width: w, height: h }); // 375×548: an iPhone SE in Safari, toolbars showing
+      await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort());
+      await page.goto('/shorts');
+      const section = page.locator('section').first();
+      const like = section.getByRole('button', { name: /^(Like|Unlike)$/ });
+      await expect(like).toBeVisible();
+      const more = (await section.getByRole('button', { name: 'More options' }).boundingBox())!;
+      const top = (await like.boundingBox())!;
+      const report = (await section.getByRole('button', { name: 'Report' }).last().boundingBox())!;
+      const title = (await section.locator('button p').first().boundingBox())!;
+      expect(top.y).toBeGreaterThan(more.y + more.height + 16);
+      expect(report.y + report.height).toBeLessThanOrEqual(title.y);
+    });
+  }
+});
+
 test.describe('Everywhere', () => {
   test('History: the channel name opens the video; YouTube text sizes', async ({ page, isMobile }) => {
     await seed(page);

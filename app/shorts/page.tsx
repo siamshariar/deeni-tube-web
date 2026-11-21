@@ -442,8 +442,10 @@ const commentsByVideo = loadComments()
 
 // Action buttons (like, comment, share...): white on a dark scrim over the video on phones and tablets;
 // beside the video on wider screens, as YouTube's grey round buttons (#f2f2f2 light / #272727 dark)
+// Phones and tablets: sized by the screen's height (34-48px), so the whole rail fits between the top controls and
+// the title on any phone, also in Safari with its toolbars showing
 const actionCircleClass =
-  "w-12 h-12 short-screen:w-10 short-screen:h-10 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent"
+  "h-[clamp(34px,6svh,48px)] w-[clamp(34px,6svh,48px)] lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent"
 const actionLabelClass =
   "text-xs font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] lg:text-sm lg:font-normal lg:text-foreground lg:[text-shadow:none]"
 
@@ -2053,7 +2055,8 @@ function ShortsPageContent() {
                 </div>
                 {/* Actions: over the video on phones/tablets, beside it on wider screens (as on YouTube) */}
                 <div className={cn(
-                  "absolute right-3 bottom-28 z-20 flex flex-col items-center gap-5 short-screen:bottom-24 short-screen:gap-3 transition-all duration-500",
+                  // Phones/tablets: the bottom offset and gaps follow the screen's height too (see actionCircleClass)
+                  "absolute right-3 bottom-[clamp(64px,12svh,112px)] z-20 flex flex-col items-center gap-[clamp(6px,2.2svh,20px)] transition-all duration-500",
                   "lg:static lg:z-auto lg:flex-shrink-0 lg:gap-4 lg:mb-1",
                   isActive && !isScrolling ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
                 )}>
