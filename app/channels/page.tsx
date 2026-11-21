@@ -169,7 +169,7 @@ export default function ChannelsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto w-full max-w-[1096px] px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16">
+      <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold">Channels</h1>
