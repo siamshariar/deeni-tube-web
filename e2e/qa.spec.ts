@@ -126,8 +126,9 @@ test.describe('Phones', () => {
 test.describe('Phones: Shorts thumbnail', () => {
   test.skip(({ isMobile }) => !isMobile, 'phones only');
 
-  test("a short's cover is its video's first frame, framed like the video: 9:16, covering the screen", async ({ page }) => {
+  for (const [w, h] of [[375, 548], [390, 664], [412, 839]] as const) test(`a short's cover is its video's first frame, framed like the video: 9:16, covering the screen (${w}×${h})`, async ({ page }) => {
     await seed(page);
+    await page.setViewportSize({ width: w, height: h }); // 375×548: iPhone 7/8/SE (iOS 15 at most) in Safari
     await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort()); // only the cover
     await page.goto('/shorts?v=o38RKuY_AUU');
     const box = page.locator('.shorts-player-box').nth(3);

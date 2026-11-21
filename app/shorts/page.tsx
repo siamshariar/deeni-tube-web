@@ -1541,24 +1541,28 @@ function ShortsPageContent() {
         .animate-play-feedback { animation: playFeedback 0.55s ease-out forwards; }
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-        /* Mobile: the 9:16 player covers the whole box (cropping the overflow), so there are no black bars at
-           the sides when the screen is wider than 9:16, which it is on most phones once the nav bar is counted */
+        /* Mobile: the 9:16 player and cover cover the whole box (cropping the overflow), so there are no black
+           bars at the sides when the screen is wider than 9:16, which it is on most phones once the nav bar is
+           counted. Pure CSS, so it's right in the server's HTML too (sized in JS, the cover showed at the screen's
+           shape until the page's script ran, then jumped). Exact with container query units; browsers without
+           them (Safari before 16: every iPhone 7, 6s and first SE; Chrome before 105) work it out from the
+           screen, which the feed fills above the 56px nav (dvh where known, else vh, which is a little taller:
+           a little more cropped, never smaller). Their old fallback was a box of the screen's shape, which showed
+           the short small with black sides until it played, then seemed to zoom in */
         @media (max-width: 767px) {
           .shorts-video-iframe, .shorts-poster {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            height: 100%;
-            aspect-ratio: 9 / 16;
-            min-width: 100%;
-            width: auto;
+            width: max(100vw, calc((100vh - 56px - env(safe-area-inset-bottom, 0px)) * 9 / 16));
+            width: max(100vw, calc((100dvh - 56px - env(safe-area-inset-bottom, 0px)) * 9 / 16));
+            height: max(calc(100vh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
+            height: max(calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
           }
           @supports (width: 1cqw) {
             .shorts-player-box { container-type: size; }
             .shorts-video-iframe, .shorts-poster {
-              aspect-ratio: auto;
-              min-width: 0;
               width: max(100cqw, 100cqh * 9 / 16);
               height: max(100cqh, 100cqw * 16 / 9);
             }
