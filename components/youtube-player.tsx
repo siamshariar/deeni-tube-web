@@ -45,6 +45,7 @@ import {
   hostShowing,
   hostWanted,
   playFromTap,
+  revealHost,
   setHostCropped,
   setHostFullscreen,
 } from "@/lib/player-host";
@@ -254,7 +255,9 @@ export function YouTubePlayer({
       if (state === PAUSED) saverRef.current?.update(timeRef.current.time, timeRef.current.duration, true);
       if (state === PLAYING) {
         playedRef.current = true;
-        setStarted(true);
+        // Shared player: the thumbnail goes once YouTube has drawn the video at this size (no small video zooming)
+        if (hosted) revealHost(() => setStarted(true));
+        else setStarted(true);
         // Touch screens: the controls go away a moment after playback starts, as in YouTube's app
         if (!overControlsRef.current) scheduleHide();
         // Shared player: go on from where the card's preview was, now that the video has loaded
@@ -311,12 +314,17 @@ export function YouTubePlayer({
         }
       }
       command("playVideo");
-      // A tap started it already and YouTube won't say "playing" again (it only reports changes): resume now
+      // A tap started it already and YouTube won't say "playing" again (it only reports changes): take it as
+      // playing now (resume, controls, thumbnail)
       const info = hostInfo();
-      if (resumeRef.current !== null && hostShowing() === videoId && info.playerState === PLAYING) {
-        command("seekTo", [resumeRef.current, true]);
+      if (hostShowing() === videoId && info.playerState === PLAYING) {
+        if (resumeRef.current !== null) command("seekTo", [resumeRef.current, true]);
         resumeRef.current = null;
         playedRef.current = true;
+        lastStateRef.current = PLAYING;
+        setPlayerState(PLAYING);
+        if (!overControlsRef.current) scheduleHide();
+        revealHost(() => setStarted(true));
       }
     }
     return () => {
@@ -324,7 +332,7 @@ export function YouTubePlayer({
       iframeRef.current = null;
       readyRef.current = false;
     };
-  }, [hosted, videoId, command]);
+  }, [hosted, videoId, command, scheduleHide]);
   useEffect(() => {
     if (hosted) setHostCropped(cropped);
   }, [hosted, cropped]);

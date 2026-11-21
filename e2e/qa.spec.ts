@@ -182,6 +182,20 @@ test.describe('Everywhere', () => {
     await expect(page.locator('main li')).toHaveCount(10);
   });
 
+  test('Channels: the page scrolls while the Home feed menu is open, and scrolling closes it', async ({ page, isMobile }) => {
+    await seed(page);
+    await page.setViewportSize({ width: page.viewportSize()!.width, height: 500 });
+    await page.goto('/channels');
+    await page.getByRole('button', { name: /on your Home feed$/ }).first().click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    // A real wheel scroll over the page (a scroll lock would swallow it)
+    await page.mouse.move(isMobile ? 40 : 400, 400); // over the list (not the desktop sidebar)
+    await page.mouse.wheel(0, 300);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+    await expect(menu).toHaveCount(0);
+  });
+
   test("cards show the video's real length", async ({ page }) => {
     await seed(page);
     await page.goto('/');

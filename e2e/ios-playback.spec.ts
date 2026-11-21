@@ -65,6 +65,8 @@ test.describe('iPhone: tap to play with sound', () => {
 
     // Our controls drive it: they hide on their own while it plays, a tap brings them back, Pause pauses it
     const controls = page.locator('[role="slider"][aria-label="Seek"]').locator('xpath=ancestor::div[contains(@class,"transition-opacity")][1]');
+    // Shown once the video is (the shared player shows once YouTube has drawn it at this size), then hidden
+    await expect(controls).toHaveCSS('opacity', '1', { timeout: 6000 });
     await expect(controls).toHaveCSS('opacity', '0', { timeout: 6000 });
     await page.getByRole('region', { name: 'Video player' }).tap({ position: { x: box.width / 4, y: box.height / 2 } });
     await expect(controls).toHaveCSS('opacity', '1');
@@ -167,6 +169,13 @@ test.describe('iPhone: Shorts with sound', () => {
     const frame = await hostFrame(page);
     await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: true, videoId: PLACEHOLDER });
 
+    // Record when the shared player is laid out (display) and shown (opacity)
+    await page.evaluate(() => {
+      const host = document.querySelector<HTMLElement>('[data-player-host]')!;
+      const log: [number, string, string][] = [];
+      (window as unknown as { __hostLog: typeof log }).__hostLog = log;
+      new MutationObserver(() => log.push([performance.now(), host.style.display, host.style.opacity])).observe(host, { attributes: true, attributeFilter: ['style'] });
+    });
     await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('link', { name: 'Shorts' }).tap();
     await expect(page).toHaveURL(/\/shorts$/);
     const sent = await log(frame);
@@ -178,6 +187,14 @@ test.describe('iPhone: Shorts with sound', () => {
     // One player for the whole feed, over the short on screen
     await expect(page.locator('iframe')).toHaveCount(1);
     await expectHostOver(page, 0);
+    // Not shown the moment it's laid out at the short's size, but once YouTube has had time to redraw it there
+    // (otherwise the video shows small, then zooms to fill the screen)
+    const hostLog = await page.evaluate(() => (window as unknown as { __hostLog: [number, string, string][] }).__hostLog);
+    const laidOut = hostLog.find(([, display]) => display === 'block')![0];
+    const shown = hostLog.find(([t, display, opacity]) => t >= laidOut && display === 'block' && opacity === '1')![0];
+    // (400ms in the player; the observer sees the first change only after the page's mount work, ~80ms late.
+    // Shown at once, the gap would be near 0)
+    expect(shown - laidOut).toBeGreaterThanOrEqual(250);
 
     // Next short: the same player loads it, still with sound
     await page.keyboard.press('ArrowDown');

@@ -52,11 +52,23 @@ const FEED_CHOICES = [
 /**
  * A channel's place on the Home feed, in the style of YouTube's "Subscribed ▾" button: a grey pill that says
  * where the channel is ("On Home" or "Hidden") and opens a menu with the two choices, each explained.
+ * As on YouTube, the page still scrolls while the menu is open, and scrolling closes it.
  */
 function HomeFeedButton({ name, onHome, onChange }: { name: string; onHome: boolean; onChange: (on: boolean) => void }) {
   const Icon = onHome ? House : EyeOff;
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const from = window.scrollY;
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - from) > 8) setOpen(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [open]);
   return (
-    <DropdownMenu>
+    // Not modal: no scroll lock while it's open
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"

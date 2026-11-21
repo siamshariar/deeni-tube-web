@@ -60,6 +60,17 @@ let keepSoundUntil = 0;
 // A tap (or click, or key press) has started or unmuted this player: Safari lets it play with sound from now on
 let soundAllowed = false;
 let observer: ResizeObserver | null = null;
+// YouTube redraws its video a moment after its frame changes size (or comes out of display: none), and until then
+// shows it at the old size: the frame is only shown once its size has been the same for SETTLE_MS
+const SETTLE_MS = 400;
+let settledAt = 0;
+let shownSize = "";
+let revealTimer: ReturnType<typeof setTimeout> | undefined;
+const sized = (key: string) => {
+  if (key === shownSize) return;
+  shownSize = key;
+  settledAt = performance.now() + SETTLE_MS;
+};
 
 /** iPhone, iPad (also when it says it's a Mac) or Safari: the browsers that need the shared player. */
 export function hostWanted(): boolean {
@@ -199,7 +210,10 @@ export function attachHost(el: HTMLElement, fit: HostFit = "video"): number {
   const token = nextToken++;
   attached = { el, token, fit };
   pending = null;
-  if (wrapper) wrapper.style.display = "block";
+  if (wrapper && wrapper.style.display === "none") {
+    wrapper.style.display = "block";
+    shownSize = ""; // laid out again from nothing
+  }
   observer?.disconnect();
   observer = new ResizeObserver(place);
   observer.observe(el);
@@ -223,8 +237,26 @@ function onScroll() {
 
 /** Show or hide the attached player without letting it go (Shorts: until the next short plays). */
 export function setHostVisible(on: boolean) {
+  if (!on) clearTimeout(revealTimer);
   if (on) place();
   if (wrapper) wrapper.style.opacity = on ? "1" : "0";
+}
+
+/**
+ * Show the attached player once YouTube has redrawn it at its current size (at once if it has), then call
+ * `onShown` (the page hides its thumbnail then). Avoids a small video that then zooms to fill the box.
+ */
+export function revealHost(onShown?: () => void) {
+  clearTimeout(revealTimer);
+  const show = () => {
+    place();
+    if (wrapper) wrapper.style.opacity = "1";
+    onShown?.();
+  };
+  place();
+  const wait = settledAt - performance.now();
+  if (wait <= 0) show();
+  else revealTimer = setTimeout(show, wait);
 }
 
 /** The page player is gone. Unless a tap already started the next video, pause and go back to the placeholder. */
@@ -235,6 +267,7 @@ export function detachHost(token: number) {
   observer = null;
   window.removeEventListener("resize", place);
   window.removeEventListener("scroll", onScroll, { capture: true });
+  clearTimeout(revealTimer);
   if (wrapper) {
     wrapper.style.display = "none";
     wrapper.style.opacity = "1";
@@ -318,6 +351,7 @@ function place() {
       const w = Math.max(rect.width, (rect.height * 9) / 16);
       const h = (w * 16) / 9;
       const band = cropped ? CROP : 0;
+      sized(`${Math.round(w)}x${Math.round(h + band * 2)}`);
       frame.style.width = `${w}px`;
       frame.style.height = `${h + band * 2}px`;
       frame.style.left = `${(rect.width - w) / 2}px`;
@@ -332,6 +366,7 @@ function place() {
   s.height = `${rect.height}px`;
   s.borderRadius = getComputedStyle(box.parentElement ?? box).borderRadius;
   s.zIndex = "1";
+  sized(`${Math.round(rect.width)}x${Math.round(rect.height)}${cropped ? "c" : ""}`);
 }
 
 // ─── Taps on video links ──────────────────────────────────────────────────────

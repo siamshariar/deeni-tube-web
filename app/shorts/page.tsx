@@ -48,7 +48,7 @@ import { openShareIntent } from "@/lib/share"
 import { recordWatch } from "@/hooks/useWatchHistory"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
 import { useWatchLater } from "@/hooks/useWatchLater"
-import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, setHostCropped, setHostVisible } from "@/lib/player-host"
+import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, revealHost, setHostCropped, setHostVisible } from "@/lib/player-host"
 
 import type { CommentReply, VideoComment } from "@/lib/types"
 // ============ SHORTS DATA ============
@@ -1160,7 +1160,9 @@ function ShortsPageContent() {
         if (state === YT_PLAYING) {
           activePlayedRef.current = true
           setIsPlaying(true)
-          setStartedId(id)
+          // The shared player: shown (and the thumbnail hidden) once YouTube has drawn it at this size
+          if (iframe === hostFrame()) revealHost(() => { if (shortsData[currentIndexRef.current]?.id === id) setStartedId(id) })
+          else setStartedId(id)
           scheduleNeighbors(1500)
         }
         // Only a real pause after it has played. Unstarted/cued/ended are passing states while switching
@@ -1220,7 +1222,7 @@ function ShortsPageContent() {
           if (info.playerState === YT_PLAYING) {
             playerStatesRef.current.set(frame, YT_PLAYING)
             activePlayedRef.current = true
-            setStartedId(activeId)
+            revealHost(() => { if (shortsData[currentIndexRef.current]?.id === activeId) setStartedId(activeId) })
           }
         }
         startPlayer(activeId)
@@ -1243,11 +1245,8 @@ function ShortsPageContent() {
     else registerPlayer(activeId)
   }, [currentIndex, startPlayer, registerPlayer, hosted])
 
-  // Shown once this short plays (the thumbnail covers the box until then); YouTube draws captions at its
-  // bottom edge, so no cropping while they're on
-  useEffect(() => {
-    if (hosted) setHostVisible(startedId === shortsData[currentIndex]?.id)
-  }, [hosted, startedId, currentIndex])
+  // (The shared player is hidden on each switch above and shown with revealHost once the short plays.)
+  // YouTube draws captions at its bottom edge, so no cropping while they're on
   useEffect(() => {
     if (hosted) setHostCropped(!captionsEnabled)
   }, [hosted, captionsEnabled])
