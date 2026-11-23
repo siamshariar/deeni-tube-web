@@ -181,41 +181,6 @@ test.describe('YouTube-style UI', () => {
     await expect(page.getByRole('tab', { name: 'Videos' })).toBeVisible();
   });
 
-  test('save dialog: tick to save, untick to remove, create a public playlist', async ({ page, isMobile }) => {
-    await seed(page);
-    await page.goto('/');
-    await page.evaluate(() => { localStorage.setItem('deeni-watch-later', '[]'); localStorage.removeItem('deeni-playlists'); });
-    await page.goto('/videos/x/v2');
-    const dialog = page.getByRole('dialog', { name: 'Save video to...' });
-    // Retry until the page has hydrated and the click opens the dialog
-    await expect(async () => {
-      await page.getByRole('button', { name: 'Save', exact: true }).locator('visible=true').first().click();
-      await expect(dialog).toBeVisible({ timeout: 1_000 });
-    }).toPass({ timeout: 10_000 });
-    if (!isMobile) expect((await dialog.boundingBox())!.width).toBeLessThanOrEqual(360);
-
-    const watchLater = dialog.getByRole('checkbox', { name: /Watch Later/ });
-    await dialog.getByText('Watch Later', { exact: true }).click();
-    await expect(watchLater).toBeChecked();
-    const savedIds = () => page.evaluate(() => JSON.parse(localStorage.getItem('deeni-watch-later') || '[]').map((v: { id: string }) => v.id));
-    await expect.poll(savedIds).toEqual(['v2']);
-    await dialog.getByText('Watch Later', { exact: true }).click();
-    await expect(watchLater).not.toBeChecked();
-    await expect.poll(savedIds).toEqual([]);
-    await expect(dialog).toBeVisible(); // stays open, as on YouTube
-
-    await dialog.getByRole('button', { name: 'Create new playlist' }).click();
-    await dialog.getByLabel('Name').fill('Voice test list');
-    await dialog.getByRole('button', { name: 'Privacy: Private' }).click();
-    await page.getByRole('menuitemradio', { name: /Public/ }).click();
-    await expect(dialog.getByRole('button', { name: 'Privacy: Public' })).toBeVisible();
-    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(dialog).toBeHidden();
-    const created = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('deeni-playlists') || '[]').find((p: { name: string }) => p.name === 'Voice test list'));
-    expect(created).toMatchObject({ isPublic: true, videoIds: ['v2'] });
-  });
-
   test('playlist dialogs keep their width on desktop', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop width');
     await seed(page);

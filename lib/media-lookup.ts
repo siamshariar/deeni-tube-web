@@ -31,3 +31,11 @@ export function youtubeIdFromThumbnail(url?: string): string | undefined {
 export function youtubeThumb(videoId: string, size: "small" | "medium" = "medium"): string {
   return `https://img.youtube.com/vi/${videoId}/${size === "small" ? "mqdefault" : "hqdefault"}.jpg`;
 }
+
+/** The small picture of a video or short (by either id), for messages; undefined when it isn't in the catalogue. */
+export function mediaThumb(id: string): { src: string; short: boolean } | undefined {
+  const video = findVideo(id);
+  if (video) return { src: youtubeThumb(video.videoId, "small"), short: false };
+  const short = findShort(id);
+  return short && { src: youtubeThumb(short.youtubeId, "small"), short: true };
+}

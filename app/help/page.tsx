@@ -25,7 +25,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
 
 const helpTopics = [
   {
@@ -95,7 +94,6 @@ export default function HelpPage() {
         setIsSubmitted(false);
         setSupportForm({ name: "", email: "", subject: "", message: "" });
         setErrors({});
-        toast.success("Your message has been sent! We'll get back to you soon.");
       }, 1500);
     }
   };

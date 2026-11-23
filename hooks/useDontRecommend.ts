@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { useFeedPreferences } from "@/hooks/useFeedPreferences";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -14,14 +14,10 @@ export function useDontRecommend() {
 
   return (channelId: string, channelName: string) => {
     if (isGuest) {
-      toast.error("Please sign in to manage channel feed", {
-        action: { label: "Sign in", onClick: () => router.push("/signin") },
-      });
+      notify("Sign in to choose your Home feed's channels", { action: { label: "Sign in", onClick: () => router.push("/signin") } });
       return;
     }
     setChannelFeed(channelId, false);
-    toast(`${channelName} won't be recommended`, {
-      action: { label: "Undo", onClick: () => setChannelFeed(channelId, true) },
-    });
+    notify(`${channelName} won't be recommended`, () => setChannelFeed(channelId, true));
   };
 }

@@ -156,8 +156,15 @@ export function usePlaylists() {
     );
   }, []);
 
+  /** Delete a playlist; returns a function that puts it back where it was (Undo). */
   const deletePlaylist = useCallback((playlistId: string) => {
+    const before = playlistStore.get();
+    const at = before.findIndex((p) => p.id === playlistId);
     playlistStore.set((prev) => prev.filter((p) => p.id !== playlistId));
+    return () => {
+      if (at < 0) return;
+      playlistStore.set((prev) => (prev.some((p) => p.id === playlistId) ? prev : [...prev.slice(0, at), before[at], ...prev.slice(at)]));
+    };
   }, []);
 
   /** Returns false if the video was already in the playlist. */
@@ -181,14 +188,26 @@ export function usePlaylists() {
     [listFor]
   );
 
+  /** Remove a video; returns a function that puts it back where it was (Undo). */
   const removeVideoFromPlaylist = useCallback(
-    (playlistId: string, videoId: string) => {
+    (playlistId: string, videoId: string): (() => void) => {
       const id = canonicalVideoId(videoId);
       const list = listFor(playlistId);
       if (list) return list.remove(id);
+      const at = playlistStore.get().find((p) => p.id === playlistId)?.videoIds.indexOf(id) ?? -1;
       playlistStore.set((prev) =>
         prev.map((p) => (p.id === playlistId ? touch(p, { videoIds: p.videoIds.filter((v) => v !== id) }) : p))
       );
+      return () => {
+        if (at < 0) return;
+        playlistStore.set((prev) =>
+          prev.map((p) =>
+            p.id === playlistId && !p.videoIds.includes(id)
+              ? touch(p, { videoIds: [...p.videoIds.slice(0, at), id, ...p.videoIds.slice(at)] })
+              : p
+          )
+        );
+      };
     },
     [listFor]
   );
@@ -209,8 +228,18 @@ export function usePlaylists() {
 
   const getPlaylist = useCallback((playlistId: string) => playlists.find((p) => p.id === playlistId), [playlists]);
 
+  /** Whether a video is saved anywhere (Watch later or a playlist; Liked videos doesn't count). */
+  const isSaved = useCallback(
+    (videoId: string) => {
+      const id = canonicalVideoId(videoId);
+      return playlists.some((p) => p.id !== LIKED_PLAYLIST_ID && p.videoIds.includes(id));
+    },
+    [playlists]
+  );
+
   return {
     playlists,
+    isSaved,
     createPlaylist,
     updatePlaylist,
     deletePlaylist,

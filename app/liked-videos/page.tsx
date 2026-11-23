@@ -8,10 +8,9 @@ import {
   Play,
   Shuffle,
   Trash2,
-  BookmarkPlus,
-  Share2,
-  Clock,
+      Clock,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import ShortCard from "@/components/short-card";
 import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
@@ -25,15 +24,15 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
-import { toast } from "sonner";
+import { notify, copyLink } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { useLikedVideos, LikedVideo } from "@/hooks/useLikedVideos";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useHydrated } from "@/lib/local-store";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 
 import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
-import { youtubeThumb } from "@/lib/media-lookup";
+import { youtubeThumb, mediaThumb } from "@/lib/media-lookup";
 import { videoPath } from "@/lib/video-url";
 type FilterOption = "all" | "videos" | "shorts";
 
@@ -45,35 +44,19 @@ export default function LikedVideosPage() {
   const router = useRouter();
   const hydrated = useHydrated();
   const { likedVideos, unlike } = useLikedVideos();
-  const { addToWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
   const videos = useMemo(() => likedVideos.filter((v) => v.type !== "short"), [likedVideos]);
   const shorts = useMemo(() => likedVideos.filter((v) => v.type === "short"), [likedVideos]);
   const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
-  const [playlistTarget, setPlaylistTarget] = useState<LikedVideo | null>(null);
 
   const removeVideo = (id: string) => {
-    unlike(id);
-    toast.success("Removed from Liked videos");
+    notify("Removed from Liked videos", { undo: unlike(id), thumb: mediaThumb(id) });
   };
   const removeShort = removeVideo;
 
-  const saveToWatchLater = (v: LikedVideo) => {
-    if (isInWatchLater(v.id)) {
-      toast("Already in Watch Later");
-      return;
-    }
-    addToWatchLater(v);
-    toast.success("Saved to Watch Later");
-  };
+  const saveToWatchLater = (v: LikedVideo) => toggleWatchLater(v);
 
-  const shareVideo = async (path: string) => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
-      toast.success("Link copied to clipboard");
-    } catch {
-      toast.error("Couldn't copy the link");
-    }
-  };
+  const shareVideo = (path: string) => copyLink(`${window.location.origin}${path}`);
 
   const firstVideo = videos[0];
   // Cover: the first video (or the first short when only shorts are saved)
@@ -278,20 +261,19 @@ export default function LikedVideosPage() {
                               <DropdownMenuItem
                                 onClick={() => saveToWatchLater(video)}
                               >
-                                <Clock className="h-5 w-5" /> Save to
-                                Watch Later
+                                <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Remove from Watch later" : "Save to Watch later"}
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => setPlaylistTarget(video)}
+                                afterClose={() => openSaveCard(video)}
                               >
-                                <BookmarkPlus className="h-5 w-5" /> Save
+                                <SaveIcon className="h-5 w-5" /> Save
                                 to playlist
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => shareVideo(videoHref(video))}
                               >
-                                <Share2 className="h-5 w-5" /> Share
+                                <ShareIcon className="h-5 w-5" /> Share
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600 dark:text-red-400"
@@ -339,19 +321,18 @@ export default function LikedVideosPage() {
                                 <DropdownMenuItem
                                   onClick={() => saveToWatchLater(short)}
                                 >
-                                  <Clock className="h-5 w-5" /> Save to
-                                  Watch Later
-                                </DropdownMenuItem>
+                                  <Clock className="h-5 w-5" /> {isInWatchLater(short.id) ? "Remove from Watch later" : "Save to Watch later"}
+                              </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => setPlaylistTarget(short)}
+                                  afterClose={() => openSaveCard(short)}
                                 >
-                                  <BookmarkPlus className="h-5 w-5" />{" "}
+                                  <SaveIcon className="h-5 w-5" />{" "}
                                   Save to playlist
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => shareVideo(shortHref(short))}
                                 >
-                                  <Share2 className="h-5 w-5" /> Share
+                                  <ShareIcon className="h-5 w-5" /> Share
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -385,13 +366,6 @@ export default function LikedVideosPage() {
         )}
       </div>
 
-      {playlistTarget && (
-        <AddToPlaylistDialog
-          video={{ id: playlistTarget.id, title: playlistTarget.title, channel: playlistTarget.channel }}
-          open
-          onOpenChange={(o) => !o && setPlaylistTarget(null)}
-        />
-      )}
     </div>
   );
 }

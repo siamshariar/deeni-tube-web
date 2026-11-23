@@ -24,7 +24,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { readLanguagePrefs, updateLanguagePrefs } from "@/lib/language-prefs";
 import { useHydrated } from "@/lib/local-store";
 import { setFeedPlayback, useFeedPlaybackSetting } from "@/lib/feed-playback";
@@ -56,7 +56,6 @@ const NOTIFICATION_ROWS: { key: NotificationKey; label: string; description: str
 // YouTube-style blue for "on" states, in both themes
 const SWITCH_ON = "data-[state=checked]:bg-[#065fd4] dark:data-[state=checked]:bg-[#3ea6ff] [&>span]:bg-white";
 
-const languageLabel = (code: string) => settingsLanguages.find((l) => l.code === code)?.label ?? code;
 const listLabels = (codes: string[]) => settingsLanguages.filter((l) => codes.includes(l.code)).map((l) => l.label).join(", ");
 
 export default function SettingsPage() {
@@ -90,19 +89,17 @@ export default function SettingsPage() {
 
   const handleThemeChange = (next: ThemeValue) => {
     setTheme(next);
-    toast.success(next === "system" ? "Using your device theme" : `${next === "light" ? "Light" : "Dark"} theme on`);
   };
 
   const toggleLanguage = (code: string) => {
     const on = languages.includes(code);
     if (on && languages.length === 1) {
-      toast("Keep at least one language", { description: "Your Home feed needs a language to show videos in." });
+      notify("Keep at least one language");
       return;
     }
     const next = on ? languages.filter((l) => l !== code) : [...languages, code];
     setLanguages(next);
     updateLanguagePrefs({ languages: next });
-    toast.success(on ? `${languageLabel(code)} removed from your Home feed` : `${languageLabel(code)} added to your Home feed`);
   };
 
   const changeAutoplay = (on: boolean) => {
@@ -110,7 +107,6 @@ export default function SettingsPage() {
     try {
       localStorage.setItem(AUTOPLAY_KEY, String(on));
     } catch {}
-    toast.success(`Autoplay turned ${on ? "on" : "off"}`);
   };
 
   const setNotification = (key: NotificationKey, value: boolean) => {
@@ -119,8 +115,6 @@ export default function SettingsPage() {
     try {
       localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(next));
     } catch {}
-    const label = NOTIFICATION_ROWS.find((r) => r.key === key)?.label ?? key;
-    toast.success(`${label} turned ${value ? "on" : "off"}`);
   };
 
   return (
@@ -249,10 +243,7 @@ export default function SettingsPage() {
               label="Playback in feeds"
               description="Videos play muted in their cards as you scroll, or when you point at one with a mouse"
               checked={feedPlayback}
-              onCheckedChange={(value) => {
-                setFeedPlayback(value);
-                toast.success(`Playback in feeds turned ${value ? "on" : "off"}`);
-              }}
+              onCheckedChange={setFeedPlayback}
             />
             <SwitchRow
               icon={<SkipForward />}

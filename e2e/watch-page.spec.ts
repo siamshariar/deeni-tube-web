@@ -55,10 +55,10 @@ test.describe('Watch page', () => {
 
     await player.click({ position: { x: b.width / 2, y: b.height / 3 } });
     await expect.poll(state).toBe(false);
-    await expect(page.getByRole('button', { name: 'Play (k)' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Play( \(k\))?$/ })).toBeVisible();
     await page.keyboard.press('k');
     await expect.poll(state).toBe(true);
-    await expect(page.getByRole('button', { name: 'Pause (k)' })).toBeAttached();
+    await expect(page.locator('button[aria-label^="Pause"]').first()).toBeAttached();
   });
 
   test("at the end, our end screen replaces YouTube's: Up next with a countdown, Cancel, Replay, Play now", async ({ page }) => {

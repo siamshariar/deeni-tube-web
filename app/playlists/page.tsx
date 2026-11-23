@@ -14,9 +14,9 @@ import {
   Plus,
   Edit,
   Trash2,
-  Share,
-  Play,
+    Play,
 } from "lucide-react";
+import { ShareIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { PlaylistItem } from "@/lib/playlist-data";
 import { usePlaylists, playlistAgeMs, isSystemPlaylist } from "@/hooks/usePlaylists";
 import { useHydrated } from "@/lib/local-store";
@@ -93,14 +93,10 @@ export default function PlaylistsPage() {
   }, [playlists, searchQuery, sortOrder]);
 
   const handleCreatePlaylist = () => {
-    if (!newPlaylistName.trim()) {
-      toast.error("Please enter a playlist name");
-      return;
-    }
+    if (!newPlaylistName.trim()) return; // Create is disabled until there's a name
     createPlaylist(newPlaylistName.trim(), newPlaylistPublic);
     resetCreateDialog();
     setShowCreateDialog(false);
-    toast.success("Playlist created!");
   };
 
   const handleEditPlaylist = () => {
@@ -108,15 +104,13 @@ export default function PlaylistsPage() {
     updatePlaylist(editingPlaylist.id, { name: editName.trim(), isPublic: editPublic });
     setShowEditDialog(false);
     setEditingPlaylist(null);
-    toast.success("Playlist updated!");
   };
 
   const handleDeletePlaylist = () => {
     if (!deletingPlaylist) return;
-    deletePlaylist(deletingPlaylist.id);
+    notify("Playlist deleted", deletePlaylist(deletingPlaylist.id));
     setShowDeleteDialog(false);
     setDeletingPlaylist(null);
-    toast.success("Playlist deleted!");
   };
 
   const openEditDialog = (playlist: PlaylistItem) => {
@@ -309,7 +303,7 @@ export default function PlaylistsPage() {
                           )}
                           {playlist.isPublic && (
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleShare(playlist); }}>
-                              <Share className="h-5 w-5" /> Share
+                              <ShareIcon className="h-5 w-5" /> Share
                             </DropdownMenuItem>
                           )}
                           {!isSystemPlaylist(playlist.id) && (

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 
 const REPORT_REASONS = [
   "Violent or repulsive content",
@@ -44,9 +44,7 @@ export function ReportDialog({ videoTitle, children, open: externalOpen, onOpenC
     reports.unshift(newReport);
     localStorage.setItem("reportHistory", JSON.stringify(reports));
 
-    toast.success("Report submitted", {
-      description: `"${videoTitle}" reported for "${selected}"`,
-    });
+    notify("Thanks for reporting");
 
     setSelected(null);
     setOpen(false);

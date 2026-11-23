@@ -7,14 +7,13 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft,
-  Share,
-  Ban,
+    Ban,
   Flag,
   ListVideo,
   Play,
   Clock,
-  Bookmark,
-} from "lucide-react";
+  } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import ShortCard from "@/components/short-card";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { MoreButton } from "@/components/more-button";
@@ -34,11 +33,10 @@ import { cn } from "@/lib/utils";
 import { channelData, ChannelItem } from "@/lib/channel-data";
 import { videoData, VideoItem } from "@/lib/video-data";
 import { ShareModal } from "@/components/share-modal";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ReportDialog } from "@/components/report-dialog";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { toast } from "sonner";
 import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
 
 import { useDontRecommend } from "@/hooks/useDontRecommend";
@@ -151,7 +149,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
     ).slice(0, 4);
   }, [channelVideos]);
 
-  const { addToWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
   const [activeTab, setActiveTab] = useState("videos");
   const [isLoading, setIsLoading] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -159,7 +157,6 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [shortDrawerOpen, setShortDrawerOpen] = useState(false);
   const [selectedShort, setSelectedShort] = useState<ChannelShort | null>(null);
-  const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -276,7 +273,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                 className="rounded-full h-9 px-4 flex-shrink-0 bg-muted hover:bg-accent font-medium"
                 onClick={handleShare}
               >
-                <Share className="h-5 w-5 mr-2" /> Share
+                <ShareIcon className="h-5 w-5 mr-2" /> Share
               </Button>
 
               <DropdownMenu>
@@ -383,14 +380,14 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                         <MoreButton />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56 rounded-xl">
-                        <DropdownMenuItem className="cursor-pointer" onClick={() => { if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); } else { addToWatchLater({ id: short.id, title: short.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); } }}>
-                          <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => { toggleWatchLater({ id: short.id, title: short.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration }); }}>
+                          <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Remove from Watch later" : "Save to Watch later"}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" afterClose={() => { setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
-                          <Bookmark className="h-4 w-4" /> Save to Playlist
+                        <DropdownMenuItem className="cursor-pointer" afterClose={() => openSaveCard({ id: short.id, title: short.title, channel: channel.name })}>
+                          <SaveIcon className="h-4 w-4" /> Save to Playlist
                         </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer" onClick={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
-                          <Share className="h-4 w-4" /> Share
+                          <ShareIcon className="h-4 w-4" /> Share
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -416,29 +413,24 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
                   onClick={() => {
                     if (selectedShort) {
-                      if (isInWatchLater(selectedShort.id)) {
-                        toast.success("Already in Watch Later");
-                      } else {
-                        addToWatchLater({ id: selectedShort.id, title: selectedShort.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${selectedShort.videoId}/hqdefault.jpg`, views: selectedShort.views, timeAgo: selectedShort.timeAgo, duration: selectedShort.duration, addedAt: Date.now() });
-                        toast.success("Added to Watch Later");
-                      }
+                      toggleWatchLater({ id: selectedShort.id, title: selectedShort.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${selectedShort.videoId}/hqdefault.jpg`, views: selectedShort.views, timeAgo: selectedShort.timeAgo, duration: selectedShort.duration });
                     }
                     setShortDrawerOpen(false);
                   }}
                 >
-                  <Clock className="h-4 w-4 flex-shrink-0" /> {selectedShort && isInWatchLater(selectedShort.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                  <Clock className="h-4 w-4 flex-shrink-0" /> {selectedShort && isInWatchLater(selectedShort.id) ? "Remove from Watch later" : "Save to Watch later"}
                 </button>
                 <button
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
-                  onClick={() => { setShowShortPlaylistDialog(true); setShortDrawerOpen(false); }}
+                  onClick={() => { const s = selectedShort; setShortDrawerOpen(false); if (s) setTimeout(() => openSaveCard({ id: s.id, title: s.title, channel: channel.name }), 150); }}
                 >
-                  <Bookmark className="h-4 w-4 flex-shrink-0" /> Save to Playlist
+                  <SaveIcon className="h-4 w-4 flex-shrink-0" /> Save to Playlist
                 </button>
                 <button
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
                   onClick={() => { if (selectedShort) { setShareUrl(`${window.location.origin}/shorts?v=${selectedShort.videoId}`); setShareModalOpen(true); } setShortDrawerOpen(false); }}
                 >
-                  <Share className="h-4 w-4 flex-shrink-0" /> Share
+                  <ShareIcon className="h-4 w-4 flex-shrink-0" /> Share
                 </button>
               </div>
             </DrawerContent>
@@ -508,7 +500,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                               <Play className="h-4 w-4" /> Play all
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareUrl(`${window.location.origin}/playlists/${playlist.slug}/${playlist.id}`); setShareModalOpen(true); }}>
-                              <Share className="h-4 w-4" /> Share
+                              <ShareIcon className="h-4 w-4" /> Share
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -561,13 +553,6 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
         </div>
       )}
 
-      {selectedShort && (
-        <AddToPlaylistDialog
-          video={{ id: selectedShort.id, title: selectedShort.title, channel: channel.name }}
-          open={showShortPlaylistDialog}
-          onOpenChange={setShowShortPlaylistDialog}
-        />
-      )}
       <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
       <ReportDialog videoTitle={channel.name} videoId={channel.id} open={showReportDialog} onOpenChange={setShowReportDialog} />
     </div>

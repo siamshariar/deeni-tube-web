@@ -180,7 +180,7 @@ test.describe('Storyboard: touch', () => {
     await expect(big.locator('[data-storyboard]')).toHaveCSS('opacity', '1');
     await expect(page.getByRole('region', { name: 'Video player' }).getByText('0:15', { exact: true })).toBeVisible();
     await expect(page.locator('[data-storyboard-box]')).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Video player' }).getByRole('button', { name: 'Full screen (f)' })).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Video player' }).getByRole('button', { name: 'Full screen', exact: true })).toBeHidden();
     await touch('touchEnd');
     await expect(big).toHaveCount(0);
     await expect.poll(() => seeks(page)).toBe(1);
@@ -195,6 +195,7 @@ test.describe('Storyboard: touch', () => {
     await page.touchscreen.tap(player.x + player.width * 0.7, player.y + 50);
     await region.getByRole('button', { name: 'Settings' }).tap();
     await region.getByRole('menuitem', { name: /Playback speed/ }).tap();
+    await page.waitForTimeout(100);
     const menu = (await region.getByRole('menu').boundingBox())!;
     expect(menu.y).toBeGreaterThanOrEqual(player.y);
     expect(menu.y + menu.height).toBeLessThanOrEqual(player.y + player.height);

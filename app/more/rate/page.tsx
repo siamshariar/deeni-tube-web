@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Star, Heart, ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 
 function RateSkeleton() {
   return (
@@ -69,12 +68,8 @@ export default function RatePage() {
   }, []);
 
   const handleSubmit = () => {
-    if (rating === 0) {
-      toast.error("Please select a rating first");
-      return;
-    }
+    if (rating === 0) return; // the button is disabled until there's a rating
     setSubmitted(true);
-    toast.success("Thank you for your rating! (demo)");
   };
 
   if (isLoading) {

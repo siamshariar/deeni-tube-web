@@ -8,20 +8,19 @@ import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
 import {
   ArrowLeft,
-  Share,
-  Clock,
+    Clock,
   UserX,
   Flag,
   ThumbsUp,
   ThumbsDown,
   MoreHorizontal,
   MessageCircle,
-  ListPlus,
-  Check,
+    Check,
   EyeOff,
   Send,
   X,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,13 +43,15 @@ import { YouTubePlayer } from "@/components/youtube-player";
 import { warmYouTube } from "@/lib/warm-youtube";
 import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
 import { cn } from "@/lib/utils";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useDontRecommend } from "@/hooks/useDontRecommend";
+import { usePlaylists } from "@/hooks/usePlaylists";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { recordWatch } from "@/hooks/useWatchHistory";
 import { historyEntryForVideo } from "@/lib/history-entry";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { videoData, VideoItem } from "@/lib/video-data"; // ✅ shared data
 
 import type { CommentReply } from "@/lib/types";
@@ -374,19 +375,13 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [relatedDrawerOpen, setRelatedDrawerOpen] = useState(false);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [selectedRelatedVideo, setSelectedRelatedVideo] = useState<VideoItem | null>(null);
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
-  const toggleWatchLater = (v: VideoItem) => {
-    if (isInWatchLater(v.id)) {
-      removeFromWatchLater(v.id);
-      toast.success("Removed from Watch later");
-    } else {
-      addToWatchLater({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration, addedAt: Date.now() });
-      toast.success("Saved to Watch later");
-    }
-  };
+  const dontRecommend = useDontRecommend();
+  const { isSaved } = usePlaylists();
+  const { toggleWatchLater: toggleSaved, isInWatchLater } = useWatchLater();
+  const toggleWatchLater = (v: VideoItem) =>
+    toggleSaved({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration });
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
 
@@ -405,7 +400,6 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
     };
     setComments((prev) => [newComment, ...prev]);
     setCommentText("");
-    toast.success("Comment added (demo)");
   };
 
   const handleLikeComment = (commentId: string) => {
@@ -497,7 +491,6 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
       )
     );
     setReplyingTo(null);
-    toast.success("Reply added");
   };
 
   // After this video: the first related one ("Up next" on our end screen, with an Autoplay countdown)
@@ -561,7 +554,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                   {/* Actions — a scrollable row of pills on phones */}
                   <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 scrollbar-none md:mx-0 md:overflow-visible md:px-0">
                     <button type="button" className={PILL} onClick={() => setShowShareModal(true)}>
-                      <Share /> Share
+                      <ShareIcon /> Share
                     </button>
                     <button
                       type="button"
@@ -571,8 +564,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                     >
                       {isInWatchLater(mainVideo.id) ? <><Check /> Saved</> : <><Clock /> Watch later</>}
                     </button>
-                    <button type="button" className={PILL} onClick={() => setShowPlaylistDialog(true)}>
-                      <ListPlus /> Save
+                    <button type="button" className={PILL} onClick={(e) => openSaveCard(mainVideo, e.currentTarget)}>
+                      <SaveIcon filled={isSaved(mainVideo.id)} /> Save
                     </button>
                     {isMobile ? (
                       <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
@@ -583,8 +576,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                         </DrawerTrigger>
                         <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
                           <div className="mt-2 pb-6">
-                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
-                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
+                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); dontRecommend(mainVideo.channelId, mainVideo.channel); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
+                            <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
                             <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-6 w-6" /> Report</div>
                           </div>
                         </DrawerContent>
@@ -597,8 +590,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => dontRecommend(mainVideo.channelId, mainVideo.channel)}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
                           <DropdownMenuItem className={MENU_ITEM} afterClose={() => setShowReportDialog(true)}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -915,8 +908,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => toggleWatchLater(v)}><Clock className="h-5 w-5" /> {isInWatchLater(v.id) ? "Remove from Watch later" : "Save to Watch later"}</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => { setSelectedRelatedVideo(v); setShowPlaylistDialog(true); }}><ListPlus className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><Share className="h-5 w-5" /> Share</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => openSaveCard(v)}><SaveIcon className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><ShareIcon className="h-5 w-5" /> Share</DropdownMenuItem>
                           <DropdownMenuItem className={MENU_ITEM} afterClose={() => { setSelectedRelatedVideo(v); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -957,8 +950,8 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
               <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
                 <div className="mt-2 pb-6">
                   <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); if (selectedRelatedVideo) toggleWatchLater(selectedRelatedVideo); }}><Clock className="h-6 w-6" /> {selectedRelatedVideo && isInWatchLater(selectedRelatedVideo.id) ? "Remove from Watch later" : "Save to Watch later"}</div>
-                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowPlaylistDialog(true); }, 150); }}><ListPlus className="h-6 w-6" /> Save to playlist</div>
-                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setShowShareModal(true); }}><Share className="h-6 w-6" /> Share</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); const v = selectedRelatedVideo; setTimeout(() => { if (v) openSaveCard(v); }, 150); }}><SaveIcon className="h-6 w-6" /> Save to playlist</div>
+                  <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setShowShareModal(true); }}><ShareIcon className="h-6 w-6" /> Share</div>
                   <div className={DRAWER_ITEM} onClick={() => { setRelatedDrawerOpen(false); setTimeout(() => { setShowReportDialog(true); }, 150); }}><Flag className="h-6 w-6" /> Report</div>
                 </div>
               </DrawerContent>
@@ -978,11 +971,6 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
               ? `${window.location.origin}${videoPath(selectedRelatedVideo)}`
               : window.location.href
         }
-      />
-      <AddToPlaylistDialog
-        video={selectedRelatedVideo ? { id: selectedRelatedVideo.id, title: selectedRelatedVideo.title, channel: selectedRelatedVideo.channel } : { id: mainVideo.id, title: mainVideo.title, channel: mainVideo.channel }}
-        open={showPlaylistDialog}
-        onOpenChange={(o) => { setShowPlaylistDialog(o); if (!o) setSelectedRelatedVideo(null); }}
       />
       <ReportDialog
         videoTitle={selectedRelatedVideo ? selectedRelatedVideo.title : mainVideo.title}

@@ -1,7 +1,7 @@
 // app/shorts/page.tsx
 "use client"
 
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, useSyncExternalStore, Suspense } from "react"
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useSyncExternalStore, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { imagePriorityProps } from "@/lib/image-priority"
@@ -10,9 +10,7 @@ import {
   ChevronDown,
   Heart,
   MessageCircle,
-  Share2,
-  Bookmark,
-  Flag,
+      Flag,
   Volume2,
   VolumeX,
   Pause,
@@ -30,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -37,16 +36,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { MoreVertIcon } from "@/components/icons/more-vert-icon"
+import { CCIconOff, CCIconOn, FullscreenIcon } from "@/components/icons/player-icons"
 
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { DescriptionText, hashtagHref } from "@/components/description-text"
 import { ReportDialog } from "@/components/report-dialog"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify";
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { openShareIntent } from "@/lib/share"
 import { recordWatch } from "@/hooks/useWatchHistory"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
+import { useMenuDismiss } from "@/hooks/use-menu-dismiss"
 import { useWatchLater } from "@/hooks/useWatchLater"
 import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, revealHost, setHostCropped, setHostVisible } from "@/lib/player-host"
 
@@ -468,36 +469,6 @@ const avatarSrc = (src?: string) => (src && !src.includes("placeholder.svg") ? s
 
 // ============ ICON COMPONENTS ============
 
-function CCIconOff({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className={className}>
-      <path d="M21 3H3a2 2 0 00-2 2v14a2 2 0 002 2h18a2 2 0 002-2V5a2 2 0 00-2-2ZM3 19V5h18v14H3ZM6.972 8.346c-.631.336-1.131.881-1.466 1.526A4.6 4.6 0 005 12c-.004.74.17 1.47.506 2.128.336.645.835 1.191 1.466 1.526a2.86 2.86 0 002.066.257c.697-.178 1.294-.606 1.737-1.176a1 1 0 00-1.578-1.228c-.21.27-.444.413-.654.467a.86.86 0 01-.632-.085c-.222-.119-.453-.342-.631-.684A2.64 2.64 0 017 12a2.6 2.6 0 01.281-1.205c.177-.342.408-.565.63-.684a.86.86 0 01.632-.085c.209.054.444.197.654.467a1 1 0 001.578-1.228c-.443-.57-1.04-.998-1.737-1.176a2.86 2.86 0 00-2.066.257Zm8 0c-.631.336-1.131.881-1.466 1.526A4.6 4.6 0 0013 12c-.004.74.17 1.47.506 2.128.336.645.835 1.191 1.466 1.526a2.86 2.86 0 002.066.257c.697-.178 1.294-.606 1.737-1.176a1 1 0 00-1.578-1.228c-.21.27-.444.413-.654.467a.86.86 0 01-.632-.085c-.222-.119-.453-.342-.631-.684A2.64 2.64 0 0115 12a2.6 2.6 0 01.281-1.205c.177-.342.408-.565.63-.684a.86.86 0 01.632-.085c.209.054.444.197.654.467a1 1 0 001.578-1.228c-.443-.57-1.04-.998-1.737-1.176a2.86 2.86 0 00-2.066.257Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function CCIconOn({ className }: { className?: string }) {
-  // Letters are cut out of a currentColor box, so the icon works on dark and light backgrounds
-  const maskId = useId()
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className={className}>
-      <mask id={maskId}>
-        <rect x="1" y="3" width="22" height="18" rx="2" fill="white" />
-        <path d="M9.038 8.089c.697.178 1.294.606 1.737 1.176a1 1 0 01-1.578 1.228c-.21-.27-.444-.413-.654-.467a.86.86 0 00-.632.085c-.222.119-.453.342-.631.684A2.64 2.64 0 007 12a2.64 2.64 0 00.281 1.205c.177.342.408.565.63.684a.86.86 0 00.632.085c.209-.054.444-.197.654-.467a1 1 0 011.578 1.228c-.443.57-1.04.998-1.737 1.176a2.86 2.86 0 01-2.066-.257c-.631-.336-1.131-.881-1.466-1.526A4.6 4.6 0 015 12c-.004-.74.17-1.47.506-2.128.336-.645.835-1.19 1.466-1.526a2.86 2.86 0 012.066-.257Zm8 0c.697.178 1.294.606 1.737 1.176a1 1 0 01-1.578 1.228c-.21-.27-.444-.413-.654-.467a.86.86 0 00-.632.085c-.222.119-.453.342-.631.684A2.64 2.64 0 0015 12a2.64 2.64 0 00.281 1.205c.177.342.408.565.63.684a.86.86 0 00.632.085c.209-.054.444-.197.654-.467a1 1 0 011.578 1.228c-.443.57-1.04.998-1.737 1.176a2.86 2.86 0 01-2.066-.257c-.631-.336-1.131-.881-1.466-1.526A4.6 4.6 0 0113 12c-.004-.74.17-1.47.506-2.128.336-.645.835-1.19 1.466-1.526a2.86 2.86 0 012.066-.257Z" fill="black" />
-      </mask>
-      <rect x="1" y="3" width="22" height="18" rx="2" fill="currentColor" mask={`url(#${maskId})`} />
-    </svg>
-  )
-}
-
-function FullscreenIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" className={className}>
-      <path d="M10 3H3v7c0 .265.105.52.293.707.187.188.442.293.707.293.265 0 .52-.105.707-.293C4.895 10.52 5 10.265 5 10V6.414l4.293 4.293.076.068c.192.155.435.233.68.22.247-.014.48-.118.654-.292.174-.174.278-.407.291-.653.014-.246-.064-.489-.219-.681l-.068-.076L6.414 5H10c.265 0 .52-.105.707-.293C10.895 4.52 11 4.265 11 4c0-.265-.105-.52-.293-.707C10.52 3.105 10.265 3 10 3Zm10 10c-.265 0-.52.105-.707.293-.188.187-.293.442-.293.707v3.586l-4.293-4.293-.076-.068c-.192-.155-.435-.233-.68-.22-.247.014-.48.118-.654.292-.174.174-.278.407-.291.653-.014.246.064.489.219.681l.068.076L17.586 19H14c-.265 0-.52.105-.707.293-.188.187-.293.442-.293.707 0 .265.105.52.293.707.187.188.442.293.707.293h7v-7c0-.265-.105-.52-.293-.707C20.52 13.105 20.265 13 20 13Z" fill="currentColor" />
-    </svg>
-  )
-}
-
 // ============ COVER ============
 
 // YouTube answers a missing picture with a 120×90 grey one
@@ -812,11 +783,17 @@ function ShortsPageContent() {
   const [isMuted, setIsMuted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const { isLiked: isLikedShort, like, unlike } = useLikedVideos()
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater()
+  const { toggleWatchLater, isInWatchLater } = useWatchLater()
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [volume, setVolume] = useState(75)
   const [, setIsFullscreen] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  // Swiping or scrolling to another short closes its menu, as on every page
+  useMenuDismiss(showMoreMenu, {
+    isInMenu: (t) => t instanceof Element && !!t.closest("[data-shorts-menu]"),
+    isTrigger: (t) => t instanceof Element && !!t.closest('[aria-label="More options"]'),
+    onDismiss: () => setShowMoreMenu(false),
+  })
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const [captionsEnabled, setCaptionsEnabled] = useState(false)
@@ -1343,7 +1320,6 @@ function ShortsPageContent() {
       id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
       thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "", addedAt: Date.now(),
     })
-    toast.success("Added to Liked videos")
   }
   const toggleFullscreen = () => {
     const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -1353,7 +1329,7 @@ function ShortsPageContent() {
       if (!isFull) {
         if (el.requestFullscreen) el.requestFullscreen().catch(() => {})
         else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
-        else { toast("Full screen isn't supported in this browser"); return }
+        else { notify("Full screen isn't supported in this browser"); return }
         setIsFullscreen(true)
       } else {
         if (document.exitFullscreen) document.exitFullscreen().catch(() => {})
@@ -1361,7 +1337,7 @@ function ShortsPageContent() {
         setIsFullscreen(false)
       }
     } catch {
-      toast("Full screen isn't supported in this browser")
+      notify("Full screen isn't supported in this browser")
     }
   }
 
@@ -1379,18 +1355,11 @@ function ShortsPageContent() {
 
   // Save = Watch Later (it holds both videos and shorts)
   const isShortSaved = (s: (typeof shortsData)[number]) => isInWatchLater(s.videoId)
-  const toggleSaveShort = (s: (typeof shortsData)[number]) => {
-    if (isShortSaved(s)) {
-      removeFromWatchLater(s.videoId)
-      toast.success("Removed from Watch Later")
-      return
-    }
-    addToWatchLater({
+  const toggleSaveShort = (s: (typeof shortsData)[number]) =>
+    toggleWatchLater({
       id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
-      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "", addedAt: Date.now(),
+      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "",
     })
-    toast.success("Saved to Watch Later")
-  }
   const handleTogglePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
     const onVideo = !(e.currentTarget instanceof HTMLButtonElement)
@@ -1525,7 +1494,6 @@ function ShortsPageContent() {
       setFeedbackSent(false)
       setFeedbackText("")
       setShowFeedbackDialog(false)
-      toast.success("Feedback sent! Thank you.")
     }, 1500)
   }
 
@@ -1929,13 +1897,12 @@ function ShortsPageContent() {
                           {/* Dropdown — same on mobile and desktop */}
                           {showMoreMenu && (
                             <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                              <div className="absolute top-full right-0 mt-2 z-50 bg-popover text-popover-foreground rounded-xl shadow-2xl border dark:border-transparent py-2 w-[280px]">
+                              <div data-shorts-menu="" className="absolute top-full right-0 mt-2 z-50 bg-popover text-popover-foreground rounded-xl shadow-2xl border dark:border-transparent py-2 w-[280px]">
                                 <button className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { openPanel("description"); setShowMoreMenu(false) }}>
                                   <List className="h-5 w-5" /> Description
                                 </button>
                                 <button type="button" className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { toggleSaveShort(short); setShowMoreMenu(false) }}>
-                                  <Bookmark className={cn("h-5 w-5", isShortSaved(short) && "fill-current")} /> {isShortSaved(short) ? "Saved to Watch Later" : "Save to Watch Later"}
+                                  <SaveIcon filled={isShortSaved(short)} className="h-5 w-5" /> {isShortSaved(short) ? "Remove from Watch later" : "Save to Watch later"}
                                 </button>
                                 <button className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { toggleCaptions(); setShowMoreMenu(false) }}>
                                   <div className="flex items-center gap-4">{captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />} Captions</div>
@@ -2083,11 +2050,11 @@ function ShortsPageContent() {
                     <span className={actionLabelClass}>{short.comments}</span>
                   </button>
                   <button type="button" onClick={() => setShowShareModal(true)} className="flex flex-col items-center gap-1 group">
-                    <span className={actionCircleClass}><Share2 className="h-6 w-6" /></span>
+                    <span className={actionCircleClass}><ShareIcon className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>Share</span>
                   </button>
                   <button type="button" aria-pressed={saved} onClick={() => toggleSaveShort(short)} className="flex flex-col items-center gap-1 group">
-                    <span className={actionCircleClass}><Bookmark className={cn("h-6 w-6", saved && "fill-current")} /></span>
+                    <span className={actionCircleClass}><SaveIcon filled={saved} className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>{saved ? "Saved" : "Save"}</span>
                   </button>
                   <ReportDialog videoTitle={short.title} videoId={short.id}>

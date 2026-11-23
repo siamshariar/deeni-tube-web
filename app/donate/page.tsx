@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 const supportOptions = [
   {
@@ -126,15 +125,11 @@ export default function DonatePage() {
   }, []);
 
   const handleDonate = () => {
-    if (!selectedOption) {
-      toast.error("Please select a support option first");
-      return;
-    }
+    if (!selectedOption) return; // the button is disabled until one is chosen
     setShowSuccess(true);
     setTimeout(() => {
       setShowSuccess(false);
       setSelectedOption(null);
-      toast.success("Thank you for your support! (demo)");
     }, 2000);
   };
 

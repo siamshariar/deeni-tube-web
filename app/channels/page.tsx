@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { channelData, ChannelItem } from "@/lib/channel-data";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { SortDropdown, SortOption } from "@/components/sort-dropdown";
 
 import { useFeedPreferences } from "@/hooks/useFeedPreferences";
@@ -52,23 +52,12 @@ const FEED_CHOICES = [
 /**
  * A channel's place on the Home feed, in the style of YouTube's "Subscribed ▾" button: a grey pill that says
  * where the channel is ("On Home" or "Hidden") and opens a menu with the two choices, each explained.
- * As on YouTube, the page still scrolls while the menu is open, and scrolling closes it.
+ * The page still scrolls while the menu is open, and scrolling closes it, as for every menu (ui/dropdown-menu).
  */
 function HomeFeedButton({ name, onHome, onChange }: { name: string; onHome: boolean; onChange: (on: boolean) => void }) {
   const Icon = onHome ? House : EyeOff;
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const from = window.scrollY;
-    const onScroll = () => {
-      if (Math.abs(window.scrollY - from) > 8) setOpen(false);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [open]);
   return (
-    // Not modal: no scroll lock while it's open
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -138,11 +127,8 @@ export default function ChannelsPage() {
 
   const setOnHome = (channel: ChannelItem, on: boolean) => {
     setChannelFeed(channel.id, on);
-    if (on) toast.success(`${channel.name} is back on your Home feed`);
-    else
-      toast(`${channel.name} hidden from your Home feed`, {
-        action: { label: "Undo", onClick: () => setChannelFeed(channel.id, true) },
-      });
+    // Showing it again needs no message: the button and the count at the top say so
+    if (!on) notify(`${channel.name} hidden from your Home feed`, () => setChannelFeed(channel.id, true));
   };
   const hiddenIds = channelData.filter((ch) => !followedChannels.includes(ch.id)).map((ch) => ch.id);
   // The Hidden filter ends by itself once nothing is hidden
@@ -150,7 +136,6 @@ export default function ChannelsPage() {
   const showAll = () => {
     hiddenIds.forEach((id) => setChannelFeed(id, true));
     setOnlyHidden(false);
-    toast.success("All channels are on your Home feed");
   };
 
   const sortChannels = (channels: ChannelItem[]) => {

@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LanguagePrompt from "@/components/language-prompt";
 import { mockLanguages, mockAccounts } from "@/lib/mock-data";
-import { toast } from "sonner";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -60,7 +59,6 @@ export default function SignInPage() {
         isGuest: false,
       }));
       setIsLoading(false);
-      toast.success(`Signed in as ${mockUser.name}`);
       notifyAuthChange();
       router.push("/");
     }, 1200);
@@ -83,7 +81,6 @@ export default function SignInPage() {
         isGuest: false,
       }));
       setIsLoading(false);
-      toast.success(`Signed in as ${mockUser.name}`);
       notifyAuthChange();
       router.push("/");
     }, 1200);

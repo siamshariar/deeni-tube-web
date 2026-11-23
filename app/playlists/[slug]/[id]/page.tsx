@@ -11,8 +11,7 @@ import {
   X,
   Globe,
   Lock,
-  Share,
-  Trash2,
+    Trash2,
   Edit,
   ChevronDown,
   GripVertical,
@@ -26,9 +25,9 @@ import {
   Flag,
   MoreHorizontal,
   EyeOff,
-  ListPlus,
-  Check,
+    Check,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import Image from "next/image";
 import Link from "next/link";
@@ -53,18 +52,19 @@ import { ShareModal } from "@/components/share-modal";
 import { DescriptionText } from "@/components/description-text";
 import { YouTubePlayer } from "@/components/youtube-player";
 import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { VideoItem } from "@/lib/video-data";
 import { extendedPlaylists } from "@/lib/playlist-data";
 import { usePlaylists, isSystemPlaylist } from "@/hooks/usePlaylists";
 import { useHydrated } from "@/lib/local-store";
-import { findVideo, youtubeThumb } from "@/lib/media-lookup";
+import { findVideo, youtubeThumb, mediaThumb } from "@/lib/media-lookup";
 import { recordWatch } from "@/hooks/useWatchHistory";
 import { historyEntryForVideo } from "@/lib/history-entry";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { useDontRecommend } from "@/hooks/useDontRecommend";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { getChannelHref } from "@/lib/channel-data";
 
@@ -337,7 +337,7 @@ export default function PlaylistDetailPage() {
   const isChannelPlaylist = searchParams.get("source") === "channel";
 
   const hydrated = useHydrated();
-  const { getPlaylist, removeVideoFromPlaylist, reorderPlaylist, deletePlaylist } = usePlaylists();
+  const { getPlaylist, isSaved, removeVideoFromPlaylist, reorderPlaylist, deletePlaylist } = usePlaylists();
   // Channel playlists are read-only and always available, even if removed from the user's library
   const playlist = hydrated
     ? getPlaylist(playlistId) ?? (isChannelPlaylist ? extendedPlaylists.find((p) => p.id === playlistId) : undefined) ?? null
@@ -354,16 +354,10 @@ export default function PlaylistDetailPage() {
   const isLoading = !hydrated;
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVideoShareModal, setShowVideoShareModal] = useState(false);
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
-  const toggleWatchLater = (v: VideoItem) => {
-    if (isInWatchLater(v.id)) {
-      removeFromWatchLater(v.id);
-      toast.success("Removed from Watch later");
-    } else {
-      addToWatchLater({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration, addedAt: Date.now() });
-      toast.success("Saved to Watch later");
-    }
-  };
+  const dontRecommend = useDontRecommend();
+  const { toggleWatchLater: toggleSaved, isInWatchLater } = useWatchLater();
+  const toggleWatchLater = (v: VideoItem) =>
+    toggleSaved({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration });
   const shareUrl = playlist && typeof window !== "undefined" ? `${window.location.origin}/playlists/${playlist.slug}/${playlist.id}` : "";
   const [collapsed, setCollapsed] = useState(false);
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);   // ✅ added
@@ -376,7 +370,6 @@ export default function PlaylistDetailPage() {
   const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
   const [commentsDrawerOpen, setCommentsDrawerOpen] = useState(false);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
 
   const [autoPlay, setAutoPlay] = useState(true);
@@ -423,14 +416,12 @@ export default function PlaylistDetailPage() {
       const i = videos.findIndex((v) => v.id === video.id);
       setCurrentVideoId((videos[i + 1] ?? videos[i - 1])?.id ?? null);
     }
-    removeVideoFromPlaylist(playlist.id, video.id);
-    toast.success(`Removed from "${playlist.name}"`);
+    notify(`Removed from ${playlist.name}`, { undo: removeVideoFromPlaylist(playlist.id, video.id), thumb: mediaThumb(video.id) });
   };
 
   const handleDeletePlaylist = () => {
     if (!playlist) return;
-    deletePlaylist(playlist.id);
-    toast.success("Playlist deleted");
+    notify("Playlist deleted", deletePlaylist(playlist.id));
     router.push("/playlists");
   };
 
@@ -468,7 +459,6 @@ export default function PlaylistDetailPage() {
     };
     setComments((prev) => [newComment, ...prev]);
     setCommentText("");
-    toast.success("Comment added (demo)");
   };
 
   const handleLikeComment = (commentId: string) => {
@@ -560,7 +550,6 @@ export default function PlaylistDetailPage() {
       )
     );
     setReplyingTo(null);
-    toast.success("Reply added");
   };
 
   const handleShare = () => {
@@ -725,7 +714,7 @@ export default function PlaylistDetailPage() {
                     {/* Actions — a scrollable row of pills on phones */}
                     <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 scrollbar-none md:mx-0 md:overflow-visible md:px-0">
                       <button type="button" className={PILL} onClick={() => setShowVideoShareModal(true)}>
-                        <Share /> Share
+                        <ShareIcon /> Share
                       </button>
                       <button
                         type="button"
@@ -735,8 +724,8 @@ export default function PlaylistDetailPage() {
                       >
                         {isInWatchLater(currentVideo.id) ? <><Check /> Saved</> : <><Clock /> Watch later</>}
                       </button>
-                      <button type="button" className={PILL} onClick={() => setShowPlaylistDialog(true)}>
-                        <ListPlus /> Save
+                      <button type="button" className={PILL} onClick={(e) => openSaveCard(currentVideo, e.currentTarget)}>
+                        <SaveIcon filled={isSaved(currentVideo.id)} /> Save
                       </button>
                       {isMobile ? (
                         <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
@@ -747,8 +736,8 @@ export default function PlaylistDetailPage() {
                           </DrawerTrigger>
                           <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
                             <div className="mt-2 pb-6">
-                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Channel removed from feed"); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
-                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
+                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); if (currentVideo) dontRecommend(currentVideo.channelId, currentVideo.channel); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
+                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
                               <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-6 w-6" /> Report</div>
                             </div>
                           </DrawerContent>
@@ -761,8 +750,8 @@ export default function PlaylistDetailPage() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
-                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
-                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
+                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => { if (currentVideo) dontRecommend(currentVideo.channelId, currentVideo.channel); }}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
+                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => { notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
                             <DropdownMenuItem className={MENU_ITEM} afterClose={() => setShowReportDialog(true)}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1037,7 +1026,7 @@ export default function PlaylistDetailPage() {
                       <DropdownMenuContent align="end" className="w-56 rounded-xl py-2">
                         {playlist.isPublic && (
                           <DropdownMenuItem className={MENU_ITEM} onClick={handleShare}>
-                            <Share className="h-5 w-5" /> Share
+                            <ShareIcon className="h-5 w-5" /> Share
                           </DropdownMenuItem>
                         )}
                         {canEdit && !isSystemPlaylist(playlist.id) && (
@@ -1221,11 +1210,6 @@ export default function PlaylistDetailPage() {
       />
       {currentVideo && (
         <>
-          <AddToPlaylistDialog
-            video={{ id: currentVideo.id, title: currentVideo.title, channel: currentVideo.channel }}
-            open={showPlaylistDialog}
-            onOpenChange={setShowPlaylistDialog}
-          />
           <ReportDialog
             videoTitle={currentVideo.title}
             videoId={currentVideo.id}

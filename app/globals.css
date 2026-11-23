@@ -220,6 +220,37 @@ html:not([data-sidebar-ready]) main[data-has-sidebar] {
   100% { opacity: 0; transform: scale(1.35); }
 }
 
+/* Watch-page player: the volume slider, a 2px line with a 12px head as on YouTube (--v: the volume) */
+.player-volume {
+  appearance: none;
+  background: transparent;
+}
+.player-volume::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, #fff var(--v), rgb(255 255 255 / 0.2) var(--v));
+}
+.player-volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #fff;
+}
+.player-volume::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, #fff var(--v), rgb(255 255 255 / 0.2) var(--v));
+}
+.player-volume::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+
 /* Bottom of the screen on phones (Chrome's edge-to-edge guide). --sab-max is the largest the bottom inset
    (gesture bar / Back-Home-Recents bar, iPhone home indicator) gets; browsers without
    safe-area-max-inset-bottom use the current inset. The bottom nav grows by it up front and is pulled down by
@@ -231,7 +262,8 @@ html:not([data-sidebar-ready]) main[data-has-sidebar] {
    the bottom edge; desktop as before. Set on the toaster itself, not :root: a custom property changed on :root
    makes the browser restyle the whole page, which cost the home feed ~100 ms (Lighthouse TBT) at load. */
 [data-sonner-toaster] {
-  --toast-bottom: 24px;
+  --toast-bottom: 30px;
+  font-family: inherit; /* the site's Roboto; sonner sets its own */
 }
 @media (max-width: 767px) {
   [data-sonner-toaster] {

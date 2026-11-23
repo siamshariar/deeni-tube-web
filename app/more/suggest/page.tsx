@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 
 function SuggestSkeleton() {
   return (
@@ -101,7 +100,6 @@ export default function SuggestPage() {
   const handleSubmit = () => {
     if (validate()) {
       setSubmitted(true);
-      toast.success("Thank you for your suggestion! (demo)");
     }
   };
 

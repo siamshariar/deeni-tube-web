@@ -9,6 +9,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { VolumeIcon } from "@/components/icons/player-icons";
 import { cn } from "@/lib/utils";
 import { progressSaver, resumeTime } from "@/lib/watch-progress";
 import { STORYBOARD_MEDIUM, StoryboardFrame, useStoryboard } from "@/components/storyboard";
@@ -50,12 +51,6 @@ function formatTime(seconds: number) {
   const ss = String(s % 60).padStart(2, "0");
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
-
-// YouTube's own volume icons (as on youtube.com's inline player)
-const VOLUME_ON =
-  "M11.485 2.143 3.913 6.687A6 6 0 001 11.832v.338a6 6 0 002.913 5.144l7.572 4.543A1 1 0 0013 21V3a1.001 1.001 0 00-1.515-.857Zm6.88 2.079a1 1 0 00-.001 1.414 9 9 0 010 12.728 1 1 0 001.414 1.414 11 11 0 000-15.556 1 1 0 00-1.413 0Zm-2.83 2.828a1 1 0 000 1.415 5 5 0 010 7.07 1 1 0 001.415 1.415 6.999 6.999 0 000-9.9 1 1 0 00-1.415 0Z";
-const VOLUME_OFF =
-  "M11.485 2.143 3.913 6.687A6 6 0 001 11.832v.338a6 6 0 002.913 5.144l7.572 4.543A1 1 0 0013 21V3a1.001 1.001 0 00-1.515-.857Zm9.808 6.15L19 10.586l-2.293-2.293a1 1 0 10-1.414 1.414L17.586 12l-2.293 2.293a1 1 0 101.414 1.414L19 13.414l2.293 2.293a1 1 0 101.414-1.414L20.414 12l2.293-2.293a1 1 0 10-1.414-1.414Z";
 
 export default function PreviewLayer({
   videoId,
@@ -329,9 +324,7 @@ export default function PreviewLayer({
               aria-hidden="true"
               className="absolute inset-1 rounded-full bg-black/60 opacity-0 transition-opacity duration-100 kb:group-focus-visible/volume:opacity-100 can-hover:group-hover/volume:opacity-100"
             />
-            <svg viewBox="0 0 24 24" className="relative h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.45)]" fill="currentColor" aria-hidden="true">
-              <path d={muted ? VOLUME_OFF : VOLUME_ON} />
-            </svg>
+            <VolumeIcon level={muted ? "off" : "on"} className="relative h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.45)]" />
           </button>
 
           {/* Time left (hidden while the bar shows the time being picked) */}

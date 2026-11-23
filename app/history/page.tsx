@@ -10,11 +10,10 @@ import {
   Play,
   Trash2,
   Clock,
-  Bookmark,
-  Share,
-  ChevronLeft,
+      ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import ShortCard from "@/components/short-card";
 import { Button } from "@/components/ui/button";
@@ -29,10 +28,11 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import Image from "next/image";
 import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { ShareModal } from "@/components/share-modal";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { mediaThumb } from "@/lib/media-lookup";
+import { openSaveCard } from "@/lib/save-card";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
@@ -82,10 +82,9 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { addToWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerShort, setDrawerShort] = useState<HistoryItem | null>(null);
-  const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
 
   const checkScroll = () => {
     const el = scrollContainerRef.current;
@@ -150,20 +149,15 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-xl">
                   <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => {
-                    if (isInWatchLater(short.id)) {
-                      toast.success("Already in Watch Later");
-                    } else {
-                      addToWatchLater({ id: short.id, title: short.title, channel: short.channel, channelAvatar: short.channelAvatar || "", thumbnail: short.thumbnail, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() });
-                      toast.success("Added to Watch Later");
-                    }
+                    toggleWatchLater({ id: short.id, title: short.title, channel: short.channel, channelAvatar: short.channelAvatar || "", thumbnail: short.thumbnail, views: short.views, timeAgo: short.timeAgo, duration: short.duration });
                   }}>
-                    <Clock className="h-5 w-5" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                    <Clock className="h-5 w-5" /> {isInWatchLater(short.id) ? "Remove from Watch later" : "Save to Watch later"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => { setDrawerShort(short); setShowShortPlaylistDialog(true); }}>
-                    <Bookmark className="h-5 w-5" /> Save to Playlist
+                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => openSaveCard(short)}>
+                    <SaveIcon className="h-5 w-5" /> Save to Playlist
                   </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => onShare(short)}>
-                    <Share className="h-5 w-5" /> Share
+                    <ShareIcon className="h-5 w-5" /> Share
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -180,42 +174,29 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
                 if (drawerShort) {
-                  if (isInWatchLater(drawerShort.id)) {
-                    toast.success("Already in Watch Later");
-                  } else {
-                    addToWatchLater({ id: drawerShort.id, title: drawerShort.title, channel: drawerShort.channel, channelAvatar: drawerShort.channelAvatar || "", thumbnail: drawerShort.thumbnail, views: drawerShort.views, timeAgo: drawerShort.timeAgo, duration: drawerShort.duration, addedAt: Date.now() });
-                    toast.success("Added to Watch Later");
-                  }
+                  toggleWatchLater({ id: drawerShort.id, title: drawerShort.title, channel: drawerShort.channel, channelAvatar: drawerShort.channelAvatar || "", thumbnail: drawerShort.thumbnail, views: drawerShort.views, timeAgo: drawerShort.timeAgo, duration: drawerShort.duration });
                 }
                 setDrawerOpen(false);
               }}
             >
-              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerShort && isInWatchLater(drawerShort.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerShort && isInWatchLater(drawerShort.id) ? "Remove from Watch later" : "Save to Watch later"}
             </button>
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
-              onClick={() => { setShowShortPlaylistDialog(true); setDrawerOpen(false); }}
+              onClick={() => { const s = drawerShort; setDrawerOpen(false); if (s) setTimeout(() => openSaveCard(s), 150); }}
             >
-              <Bookmark className="h-5 w-5 flex-shrink-0" /> Save to Playlist
+              <SaveIcon className="h-5 w-5 flex-shrink-0" /> Save to Playlist
             </button>
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { if (drawerShort) onShare(drawerShort); setDrawerOpen(false); }}
             >
-              <Share className="h-5 w-5 flex-shrink-0" /> Share
+              <ShareIcon className="h-5 w-5 flex-shrink-0" /> Share
             </button>
           </div>
         </DrawerContent>
       </Drawer>
 
-      {/* Add to Playlist Dialog for shorts */}
-      {drawerShort && (
-        <AddToPlaylistDialog
-          video={{ id: drawerShort.id, title: drawerShort.title, channel: drawerShort.channel }}
-          open={showShortPlaylistDialog}
-          onOpenChange={setShowShortPlaylistDialog}
-        />
-      )}
     </div>
   );
 }
@@ -223,7 +204,7 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
 export default function HistoryPage() {
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { addToWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
   const hydrated = useHydrated();
   const { history: videos, removeFromHistory, replaceHistory } = useWatchHistory();
   const [searchQuery, setSearchQuery] = useState("");
@@ -233,8 +214,6 @@ export default function HistoryPage() {
   const [shareUrl, setShareUrl] = useState("");
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [drawerVideo, setDrawerVideo] = useState<HistoryItem | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<HistoryItem | null>(null);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -242,17 +221,13 @@ export default function HistoryPage() {
   }, []);
 
   const handleRemove = (videoId: string) => {
-    removeFromHistory(videoId);
-    toast.success("Removed from History");
+    notify("Removed from History", { undo: removeFromHistory(videoId), thumb: mediaThumb(videoId) });
   };
 
   const handleClearAll = () => {
     const previous = videos;
     replaceHistory([]);
-    toast("Watch history cleared", {
-      action: { label: "Undo", onClick: () => replaceHistory(previous) },
-      duration: 6000,
-    });
+    notify("Watch history cleared", () => replaceHistory(previous));
   };
 
   const filteredVideos = useMemo(() => {
@@ -352,20 +327,15 @@ export default function HistoryPage() {
                   <Play className="h-5 w-5" /> Play now
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => {
-                  if (isInWatchLater(video.id)) {
-                    toast.success("Already in Watch Later");
-                  } else {
-                    addToWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar || "", thumbnail: video.thumbnail, views: video.views, timeAgo: video.timeAgo, duration: video.duration, addedAt: Date.now() });
-                    toast.success("Added to Watch Later");
-                  }
+                  toggleWatchLater({ id: video.id, title: video.title, channel: video.channel, channelAvatar: video.channelAvatar || "", thumbnail: video.thumbnail, views: video.views, timeAgo: video.timeAgo, duration: video.duration });
                 }}>
-                  <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
+                  <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Remove from Watch later" : "Save to Watch later"}
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => { setSelectedVideo(video); setShowPlaylistDialog(true); }}>
-                  <Bookmark className="h-5 w-5" /> Save to playlist
+                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => openSaveCard(video)}>
+                  <SaveIcon className="h-5 w-5" /> Save to playlist
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => handleShare(video)}>
-                  <Share className="h-5 w-5" /> Share
+                  <ShareIcon className="h-5 w-5" /> Share
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleRemove(video.id)} className="cursor-pointer gap-3 py-2 text-sm text-red-600 dark:text-red-400">
                   <Trash2 className="h-5 w-5" /> Remove from History
@@ -509,29 +479,24 @@ export default function HistoryPage() {
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => {
                 if (drawerVideo) {
-                  if (isInWatchLater(drawerVideo.id)) {
-                    toast.success("Already in Watch Later");
-                  } else {
-                    addToWatchLater({ id: drawerVideo.id, title: drawerVideo.title, channel: drawerVideo.channel, channelAvatar: drawerVideo.channelAvatar || "", thumbnail: drawerVideo.thumbnail, views: drawerVideo.views, timeAgo: drawerVideo.timeAgo, duration: drawerVideo.duration, addedAt: Date.now() });
-                    toast.success("Added to Watch Later");
-                  }
+                  toggleWatchLater({ id: drawerVideo.id, title: drawerVideo.title, channel: drawerVideo.channel, channelAvatar: drawerVideo.channelAvatar || "", thumbnail: drawerVideo.thumbnail, views: drawerVideo.views, timeAgo: drawerVideo.timeAgo, duration: drawerVideo.duration });
                 }
                 setHistoryDrawerOpen(false);
               }}
             >
-              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerVideo && isInWatchLater(drawerVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+              <Clock className="h-5 w-5 flex-shrink-0" /> {drawerVideo && isInWatchLater(drawerVideo.id) ? "Remove from Watch later" : "Save to Watch later"}
             </button>
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
-              onClick={() => { if (drawerVideo) { setSelectedVideo(drawerVideo); setShowPlaylistDialog(true); } setHistoryDrawerOpen(false); }}
+              onClick={() => { const v = drawerVideo; setHistoryDrawerOpen(false); if (v) setTimeout(() => openSaveCard(v), 150); }}
             >
-              <Bookmark className="h-5 w-5 flex-shrink-0" /> Save to playlist
+              <SaveIcon className="h-5 w-5 flex-shrink-0" /> Save to playlist
             </button>
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left"
               onClick={() => { if (drawerVideo) handleShare(drawerVideo); setHistoryDrawerOpen(false); }}
             >
-              <Share className="h-5 w-5 flex-shrink-0" /> Share
+              <ShareIcon className="h-5 w-5 flex-shrink-0" /> Share
             </button>
             <button
               className="w-full flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted active:bg-accent transition-colors text-[15px] text-left text-red-600 dark:text-red-400"
@@ -542,14 +507,6 @@ export default function HistoryPage() {
           </div>
         </DrawerContent>
       </Drawer>
-
-      {selectedVideo && (
-        <AddToPlaylistDialog
-          video={{ id: selectedVideo.id, title: selectedVideo.title, channel: selectedVideo.channel }}
-          open={showPlaylistDialog}
-          onOpenChange={setShowPlaylistDialog}
-        />
-      )}
 
       <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
     </div>

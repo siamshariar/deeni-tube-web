@@ -8,14 +8,13 @@ import {
   Play,
   Shuffle,
   Trash2,
-  BookmarkPlus,
-  Share2,
-  ChevronsUp,
+      ChevronsUp,
   ChevronsDown,
   GripVertical,
   ArrowUpDown,
   Check,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import ShortCard from "@/components/short-card";
 import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
@@ -29,14 +28,14 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
-import { toast } from "sonner";
+import { notify, copyLink } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { useWatchLater, WatchLaterVideo } from "@/hooks/useWatchLater";
 import { useHydrated } from "@/lib/local-store";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 
 import { imagePriorityProps, priorityForIndex } from "@/lib/image-priority";
-import { youtubeThumb } from "@/lib/media-lookup";
+import { youtubeThumb, mediaThumb } from "@/lib/media-lookup";
 import { videoPath } from "@/lib/video-url";
 type SortOption =
   | "manual"
@@ -84,16 +83,8 @@ export default function WatchLaterPage() {
   const videos = useMemo(() => saved.filter((v) => v.type !== "short"), [saved]);
   const shorts = useMemo(() => saved.filter((v) => v.type === "short"), [saved]);
   const setVideos = (next: WatchLaterVideo[]) => setWatchLater([...next, ...shorts]);
-  const [playlistTarget, setPlaylistTarget] = useState<WatchLaterVideo | null>(null);
 
-  const shareVideo = async (path: string) => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
-      toast.success("Link copied to clipboard");
-    } catch {
-      toast.error("Couldn't copy the link");
-    }
-  };
+  const shareVideo = (path: string) => copyLink(`${window.location.origin}${path}`);
   const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
   const [sortBy, setSortBy] = useState<SortOption>("manual");
 
@@ -142,8 +133,7 @@ export default function WatchLaterPage() {
   };
 
   const removeVideo = (id: string) => {
-    removeFromWatchLater(id);
-    toast.success("Removed from Watch Later");
+    notify("Removed from Watch later", { undo: removeFromWatchLater(id), thumb: mediaThumb(id) });
   };
 
   const removeShort = removeVideo;
@@ -421,9 +411,9 @@ export default function WatchLaterPage() {
                               className="w-60 rounded-xl py-2"
                             >
                               <DropdownMenuItem
-                                onClick={() => setPlaylistTarget(video)}
+                                afterClose={() => openSaveCard(video)}
                               >
-                                <BookmarkPlus className="h-5 w-5" /> Save
+                                <SaveIcon className="h-5 w-5" /> Save
                                 to playlist
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
@@ -443,7 +433,7 @@ export default function WatchLaterPage() {
                               <DropdownMenuItem
                                 onClick={() => shareVideo(videoHref(video))}
                               >
-                                <Share2 className="h-5 w-5" /> Share
+                                <ShareIcon className="h-5 w-5" /> Share
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-600 dark:text-red-400"
@@ -489,15 +479,15 @@ export default function WatchLaterPage() {
                                 className="w-60 rounded-xl py-2"
                               >
                                 <DropdownMenuItem
-                                  onClick={() => setPlaylistTarget(short)}
+                                  afterClose={() => openSaveCard(short)}
                                 >
-                                  <BookmarkPlus className="h-5 w-5" />{" "}
+                                  <SaveIcon className="h-5 w-5" />{" "}
                                   Save to playlist
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => shareVideo(`/shorts?v=${ytId(short)}`)}
                                 >
-                                  <Share2 className="h-5 w-5" /> Share
+                                  <ShareIcon className="h-5 w-5" /> Share
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -531,13 +521,6 @@ export default function WatchLaterPage() {
         )}
       </div>
 
-      {playlistTarget && (
-        <AddToPlaylistDialog
-          video={{ id: playlistTarget.id, title: playlistTarget.title, channel: playlistTarget.channel }}
-          open
-          onOpenChange={(o) => !o && setPlaylistTarget(null)}
-        />
-      )}
     </div>
   );
 }

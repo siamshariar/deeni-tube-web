@@ -3,6 +3,9 @@
 
 import { createSavedList, demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
 import { extendedPlaylists } from "@/lib/playlist-data";
+import { mediaThumb } from "@/lib/media-lookup";
+import { notify } from "@/lib/notify";
+import { openSaveCard } from "@/lib/save-card";
 import { shortsVideos } from "@/lib/shorts-data";
 
 export type WatchLaterVideo = SavedVideo;
@@ -21,8 +24,21 @@ const useWatchLaterList = createSavedList("deeni-watch-later", seed);
 
 export const useWatchLater = () => {
   const { items, add, remove, replace, has } = useWatchLaterList();
+
+  /** Save a video, or remove it when it's saved already, with the message: its picture, and Undo, or Change (another
+   *  playlist), as on YouTube. */
+  const toggleWatchLater = (video: Omit<SavedVideo, "addedAt">) => {
+    const thumb = mediaThumb(video.id);
+    if (has(video.id)) notify("Removed from Watch later", { undo: remove(video.id), thumb });
+    else {
+      add({ ...video, addedAt: Date.now() });
+      notify("Saved to Watch later", { action: { label: "Change", onClick: () => openSaveCard(video) }, thumb });
+    }
+  };
+
   return {
     videos: items,
+    toggleWatchLater,
     addToWatchLater: add,
     removeFromWatchLater: remove,
     setWatchLater: replace,

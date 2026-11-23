@@ -40,8 +40,15 @@ export function useWatchHistory() {
     [stored]
   );
 
+  /** Remove an entry; returns a function that puts it back where it was (Undo). */
   const removeFromHistory = useCallback((id: string) => {
+    const before = historyStore.get();
+    const at = before.findIndex((v) => v.id === id);
     historyStore.set((prev) => prev.filter((v) => v.id !== id));
+    return () => {
+      if (at < 0) return;
+      historyStore.set((prev) => (prev.some((v) => v.id === id) ? prev : [...prev.slice(0, at), before[at], ...prev.slice(at)]));
+    };
   }, []);
 
   const replaceHistory = useCallback((next: HistoryItem[]) => {

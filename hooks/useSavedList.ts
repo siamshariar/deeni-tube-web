@@ -100,9 +100,19 @@ export function createSavedList(key: string, seed: () => SavedVideo[]) {
       });
     }, []);
 
+    /** Remove a video; returns a function that puts it back where it was (Undo). */
     const remove = useCallback((videoId: string) => {
       const id = canonicalMediaId(videoId);
+      const before = normalizeAll(store.get());
+      const at = before.findIndex((v) => v.id === id);
       store.set((prev) => normalizeAll(prev).filter((v) => v.id !== id));
+      return () => {
+        if (at < 0) return;
+        store.set((prev) => {
+          const list = normalizeAll(prev);
+          return list.some((v) => v.id === id) ? list : [...list.slice(0, at), before[at], ...list.slice(at)];
+        });
+      };
     }, []);
 
     /** Replace the whole list (used for manual reordering). */

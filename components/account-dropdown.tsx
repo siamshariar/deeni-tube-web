@@ -33,7 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import LanguagePrompt from "@/components/language-prompt";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { readLanguagePrefs, signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 import { mockLanguages } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -118,7 +118,6 @@ export default function AccountDropdown() {
       setFeedbackSent(false);
       setFeedbackText("");
       setShowFeedbackDialog(false);
-      toast.success("Feedback sent! Thank you.");
     }, 1500);
   };
 
@@ -139,7 +138,7 @@ export default function AccountDropdown() {
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={handleOpenChange} modal={false}>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange} closeOnScroll={false}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -254,7 +253,7 @@ export default function AccountDropdown() {
         open={showLanguagePrompt}
         onSave={(langs) => {
           updateLanguagePrefs({ languages: langs });
-          toast.success("Language preferences updated");
+          notify("Languages updated");
           setShowLanguagePrompt(false);
         }}
         onSkip={() => setShowLanguagePrompt(false)}

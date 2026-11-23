@@ -12,17 +12,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps['theme']}
       className="toaster group"
-      toastOptions={{
-        classNames: {
-          toast:
-            'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-muted-foreground',
-          actionButton:
-            'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
-          cancelButton:
-            'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
-        },
-      }}
+      // The card itself is components/message-card.tsx; YouTube's is at most 416px wide
+      style={{ '--width': '416px' } as React.CSSProperties}
       {...props}
     />
   )

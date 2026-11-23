@@ -15,6 +15,10 @@
 // Also: the video's thumbnail shows until it plays (no black box), and if the browser blocks sound it plays
 // muted with a "Click to unmute" button. Keyboard: space/k play, j/l ±10s, ←/→ ±5s, f full screen, m mute,
 // c captions. On touch screens the controls hide 3s after the video starts or after a tap, as in YouTube's app.
+// The controls are YouTube's updated ones (measured on youtube.com and m.youtube.com): each group on its own rounded
+// dark backing, no gradient. With a mouse: play and next, volume (opens a slider), the time (a click shows the time
+// left), and one group with Autoplay, captions, settings and full screen, each with its name and key on hover. On touch
+// screens: play and next in the middle, the switches at the top right, the time and full screen above the bar.
 // The progress bar is YouTube's (measured): a 4px line, 6px under the pointer, 56px above the bottom on desktop. Over
 // it, a box with the video's frame there (YouTube's storyboard, components/storyboard.tsx) and the time; dragging
 // also covers the video with that frame, dimmed. With a finger: the frame over the whole video and the time in the
@@ -30,7 +34,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Captions, Check, ChevronLeft, ChevronRight, Maximize, Minimize, Pause, Play, RotateCcw, Settings, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Gauge, ListVideo, Minimize2, Pause, Play, RotateCcw, Settings, SkipForward } from "lucide-react";
+import { CCIconOff, CCIconOn, FullscreenIcon, VolumeIcon } from "@/components/icons/player-icons";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
@@ -144,6 +149,8 @@ export function YouTubePlayer({
   const board = useStoryboard(videoId, wantBoard);
   const [controlsShown, setControlsShown] = useState(true);
   const [menu, setMenu] = useState<null | "main" | "speed">(null);
+  // The time left instead of the time played (a click on the time)
+  const [showTimeLeft, setShowTimeLeft] = useState(false);
   // The menu scrolls when the player is too short for it (phones)
   const [menuMax, setMenuMax] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -645,10 +652,20 @@ export function YouTubePlayer({
   const hoverPercent = hover && scrubTime === null && duration ? Math.min(100, (hover.time / duration) * 100) : null;
   const boardWidth = hover ? Math.round(Math.min(BOARD_WIDTH.max, Math.max(BOARD_WIDTH.min, hover.width * BOARD_WIDTH.share))) : 0;
   const pickedTime = scrubTime ?? hover?.time ?? 0;
-  const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+  const volumeLevel = muted || volume === 0 ? "off" : volume < 50 ? "low" : "on";
   const canGoNext = !!(upNext && onNext);
-  const btn =
-    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [&_svg]:h-6 [&_svg]:w-6";
+  const isFull = fullscreen || pseudoFullscreen;
+  const timeText = (
+    <>
+      {showTimeLeft ? `-${formatTime(duration - shownTime)}` : formatTime(shownTime)}
+      <span className="font-normal"> / {formatTime(duration)}</span>
+    </>
+  );
+  const openMenu = () => {
+    // Above the bar with a mouse; over the controls on touch screens, where there's less room
+    setMenuMax((rootRef.current?.clientHeight ?? 400) - (pointerTypeRef.current === "mouse" ? 78 : 24));
+    setMenu(menu ? null : "main");
+  };
 
   return (
     <div
@@ -703,7 +720,7 @@ export function YouTubePlayer({
       )}
       {/* …and with a finger, the time in the middle, above the bar */}
       {touchScrub && scrubTime !== null && (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[76px] z-30 flex justify-center">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[52px] z-30 flex justify-center">
           <span className="rounded-2xl bg-black/60 px-4 py-2 text-xs font-bold leading-[18px]">{formatTime(scrubTime)}</span>
         </div>
       )}
@@ -717,17 +734,40 @@ export function YouTubePlayer({
         </div>
       )}
 
-      {/* Touch: big play/pause in the middle while the controls show */}
+      {/* ── Touch: the controls over the video ── */}
       {controlsVisible && !touchScrub && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center can-hover:hidden">
-          <button
-            type="button"
-            aria-label={isPlaying ? "Pause" : "Play"}
-            onClick={() => { togglePlay(); showControls(); }}
-            className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/50 [&_svg]:h-7 [&_svg]:w-7"
-          >
-            {isPlaying ? <Pause className="fill-current" /> : <Play className="fill-current" />}
-          </button>
+        <div className="pointer-events-none absolute inset-0 z-20 animate-in fade-in duration-200 can-hover:hidden">
+          <div className="absolute inset-0 flex items-center justify-center gap-[34px]">
+            {canGoNext && <span className="w-12" />}
+            <button
+              type="button"
+              aria-label={isPlaying ? "Pause" : "Play"}
+              onClick={() => { togglePlay(); showControls(); }}
+              className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-black/30 active:bg-black/50 [&_svg]:h-8 [&_svg]:w-8"
+            >
+              {isPlaying ? <Pause className="fill-current stroke-0" /> : <Play className="fill-current stroke-0" />}
+            </button>
+            {canGoNext && (
+              <button type="button" aria-label="Next" onClick={goNext} className="group pointer-events-auto flex h-12 w-12 items-center justify-center">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/30 group-active:bg-black/50 [&_svg]:h-5 [&_svg]:w-5">
+                  <SkipForward className="fill-current" />
+                </span>
+              </button>
+            )}
+          </div>
+          <div className="pointer-events-auto absolute right-3 top-2 flex h-10 items-center rounded-full bg-black/30 px-1 [&_svg]:h-6 [&_svg]:w-6">
+            {canGoNext && (
+              <button type="button" role="switch" aria-checked={autoplayOn} aria-label={autoplayOn ? "Autoplay is on" : "Autoplay is off"} onClick={() => { toggleAutoplay(); showControls(); }} className="flex h-10 w-11 items-center justify-center">
+                <AutoplayTrack on={autoplayOn} />
+              </button>
+            )}
+            <button type="button" aria-label="Subtitles/closed captions" aria-pressed={captions} onClick={() => { toggleCaptions(); showControls(); }} className="flex h-10 w-11 items-center justify-center">
+              {captions ? <CCIconOn /> : <CCIconOff className="fill-current" />}
+            </button>
+            <button type="button" aria-label="Settings" aria-expanded={menu !== null} onClick={openMenu} className="flex h-10 w-11 items-center justify-center">
+              <Settings />
+            </button>
+          </div>
         </div>
       )}
 
@@ -737,7 +777,7 @@ export function YouTubePlayer({
           onClick={() => { command("unMute"); setMuted(false); setMutedByBrowser(false); }}
           className="absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-sm font-medium backdrop-blur-sm transition-colors hover:bg-black/85"
         >
-          <VolumeX className="h-5 w-5" />
+          <VolumeIcon level="off" className="h-5 w-5" />
           <span className="md:hidden">Tap to unmute</span>
           <span className="hidden md:inline">Click to unmute</span>
         </button>
@@ -754,43 +794,17 @@ export function YouTubePlayer({
         }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") overControlsRef.current = false; }}
       >
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-
-        {menu && (
-          <div role="menu" aria-label="Settings" style={{ maxHeight: menuMax }} className="yt-scrollbar absolute bottom-16 right-3 z-30 w-60 overflow-y-auto overscroll-contain rounded-xl bg-[#1c1c1c]/95 py-2 text-sm shadow-xl sm:bottom-20">
-            {menu === "main" ? (
-              <>
-                {canGoNext && (
-                  <button type="button" role="menuitemcheckbox" aria-checked={autoplayOn} onClick={toggleAutoplay} className="flex h-10 w-full items-center justify-between px-4 hover:bg-white/10">
-                    <span>Autoplay</span>
-                    <span className="text-white/70">{autoplayOn ? "On" : "Off"}</span>
-                  </button>
-                )}
-                <button type="button" role="menuitem" onClick={() => setMenu("speed")} className="flex h-10 w-full items-center justify-between px-4 hover:bg-white/10">
-                  <span>Playback speed</span>
-                  <span className="flex items-center gap-1 text-white/70">
-                    {rate === 1 ? "Normal" : rate}
-                    <ChevronRight className="h-4 w-4" />
-                  </span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" role="menuitem" onClick={() => setMenu("main")} className="mb-1 flex h-10 w-full items-center gap-2 border-b border-white/15 px-3 font-medium hover:bg-white/10">
-                  <ChevronLeft className="h-5 w-5" /> Playback speed
-                </button>
-                {SPEEDS.map((s) => (
-                  <button key={s} type="button" role="menuitemradio" aria-checked={rate === s} onClick={() => changeRate(s)} className="flex h-9 w-full items-center gap-3 px-4 hover:bg-white/10">
-                    <Check className={cn("h-4 w-4", rate !== s && "invisible")} />
-                    {s === 1 ? "Normal" : s}
-                  </button>
-                ))}
-              </>
-            )}
+        <div className="flex flex-col px-7 can-hover:px-3">
+          {/* Touch: the time and full screen, above the bar */}
+          <div className={cn("flex h-11 items-center justify-between can-hover:hidden", touchScrub && "invisible")}>
+            <span className="rounded-full bg-black/30 px-2 py-1 text-sm font-medium leading-4 tabular-nums">{timeText}</span>
+            <button type="button" aria-label={isFull ? "Exit full screen" : "Full screen"} onClick={toggleFullscreen} className="group -mr-1.5 flex h-12 w-12 items-center justify-center">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/30 group-active:bg-black/50 [&_svg]:h-5 [&_svg]:w-5">
+                {isFull ? <Minimize2 className="rotate-90" /> : <FullscreenIcon className="fill-current" />}
+              </span>
+            </button>
           </div>
-        )}
 
-        <div className="relative px-2 sm:px-3">
           {/* Progress bar: hover to see the frame and time there, click or drag to go there. The pointer can be up to
               10px above the line (a finger more) */}
           <div
@@ -801,7 +815,7 @@ export function YouTubePlayer({
             aria-valuenow={Math.round(shownTime)}
             aria-valuetext={`${formatTime(shownTime)} of ${formatTime(duration)}`}
             tabIndex={-1}
-            className="relative h-4 cursor-pointer touch-none before:absolute before:inset-x-0 before:-top-3 before:bottom-0 can-hover:before:hidden"
+            className="relative mb-[19px] h-4 cursor-pointer touch-none before:absolute before:inset-x-0 before:-bottom-4 before:-top-2 can-hover:mb-0 can-hover:before:hidden"
             onPointerDown={onBarDown}
             onPointerMove={onBarMove}
             onPointerUp={onBarUp}
@@ -811,12 +825,12 @@ export function YouTubePlayer({
             <div
               data-seek-line=""
               className={cn(
-                "absolute inset-x-0 bottom-0 h-1.5 overflow-hidden rounded-[3px] bg-[rgba(40,40,40,0.6)] transition-transform",
+                "absolute inset-x-0 bottom-0 h-1.5 overflow-hidden rounded-[3px] bg-white/30 transition-transform can-hover:bg-[rgba(40,40,40,0.6)]",
                 BAR_EASE,
-                barActive ? "scale-y-100" : "scale-y-[0.667]"
+                barActive && !touchScrub ? "scale-y-100" : "scale-y-[0.5] can-hover:scale-y-[0.667]"
               )}
             >
-              <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: `${loaded * 100}%` }} />
+              <div className="absolute inset-y-0 left-0 bg-white/60 can-hover:bg-white/40" style={{ width: `${loaded * 100}%` }} />
               <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#f03_80%,#ff2791)]" style={{ width: `${played}%` }} />
               {/* Between the playhead and the pointer */}
               {hoverPercent !== null && (
@@ -847,19 +861,22 @@ export function YouTubePlayer({
             )}
           </div>
 
-          <div className={cn("flex h-11 items-center gap-0.5 sm:h-14", touchScrub && "invisible")}>
-            <button type="button" aria-label={isPlaying ? "Pause (k)" : "Play (k)"} title={isPlaying ? "Pause (k)" : "Play (k)"} onClick={togglePlay} className={btn}>
-              {isPlaying ? <Pause className="fill-current" /> : <Play className="fill-current" />}
-            </button>
-            {canGoNext && (
-              <button type="button" aria-label="Next" title="Next" onClick={goNext} className={cn(btn, "hidden sm:flex")}>
-                <SkipForward className="fill-current" />
-              </button>
-            )}
-            <div className="group/vol flex items-center">
-              <button type="button" aria-label={muted || volume === 0 ? "Unmute (m)" : "Mute (m)"} title={muted ? "Unmute (m)" : "Mute (m)"} onClick={toggleMute} className={btn}>
-                <VolumeIcon />
-              </button>
+          {/* Mouse: 40px groups, 8px above the bottom edge */}
+          <div className="hidden h-14 items-start pt-2 can-hover:flex">
+            <div className="flex h-10 rounded-full bg-black/30">
+              <BarButton name={isPlaying ? "Pause" : "Play"} keyName="k" tip="left" onClick={togglePlay}>
+                {isPlaying ? <Pause className="fill-current stroke-0" /> : <Play className="fill-current stroke-0" />}
+              </BarButton>
+              {canGoNext && (
+                <BarButton name="Next" onClick={goNext}>
+                  <SkipForward className="fill-current" />
+                </BarButton>
+              )}
+            </div>
+            <div className="group/vol ml-3 flex h-10 items-center rounded-full bg-black/30">
+              <BarButton name={volumeLevel === "off" ? "Unmute" : "Mute"} keyName="m" onClick={toggleMute}>
+                <VolumeIcon level={volumeLevel} />
+              </BarButton>
               <input
                 type="range"
                 min={0}
@@ -867,46 +884,80 @@ export function YouTubePlayer({
                 value={muted ? 0 : volume}
                 aria-label="Volume"
                 onChange={(e) => changeVolume(Number(e.target.value))}
-                className="hidden h-1 w-0 cursor-pointer accent-white opacity-0 transition-all duration-200 group-hover/vol:w-16 group-hover/vol:opacity-100 kb:focus-visible:w-16 kb:focus-visible:opacity-100 can-hover:block"
+                style={{ "--v": `${muted ? 0 : volume}%` } as React.CSSProperties}
+                className="player-volume h-10 w-0 cursor-pointer overflow-hidden opacity-0 transition-all duration-200 group-hover/vol:mr-4 group-hover/vol:w-[52px] group-hover/vol:opacity-100 kb:focus-visible:mr-4 kb:focus-visible:w-[52px] kb:focus-visible:opacity-100"
               />
             </div>
-            <span className="ml-1 whitespace-nowrap text-[13px] tabular-nums text-white/90 sm:ml-2 sm:text-sm">
-              {formatTime(shownTime)} <span className="text-white/60">/ {formatTime(duration)}</span>
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowTimeLeft(!showTimeLeft)}
+              className="group/btn relative ml-2 h-10 whitespace-nowrap rounded-full bg-black/30 px-4 text-sm font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <span aria-hidden="true" className="absolute inset-1 rounded-full transition-colors group-hover/btn:bg-white/10" />
+              <span className="relative">{timeText}</span>
+            </button>
             <div className="flex-1" />
-            {canGoNext && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoplayOn}
-                aria-label={autoplayOn ? "Autoplay is on" : "Autoplay is off"}
-                title={autoplayOn ? "Autoplay is on" : "Autoplay is off"}
-                onClick={toggleAutoplay}
-                className="mr-1 hidden h-10 items-center px-2 sm:flex"
-              >
-                <span className={cn("relative h-3.5 w-9 rounded-full transition-colors", autoplayOn ? "bg-white/70" : "bg-white/30")}>
-                  <span className={cn("absolute top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-black shadow transition-all", autoplayOn ? "left-4 bg-white" : "left-0 bg-[#bbb]")}>
-                    {autoplayOn ? <Play className="h-2.5 w-2.5 fill-current" /> : <Pause className="h-2.5 w-2.5 fill-current" />}
-                  </span>
-                </span>
-              </button>
-            )}
-            <button type="button" aria-label="Subtitles/closed captions (c)" aria-pressed={captions} title="Subtitles/closed captions (c)" onClick={toggleCaptions} className={cn(btn, "relative")}>
-              <Captions />
-              {captions && <span className="absolute bottom-1.5 left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-[#f00]" />}
-            </button>
-            <button type="button" aria-label="Settings" aria-expanded={menu !== null} title="Settings" onClick={() => {
-                setMenuMax((rootRef.current?.clientHeight ?? 400) - 88);
-                setMenu(menu ? null : "main");
-              }} className={btn}>
-              <Settings className={cn("transition-transform duration-200", menu && "rotate-45")} />
-            </button>
-            <button type="button" aria-label={fullscreen || pseudoFullscreen ? "Exit full screen (f)" : "Full screen (f)"} title="Full screen (f)" onClick={toggleFullscreen} className={btn}>
-              {fullscreen || pseudoFullscreen ? <Minimize /> : <Maximize />}
-            </button>
+            <div className="flex h-10 items-center rounded-full bg-black/30 px-1">
+              {canGoNext && (
+                <BarButton name={autoplayOn ? "Autoplay is on" : "Autoplay is off"} role="switch" aria-checked={autoplayOn} wide onClick={toggleAutoplay} className="hidden sm:flex">
+                  <AutoplayTrack on={autoplayOn} />
+                </BarButton>
+              )}
+              <BarButton name="Subtitles/closed captions" keyName="c" aria-pressed={captions} wide onClick={toggleCaptions}>
+                {captions ? <CCIconOn /> : <CCIconOff className="fill-current" />}
+                {captions && <span className="absolute -bottom-1.5 left-0 h-[3px] w-6 rounded-full bg-[#e1002d]" />}
+              </BarButton>
+              <BarButton name="Settings" aria-expanded={menu !== null} wide onClick={openMenu} tip={menu ? "none" : "center"}>
+                <Settings className={cn("transition-transform duration-200", menu && "rotate-45")} />
+              </BarButton>
+              <BarButton name={isFull ? "Exit full screen" : "Full screen"} keyName="f" wide tip="right" onClick={toggleFullscreen}>
+                {isFull ? <Minimize2 className="rotate-90" /> : <FullscreenIcon className="fill-current" />}
+              </BarButton>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ── Settings ── above the bar with a mouse, over the controls on touch screens */}
+      {menu && controlsVisible && (
+        <div
+          role="menu"
+          aria-label="Settings"
+          style={{ maxHeight: menuMax }}
+          className="yt-scrollbar absolute bottom-3 right-3 z-40 w-[min(320px,calc(100%-24px))] overflow-y-auto overscroll-contain rounded-xl bg-black/60 p-2 text-sm backdrop-blur-sm can-hover:bottom-[62px]"
+          onPointerEnter={(e) => { if (e.pointerType === "mouse") overControlsRef.current = true; }}
+          onPointerLeave={(e) => { if (e.pointerType === "mouse") overControlsRef.current = false; }}
+        >
+          {menu === "main" ? (
+            <>
+              {canGoNext && (
+                <MenuRow role="menuitemcheckbox" aria-checked={autoplayOn} icon={<ListVideo />} label="Autoplay" onClick={toggleAutoplay}>
+                  <MenuSwitch on={autoplayOn} />
+                </MenuRow>
+              )}
+              <MenuRow role="menuitemcheckbox" aria-checked={captions} icon={<CCIconOff className="fill-current" />} label="Subtitles/CC" onClick={toggleCaptions}>
+                <MenuSwitch on={captions} />
+              </MenuRow>
+              <MenuRow role="menuitem" icon={<Gauge />} label="Playback speed" onClick={() => setMenu("speed")}>
+                {rate === 1 ? "Normal" : rate}
+                <ChevronRight className="h-5 w-5" />
+              </MenuRow>
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" onClick={() => setMenu("main")} className="mb-2 flex h-12 w-full items-center gap-2 border-b border-white/20 px-1 pb-1 font-medium">
+                <ChevronLeft className="h-6 w-6" /> Playback speed
+              </button>
+              {SPEEDS.map((s) => (
+                <button key={s} type="button" role="menuitemradio" aria-checked={rate === s} onClick={() => changeRate(s)} className="flex h-10 w-full items-center gap-4 rounded-lg px-2 hover:bg-white/10 active:bg-white/10">
+                  <Check className={cn("h-5 w-5", rate !== s && "invisible")} />
+                  {s === 1 ? "Normal" : s}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Our end screen, over YouTube's suggestions ── */}
       {ended && (
@@ -949,6 +1000,75 @@ export function YouTubePlayer({
         </div>
       )}
     </div>
+  );
+}
+
+/** A button of the control bar (mouse): the highlight inside its group, and its name and key above the progress bar. */
+function BarButton({
+  name,
+  keyName,
+  wide,
+  tip = "center",
+  className,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { name: string; keyName?: string; wide?: boolean; tip?: "left" | "center" | "right" | "none" }) {
+  return (
+    <button
+      type="button"
+      aria-label={keyName ? `${name} (${keyName})` : name}
+      className={cn(
+        "group/btn relative flex h-10 flex-shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [&_svg]:h-6 [&_svg]:w-6",
+        wide ? "w-12" : "w-10",
+        className
+      )}
+      {...props}
+    >
+      <span aria-hidden="true" className={cn("absolute rounded-full transition-colors group-hover/btn:bg-white/10", wide ? "inset-x-0 inset-y-1" : "inset-1")} />
+      <span className="relative flex drop-shadow-[0_0_2px_rgba(0,0,0,0.4)]">{children}</span>
+      {tip !== "none" && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute bottom-[calc(100%+22px)] hidden items-center gap-1.5 whitespace-nowrap rounded-lg bg-black/60 px-2 py-1.5 text-[13px] font-medium leading-[15px] can-hover:group-hover/btn:flex",
+            tip === "left" ? "left-0" : tip === "right" ? "-right-1" : "left-1/2 -translate-x-1/2"
+          )}
+        >
+          {name}
+          {keyName && <kbd className="rounded border border-white/40 px-1 font-sans text-xs uppercase leading-[15px]">{keyName}</kbd>}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** The Autoplay switch: a small track with a play or pause knob. */
+function AutoplayTrack({ on }: { on: boolean }) {
+  return (
+    <span className={cn("relative block h-[18px] w-[30px] rounded-full transition-colors", on ? "bg-white" : "bg-white/40")}>
+      <span className={cn("absolute top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full transition-[left]", on ? "left-3.5 bg-black text-white" : "left-0.5 bg-white text-black")}>
+        {on ? <Play className="!h-2 !w-2 fill-current" /> : <Pause className="!h-2 !w-2 fill-current" />}
+      </span>
+    </span>
+  );
+}
+
+/** A row of the player's settings: icon, name, and its value or switch on the right. */
+function MenuRow({ icon, label, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactNode; label: string }) {
+  return (
+    <button type="button" className="flex h-12 w-full items-center rounded-lg px-2 text-left hover:bg-white/10 active:bg-white/10" {...props}>
+      <span className="mr-5 flex [&_svg]:h-6 [&_svg]:w-6">{icon}</span>
+      <span className="flex-1">{label}</span>
+      <span className="flex items-center gap-1 text-white/70">{children}</span>
+    </button>
+  );
+}
+
+function MenuSwitch({ on }: { on: boolean }) {
+  return (
+    <span aria-hidden="true" className={cn("relative h-6 w-10 rounded-full transition-colors", on ? "bg-white/40" : "bg-white/15")}>
+      <span className={cn("absolute top-0.5 h-5 w-5 rounded-full transition-[left,background-color]", on ? "left-[18px] bg-white" : "left-0.5 bg-white/70")} />
+    </span>
   );
 }
 

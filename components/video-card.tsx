@@ -1,7 +1,8 @@
 // components/video-card.tsx
 "use client";
 
-import { Clock, Bookmark, Share, UserX, Flag, BookmarkCheck, EyeOff } from "lucide-react";
+import { Clock, UserX, Flag, EyeOff } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import Image from "next/image";
 import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
@@ -12,14 +13,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useDontRecommend } from "@/hooks/useDontRecommend";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import { ShareModal } from "@/components/share-modal";
 import { ReportDialog } from "@/components/report-dialog";
-import { toast } from "sonner";
 import { getChannelHref } from "@/lib/channel-data";
 import { imagePriorityProps, type ImagePriority } from "@/lib/image-priority";
 import { MoreButton } from "@/components/more-button";
 import { warmYouTube } from "@/lib/warm-youtube";
+import { cn } from "@/lib/utils";
 import { videoPath } from "@/lib/video-url";
 import { InlinePreview } from "@/components/inline-preview";
 
@@ -54,64 +55,53 @@ export default function VideoCard({
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [open, setOpen] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
+  const saveToPlaylist = () => openSaveCard({ id: videoId, title, channel });
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
   const dontRecommend = useDontRecommend();
 
   // Read straight from the shared Watch Later store
   const saved = isInWatchLater(videoId);
 
-  const handleWatchLaterToggle = () => {
-    if (saved) {
-      removeFromWatchLater(videoId);
-      toast.success("Removed from Watch Later");
-    } else {
-      addToWatchLater({
-        id: videoId,
-        title,
-        channel,
-        channelAvatar,
-        thumbnail,
-        views,
-        timeAgo: timestamp,
-        duration,
-        addedAt: Date.now(),
-      });
-      toast.success("Added to Watch Later");
-    }
-  };
+  const handleWatchLaterToggle = () =>
+    toggleWatchLater({ id: videoId, title, channel, channelAvatar, thumbnail, views, timeAgo: timestamp, duration });
 
   const handleDontRecommend = () => dontRecommend(channelId, channel);
 
-  const handleNotInterested = () => {
-    setHidden(true);
-    toast("Video removed", {
-      description: "We won't show this video again",
-      action: {
-        label: "Undo",
-        onClick: () => setHidden(false),
-      },
-      duration: 5000,
-    });
-  };
+  // The card itself says so, with Undo (as YouTube's does): no message needed
+  const handleNotInterested = () => setHidden(true);
 
   const videoUrl = `${window.location.origin}${videoPath({ title, videoId })}`;
 
-  if (hidden) return null;
+  if (hidden)
+    return (
+      <div
+        role="status"
+        className={cn("flex aspect-video w-full flex-col items-center justify-center gap-3 bg-muted p-4 text-center", isHorizontal ? "sm:rounded-xl" : "rounded-xl")}
+      >
+        <p className="text-sm">Video removed</p>
+        <button
+          type="button"
+          onClick={() => setHidden(false)}
+          className="h-9 rounded-full bg-background px-4 text-sm font-medium transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Undo
+        </button>
+      </div>
+    );
 
   // Drawer items (mobile)
   const drawerItems = (
     <>
       <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowShareModal(true), 150); }}>
-        <Share className="h-5 w-5" /><span>Share</span>
+        <ShareIcon className="h-5 w-5" /><span>Share</span>
       </div>
       <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); handleWatchLaterToggle(); }}>
-        {saved ? <><BookmarkCheck className="h-5 w-5 fill-current text-primary" /><span className="text-primary">Saved</span></> : <><Clock className="h-5 w-5" /><span>Save to Watch later</span></>}
+        <Clock className="h-5 w-5" /><span>{saved ? "Remove from Watch later" : "Save to Watch later"}</span>
       </div>
-      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(() => setShowPlaylistDialog(true), 150); }}>
-        <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
+      <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); setTimeout(saveToPlaylist, 150); }}>
+        <SaveIcon className="h-5 w-5" /><span>Save to playlist</span>
       </div>
       <div className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer" onClick={() => { setOpen(false); handleDontRecommend(); }}>
         <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
@@ -129,13 +119,13 @@ export default function VideoCard({
   const dropdownItems = (
     <>
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={() => setShowShareModal(true)}>
-        <Share className="h-5 w-5" /><span>Share</span>
+        <ShareIcon className="h-5 w-5" /><span>Share</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleWatchLaterToggle}>
-        {saved ? <><BookmarkCheck className="h-5 w-5 fill-current text-primary" /><span className="text-primary">Saved</span></> : <><Clock className="h-5 w-5" /><span>Save to Watch later</span></>}
+        <Clock className="h-5 w-5" /><span>{saved ? "Remove from Watch later" : "Save to Watch later"}</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={() => setShowPlaylistDialog(true)}>
-        <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={saveToPlaylist}>
+        <SaveIcon className="h-5 w-5" /><span>Save to playlist</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleDontRecommend}>
         <UserX className="h-5 w-5" /><span>Don&apos;t recommend channel</span>
@@ -174,7 +164,6 @@ export default function VideoCard({
   const dialogs = (
     <>
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} videoUrl={videoUrl} />
-      <AddToPlaylistDialog video={{ id: videoId, title, channel }} open={showPlaylistDialog} onOpenChange={setShowPlaylistDialog} />
       <ReportDialog videoTitle={title} videoId={videoId} open={showReportDialog} onOpenChange={setShowReportDialog} />
     </>
   );

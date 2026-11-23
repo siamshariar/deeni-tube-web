@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Search, Clock, Bookmark, Share,
-  SlidersHorizontal, Check, ChevronDown, X,
+  Search, Clock,   SlidersHorizontal, Check, ChevronDown, X,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,12 +18,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ShareModal } from "@/components/share-modal";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import {
   Drawer, DrawerContent,
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { videoData, VideoItem } from "@/lib/video-data";
 import { channelData, ChannelItem } from "@/lib/channel-data";
 import { scholarData } from "@/lib/scholar-data";
@@ -237,13 +236,13 @@ function ResultList({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52 rounded-xl">
                     <DropdownMenuItem onSelect={() => onWatchLaterToggle(video)}>
-                      <Clock className="h-4 w-4" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                      <Clock className="h-4 w-4" /> {isInWatchLater(video.id) ? "Remove from Watch later" : "Save to Watch later"}
                     </DropdownMenuItem>
                     <DropdownMenuItem afterClose={() => onPlaylist(video)}>
-                      <Bookmark className="h-4 w-4" /> Save to playlist
+                      <SaveIcon className="h-4 w-4" /> Save to playlist
                     </DropdownMenuItem>
                     <DropdownMenuItem afterClose={() => onShare(video)}>
-                      <Share className="h-4 w-4" /> Share
+                      <ShareIcon className="h-4 w-4" /> Share
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -262,19 +261,19 @@ function ResultList({
               onClick={() => { setDrawerOpen(false); if (drawerVideo) onWatchLaterToggle(drawerVideo); }}
             >
               <Clock className="h-5 w-5" />
-              {drawerVideo && isInWatchLater(drawerVideo.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+              {drawerVideo && isInWatchLater(drawerVideo.id) ? "Remove from Watch later" : "Save to Watch later"}
             </div>
             <div
               className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer"
               onClick={() => { setDrawerOpen(false); setTimeout(() => { if (drawerVideo) onPlaylist(drawerVideo); }, 150); }}
             >
-              <Bookmark className="h-5 w-5" /> Save to playlist
+              <SaveIcon className="h-5 w-5" /> Save to playlist
             </div>
             <div
               className="flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer"
               onClick={() => { setDrawerOpen(false); if (drawerVideo) onShare(drawerVideo); }}
             >
-              <Share className="h-5 w-5" /> Share
+              <ShareIcon className="h-5 w-5" /> Share
             </div>
           </div>
         </DrawerContent>
@@ -313,30 +312,17 @@ function SearchPageContent() {
   const [shareUrl, setShareUrl]                     = useState("");
 
   // Watch Later + Playlist
-  const { addToWatchLater, removeFromWatchLater, isInWatchLater } = useWatchLater();
-  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
-  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
 
-  const handleWatchLaterToggle = (video: VideoItem) => {
-    if (isInWatchLater(video.id)) {
-      removeFromWatchLater(video.id);
-      toast.success("Removed from Watch Later");
-    } else {
-      addToWatchLater({
-        id: video.id, title: video.title, channel: video.channel,
-        channelAvatar: video.channelAvatar || "",
-        thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`,
-        views: video.views, timeAgo: video.timeAgo, duration: video.duration,
-        addedAt: Date.now(),
-      });
-      toast.success("Saved to Watch Later");
-    }
-  };
+  const handleWatchLaterToggle = (video: VideoItem) =>
+    toggleWatchLater({
+      id: video.id, title: video.title, channel: video.channel,
+      channelAvatar: video.channelAvatar || "",
+      thumbnail: `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`,
+      views: video.views, timeAgo: video.timeAgo, duration: video.duration,
+    });
 
-  const handlePlaylist = (video: VideoItem) => {
-    setSelectedVideo(video);
-    setShowPlaylistDialog(true);
-  };
+  const handlePlaylist = (video: VideoItem) => openSaveCard(video);
 
   const performSearchRef = useRef<((q?: string) => void) | null>(null);
 
@@ -619,13 +605,6 @@ function SearchPageContent() {
       </div>
 
       <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
-      {selectedVideo && (
-        <AddToPlaylistDialog
-          video={{ id: selectedVideo.id, title: selectedVideo.title, channel: selectedVideo.channel }}
-          open={showPlaylistDialog}
-          onOpenChange={(o) => { setShowPlaylistDialog(o); if (!o) setSelectedVideo(null); }}
-        />
-      )}
     </div>
   );
 }

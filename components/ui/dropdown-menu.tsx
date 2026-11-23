@@ -4,9 +4,48 @@ import * as React from 'react'
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronRight, Circle } from 'lucide-react'
 
+import { useMenuDismiss } from '@/hooks/use-menu-dismiss'
 import { cn } from '@/lib/utils'
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+// What the menu and its parts share: what to run once it has closed and focus is back on its button
+// (DropdownMenuItem's `afterClose`), whether scrolling closed it, and its own element
+type MenuShared = { afterClose: (() => void) | null; closedByScroll: boolean; content: HTMLElement | null }
+const MenuContext = React.createContext<React.MutableRefObject<MenuShared> | null>(null)
+
+type DropdownMenuProps = React.ComponentProps<typeof DropdownMenuPrimitive.Root> & {
+  /** The page scrolls while the menu is open, which closes it (default). false: a popup of the fixed header, which
+   *  stays open and lets clicks through to the page */
+  closeOnScroll?: boolean
+}
+
+/**
+ * A menu. The page (and any list in it, such as the related videos) still scrolls while it's open, and scrolling
+ * closes it (hooks/use-menu-dismiss): Radix's own "modal" menus lock the page instead.
+ */
+function DropdownMenu({ open: openProp, defaultOpen, onOpenChange, closeOnScroll = true, ...props }: DropdownMenuProps) {
+  const [openState, setOpenState] = React.useState(defaultOpen ?? false)
+  const open = openProp ?? openState
+  const shared = React.useRef<MenuShared>({ afterClose: null, closedByScroll: false, content: null })
+  const setOpen = (next: boolean) => {
+    if (next) shared.current.closedByScroll = false
+    if (openProp === undefined) setOpenState(next)
+    onOpenChange?.(next)
+  }
+  useMenuDismiss(open && closeOnScroll, {
+    isInMenu: (t) => t instanceof Node && !!shared.current.content?.contains(t),
+    isTrigger: (t) => t instanceof Element && !!t.closest('[aria-haspopup="menu"]'),
+    onDismiss: (by) => {
+      shared.current.closedByScroll = by === 'scroll'
+      setOpen(false)
+    },
+  })
+
+  return (
+    <MenuContext.Provider value={shared}>
+      <DropdownMenuPrimitive.Root modal={false} open={open} onOpenChange={setOpen} {...props} />
+    </MenuContext.Provider>
+  )
+}
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
@@ -56,34 +95,42 @@ const DropdownMenuSubContent = React.forwardRef<
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName
 
-// What to run once the menu has closed and focus is back on its button (DropdownMenuItem's `afterClose`)
-const AfterCloseContext = React.createContext<React.MutableRefObject<(() => void) | null> | null>(null)
-
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, onCloseAutoFocus, ...props }, ref) => {
-  const afterClose = React.useRef<(() => void) | null>(null)
+>(({ className, sideOffset = 4, onCloseAutoFocus, onPointerDownOutside, ...props }, ref) => {
+  const shared = React.useContext(MenuContext)
   return (
-    <AfterCloseContext.Provider value={afterClose}>
-      <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content
-          ref={ref}
-          sideOffset={sideOffset}
-          onCloseAutoFocus={(e) => {
-            onCloseAutoFocus?.(e)
-            const run = afterClose.current
-            afterClose.current = null
-            if (run) setTimeout(run)
-          }}
-          className={cn(
-            'z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover py-2 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
-            className,
-          )}
-          {...props}
-        />
-      </DropdownMenuPrimitive.Portal>
-    </AfterCloseContext.Provider>
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        ref={(el) => {
+          if (shared) shared.current.content = el
+          if (typeof ref === 'function') ref(el)
+          else if (ref) ref.current = el
+        }}
+        sideOffset={sideOffset}
+        onPointerDownOutside={(e) => {
+          onPointerDownOutside?.(e)
+          // Its own button opens and closes it; dismissing here too would close a menu opened again while it fades out
+          const button = shared?.current.content?.getAttribute('aria-labelledby')
+          if (button && e.target instanceof Element && e.target.closest(`#${CSS.escape(button)}`)) e.preventDefault()
+        }}
+        onCloseAutoFocus={(e) => {
+          onCloseAutoFocus?.(e)
+          if (!shared) return
+          // Giving the focus back to its button would scroll the page back to it
+          if (shared.current.closedByScroll) e.preventDefault()
+          const run = shared.current.afterClose
+          shared.current.afterClose = null
+          if (run) setTimeout(run)
+        }}
+        className={cn(
+          'z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover py-2 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          className,
+        )}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
   )
 })
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
@@ -96,13 +143,13 @@ const DropdownMenuItem = React.forwardRef<
     afterClose?: () => void
   }
 >(({ className, inset, afterClose, onSelect, ...props }, ref) => {
-  const pending = React.useContext(AfterCloseContext)
+  const shared = React.useContext(MenuContext)
   return (
     <DropdownMenuPrimitive.Item
       ref={ref}
       onSelect={(e) => {
         onSelect?.(e)
-        if (afterClose && pending) pending.current = afterClose
+        if (afterClose && shared) shared.current.afterClose = afterClose
       }}
       className={cn(
         'relative flex cursor-pointer select-none items-center gap-3 px-4 py-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0',

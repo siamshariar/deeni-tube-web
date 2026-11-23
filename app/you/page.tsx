@@ -25,7 +25,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { mockLanguages } from "@/lib/mock-data";
-import { toast } from "sonner";
 import { signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 
 const preferredLanguageOptions = mockLanguages.filter((l) => l.code !== "en");
@@ -75,7 +74,6 @@ export default function YouPage() {
     updateLanguagePrefs({ languages: preferredLanguages, default: defaultLanguage });
     setPrefSaved(true);
     setTimeout(() => setPrefSaved(false), 2500);
-    toast.success("Preferences saved successfully!");
   };
 
   const togglePreferredLanguage = (code: string) => {

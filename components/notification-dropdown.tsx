@@ -26,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { videoPathForId } from "@/lib/video-url";
 
 // ── Notification Data ──
@@ -181,7 +180,7 @@ export default function NotificationDropdown() {
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={handleOpen} modal={false}>
+    <DropdownMenu open={open} onOpenChange={handleOpen} closeOnScroll={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -267,9 +266,38 @@ export default function NotificationDropdown() {
   );
 }
 
+// Hidden or muted during this visit: gone the next time the panel opens
+const dismissed = new Set<string>();
+
 // ── Notification Item (YouTube style) ──
-// onNavigate closes the panel: it stays mounted (modal={false}) across client-side navigation
+// onNavigate closes the panel, which stays mounted across client-side navigation
 function NotificationItem({ notification, onNavigate }: { notification: Notification; onNavigate: () => void }) {
+  const [goneBefore] = useState(() => dismissed.has(notification.id));
+  const [gone, setGone] = useState<null | "hidden" | "muted">(null);
+  const dismiss = (how: "hidden" | "muted") => {
+    dismissed.add(notification.id);
+    setGone(how);
+  };
+
+  if (goneBefore) return null;
+  // The row itself says so, with Undo
+  if (gone)
+    return (
+      <div role="status" className="flex min-h-[72px] items-center justify-between gap-3 py-3 pl-6 pr-4 text-sm text-muted-foreground">
+        <span className="min-w-0">{gone === "hidden" ? "Notification hidden" : `Notifications from ${notification.channelName} are off`}</span>
+        <button
+          type="button"
+          onClick={() => {
+            dismissed.delete(notification.id);
+            setGone(null);
+          }}
+          className="h-9 flex-shrink-0 rounded-full px-4 font-medium text-foreground transition-colors hover:bg-accent active:bg-accent"
+        >
+          Undo
+        </button>
+      </div>
+    );
+
   return (
     <div
       className={cn(
@@ -337,13 +365,13 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
         <SubDropdownContent align="end" className="w-48 rounded-xl">
           <SubDropdownItem
             className="cursor-pointer py-2.5"
-            onClick={() => toast.success("Notification hidden (demo)")}
+            onClick={() => dismiss("hidden")}
           >
             Hide this notification
           </SubDropdownItem>
           <SubDropdownItem
             className="cursor-pointer py-2.5"
-            onClick={() => toast.success("Notifications muted (demo)")}
+            onClick={() => dismiss("muted")}
           >
             Mute from {notification.channelName}
           </SubDropdownItem>

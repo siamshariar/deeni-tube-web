@@ -13,16 +13,15 @@ import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
 import {
   ArrowLeft,
-  Share,
-  Flag,
+    Flag,
   Ban,
   Play,
   Clock,
-  Bookmark,
-  ListVideo,
+    ListVideo,
   Video,
   ExternalLink,
 } from "lucide-react";
+import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import ShortCard from "@/components/short-card";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { MoreButton } from "@/components/more-button";
@@ -41,11 +40,10 @@ import { scholarData, ScholarItem } from "@/lib/scholar-data";
 import { videoData, VideoItem } from "@/lib/video-data";
 import { extendedPlaylists } from "@/lib/playlist-data";
 import { ShareModal } from "@/components/share-modal";
-import { AddToPlaylistDialog } from "@/components/add-to-playlist-dialog";
+import { openSaveCard } from "@/lib/save-card";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ReportDialog } from "@/components/report-dialog";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { toast } from "sonner";
 
 
 import { useDontRecommend } from "@/hooks/useDontRecommend";
@@ -140,8 +138,7 @@ export default function ScholarView() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [selectedShort, setSelectedShort] = useState<ChannelShort | null>(null);
   const [shortDrawerOpen, setShortDrawerOpen] = useState(false);
-  const [showShortPlaylistDialog, setShowShortPlaylistDialog] = useState(false);
-  const { addToWatchLater, isInWatchLater } = useWatchLater();
+  const { toggleWatchLater, isInWatchLater } = useWatchLater();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 600);
@@ -296,7 +293,7 @@ export default function ScholarView() {
 
             <div className="flex items-center gap-2 mt-3">
               <Button variant="secondary" className="rounded-full h-9 px-4 bg-muted hover:bg-accent font-medium" onClick={() => { setShareUrl(window.location.href); setShareModalOpen(true); }}>
-                <Share className="h-5 w-5 mr-2" /> Share
+                <ShareIcon className="h-5 w-5 mr-2" /> Share
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -380,16 +377,15 @@ export default function ScholarView() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56 rounded-xl">
                             <DropdownMenuItem className="cursor-pointer" onSelect={() => {
-                              if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); }
-                              else { addToWatchLater({ id: short.id, title: short.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
+                              toggleWatchLater({ id: short.id, title: short.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration });
                             }}>
-                              <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                              <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Remove from Watch later" : "Save to Watch later"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" afterClose={() => { setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
-                              <Bookmark className="h-4 w-4" /> Save to Playlist
+                            <DropdownMenuItem className="cursor-pointer" afterClose={() => openSaveCard({ id: short.id, title: short.title, channel: scholar.name })}>
+                              <SaveIcon className="h-4 w-4" /> Save to Playlist
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>
-                              <Share className="h-4 w-4" /> Share
+                              <ShareIcon className="h-4 w-4" /> Share
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -406,25 +402,24 @@ export default function ScholarView() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
                         onClick={() => {
                           if (selectedShort) {
-                            if (isInWatchLater(selectedShort.id)) { toast.success("Already in Watch Later"); }
-                            else { addToWatchLater({ id: selectedShort.id, title: selectedShort.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${selectedShort.videoId}/hqdefault.jpg`, views: selectedShort.views, timeAgo: selectedShort.timeAgo, duration: selectedShort.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); }
+                            toggleWatchLater({ id: selectedShort.id, title: selectedShort.title, channel: scholar.name, channelAvatar: scholar.avatar || "", thumbnail: `https://img.youtube.com/vi/${selectedShort.videoId}/hqdefault.jpg`, views: selectedShort.views, timeAgo: selectedShort.timeAgo, duration: selectedShort.duration });
                           }
                           setShortDrawerOpen(false);
                         }}
                       >
-                        <Clock className="h-4 w-4 flex-shrink-0" /> {selectedShort && isInWatchLater(selectedShort.id) ? "Saved to Watch Later" : "Save to Watch Later"}
+                        <Clock className="h-4 w-4 flex-shrink-0" /> {selectedShort && isInWatchLater(selectedShort.id) ? "Remove from Watch later" : "Save to Watch later"}
                       </button>
                       <button
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
-                        onClick={() => { setShowShortPlaylistDialog(true); setShortDrawerOpen(false); }}
+                        onClick={() => { const s = selectedShort; setShortDrawerOpen(false); if (s) setTimeout(() => openSaveCard({ id: s.id, title: s.title, channel: scholar.name }), 150); }}
                       >
-                        <Bookmark className="h-4 w-4 flex-shrink-0" /> Save to Playlist
+                        <SaveIcon className="h-4 w-4 flex-shrink-0" /> Save to Playlist
                       </button>
                       <button
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-left"
                         onClick={() => { if (selectedShort) { setShareUrl(`${window.location.origin}/shorts?v=${selectedShort.videoId}`); setShareModalOpen(true); } setShortDrawerOpen(false); }}
                       >
-                        <Share className="h-4 w-4 flex-shrink-0" /> Share
+                        <ShareIcon className="h-4 w-4 flex-shrink-0" /> Share
                       </button>
                     </div>
                   </DrawerContent>
@@ -496,7 +491,7 @@ export default function ScholarView() {
                                 <Play className="h-4 w-4" /> Play all
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareUrl(`${window.location.origin}/playlists/${pl.slug}/${pl.id}`); setShareModalOpen(true); }}>
-                                <Share className="h-4 w-4" /> Share
+                                <ShareIcon className="h-4 w-4" /> Share
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -513,13 +508,6 @@ export default function ScholarView() {
 
       <ShareModal isOpen={shareModalOpen} onClose={() => setShareModalOpen(false)} videoUrl={shareUrl} />
       <ReportDialog videoTitle={scholar.name} videoId={scholar.channelId} open={showReportDialog} onOpenChange={setShowReportDialog} />
-      {selectedShort && (
-        <AddToPlaylistDialog
-          video={{ id: selectedShort.id, title: selectedShort.title, channel: scholar.name }}
-          open={showShortPlaylistDialog}
-          onOpenChange={setShowShortPlaylistDialog}
-        />
-      )}
     </div>
   );
 }

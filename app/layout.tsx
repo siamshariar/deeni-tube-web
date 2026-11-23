@@ -10,6 +10,7 @@ import MobileNav from "@/components/mobile-nav";
 import AppShell from "@/components/app-shell";
 import MobileSearchModal from "@/components/mobile-search-modal";
 import { HeaderProvider } from "@/app/contexts/header-context";
+import SaveCardHost from "@/components/save-card-host";
 import { Toaster } from "@/components/ui/sonner";
 
 // Roboto, as on YouTube. Bangla/Arabic/Urdu titles fall back to the system's font for those scripts.
@@ -75,8 +76,9 @@ export default function RootLayout({
             <MobileNav />
             <MobileSearchModal />
           </HeaderProvider>
-          {/* Above the phone's bottom nav when it shows, else near the bottom edge (--toast-bottom, globals.css) */}
-          <Toaster position="bottom-center" offset={{ bottom: "var(--toast-bottom)" }} mobileOffset={{ bottom: "var(--toast-bottom)" }} />
+          {/* Messages: at the bottom left, as on YouTube. Above the phone's bottom nav when it shows, else near the bottom edge (--toast-bottom, globals.css) */}
+          <Toaster position="bottom-left" offset={{ bottom: "var(--toast-bottom)", left: 16 }} mobileOffset={{ bottom: "var(--toast-bottom)" }} />
+          <SaveCardHost />
         </ThemeProvider>
       </body>
     </html>

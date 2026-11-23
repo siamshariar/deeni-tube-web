@@ -70,9 +70,9 @@ test.describe('iPhone: tap to play with sound', () => {
     await expect(controls).toHaveCSS('opacity', '0', { timeout: 6000 });
     await page.getByRole('region', { name: 'Video player' }).tap({ position: { x: box.width / 4, y: box.height / 2 } });
     await expect(controls).toHaveCSS('opacity', '1');
-    await page.getByRole('button', { name: 'Pause (k)' }).tap();
+    await page.getByRole('button', { name: 'Pause', exact: true }).tap();
     await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(false);
-    await page.getByRole('button', { name: 'Play (k)' }).tap();
+    await page.getByRole('button', { name: 'Play', exact: true }).tap();
     await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(true);
 
     // The next video (a related one) keeps the sound
