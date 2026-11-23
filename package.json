@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "storyboards": "node scripts/storyboards.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.2",

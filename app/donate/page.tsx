@@ -193,7 +193,7 @@ export default function DonatePage() {
                   className={cn(
                     "flex items-start gap-3 p-4 border rounded-xl text-left transition-all",
                     isSelected
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      ? "border-primary bg-primary/5"
                       : "border-border hover:bg-muted/50"
                   )}
                 >

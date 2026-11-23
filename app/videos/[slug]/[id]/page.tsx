@@ -60,9 +60,9 @@ import { videoPath } from "@/lib/video-url";
 
 // YouTube-style action pill (36px tall, 24px icon) and round icon button
 const PILL =
-  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
 const ROUND =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
 const MENU_ITEM = "flex items-center gap-4 px-4 py-2 text-sm cursor-pointer";
 const DRAWER_ITEM = "flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer";
 // ─── Mock comments (unchanged) ─────────────────────────────────────
@@ -599,7 +599,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                         <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => setShowReportDialog(true)}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -910,14 +910,14 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                           <MoreButton
                             size="sm"
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute -right-2 -top-1 can-hover:opacity-0 can-hover:group-hover/rel:opacity-100 can-hover:group-focus-within/rel:opacity-100 data-[state=open]:opacity-100"
+                            className="absolute -right-2 -top-1 can-hover:opacity-0 can-hover:group-hover/rel:opacity-100 kb:group-focus-within/rel:opacity-100 data-[state=open]:opacity-100"
                           />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => toggleWatchLater(v)}><Clock className="h-5 w-5" /> {isInWatchLater(v.id) ? "Remove from Watch later" : "Save to Watch later"}</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setSelectedRelatedVideo(v); setShowPlaylistDialog(true); }}><ListPlus className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => { setSelectedRelatedVideo(v); setShowPlaylistDialog(true); }}><ListPlus className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
                           <DropdownMenuItem className={MENU_ITEM} onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><Share className="h-5 w-5" /> Share</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setSelectedRelatedVideo(v); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
+                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => { setSelectedRelatedVideo(v); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

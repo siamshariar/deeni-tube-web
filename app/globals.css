@@ -114,6 +114,21 @@ html body[data-scroll-locked] {
 /* app/globals.css */
 /* Add these styles at the end of the file */
 
+/* No border left behind by a click or tap. `:focus-visible` isn't enough: closing a menu or dialog gives the focus
+   back to its button, which browsers then count as keyboard focus and outline (as they do the first button of a
+   dialog that opens, and any clicked button once a key is pressed). So outlines and rings (Tailwind's `ring-*`) show
+   only while the visitor moves around with Tab: html[data-keyboard], set by a script in app/layout.tsx.
+   Fields show their focus with their border colour instead. Nor the grey box phones flash over a tapped link. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+html:not([data-keyboard]) :focus,
+html:not([data-keyboard]) .peer:focus ~ * {
+  outline: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+}
+
 /* YouTube-style thin scrollbar for sidebars, popups and panels (`yt-scrollbar`): no arrow buttons, a
    transparent track and a grey thumb that shows while the area is hovered. Chrome and Firefox use the
    standard properties (Chrome then ignores the ::-webkit-scrollbar rules); Safari uses the webkit ones. */
@@ -122,11 +137,11 @@ html body[data-scroll-locked] {
   scrollbar-color: transparent transparent;
 }
 .yt-scrollbar:hover,
-.yt-scrollbar:focus-within {
+html[data-keyboard] .yt-scrollbar:focus-within {
   scrollbar-color: #909090 transparent;
 }
 .dark .yt-scrollbar:hover,
-.dark .yt-scrollbar:focus-within {
+html.dark[data-keyboard] .yt-scrollbar:focus-within {
   scrollbar-color: #717171 transparent;
 }
 .yt-scrollbar::-webkit-scrollbar {

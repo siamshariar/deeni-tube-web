@@ -286,7 +286,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                 <DropdownMenuContent align="end" className="w-56 rounded-xl">
                   <DropdownMenuItem
                     className="cursor-pointer"
-                    onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}
+                    afterClose={() => setShowReportDialog(true)}
                   >
                     <Flag className="h-4 w-4" /> Report
                   </DropdownMenuItem>
@@ -386,7 +386,7 @@ function ChannelView({ channel }: { channel: ChannelItem }) {
                         <DropdownMenuItem className="cursor-pointer" onClick={() => { if (isInWatchLater(short.id)) { toast.success("Already in Watch Later"); } else { addToWatchLater({ id: short.id, title: short.title, channel: channel.name, channelAvatar: channel.avatar || "", thumbnail: `https://img.youtube.com/vi/${short.videoId}/hqdefault.jpg`, views: short.views, timeAgo: short.timeAgo, duration: short.duration, addedAt: Date.now() }); toast.success("Added to Watch Later"); } }}>
                           <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
+                        <DropdownMenuItem className="cursor-pointer" afterClose={() => { setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
                           <Bookmark className="h-4 w-4" /> Save to Playlist
                         </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer" onClick={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>

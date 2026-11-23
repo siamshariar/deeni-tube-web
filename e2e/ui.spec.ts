@@ -103,8 +103,13 @@ test.describe('YouTube-style UI', () => {
 
   test('shorts description wraps long links inside the screen', async ({ page }) => {
     await page.goto('/shorts');
-    await page.getByRole('button', { name: 'More options' }).locator('visible=true').first().click();
-    await page.getByRole('button', { name: 'Description' }).locator('visible=true').first().click();
+    const description = page.getByRole('button', { name: 'Description' }).locator('visible=true').first();
+    // A click before the page is ready (hydrated) does nothing: click until the menu opens
+    await expect(async () => {
+      await page.getByRole('button', { name: 'More options' }).locator('visible=true').first().click({ timeout: 5000 });
+      await expect(description).toBeVisible({ timeout: 1500 });
+    }).toPass({ timeout: 20_000 });
+    await description.click();
     const link = page.locator('a[href^="https://www.youtube.com/@"]').locator('visible=true').first();
     await expect(link).toBeVisible({ timeout: 10_000 });
     const fits = await link.evaluate((a) => {

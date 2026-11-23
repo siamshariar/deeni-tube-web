@@ -125,16 +125,16 @@ export default function VideoCard({
     </>
   );
 
-  // Dropdown items (desktop) — use onSelect+preventDefault for items that open modals
+  // Dropdown items (desktop): the ones that open a dialog use afterClose, so the menu closes first
   const dropdownItems = (
     <>
-      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowShareModal(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={() => setShowShareModal(true)}>
         <Share className="h-5 w-5" /><span>Share</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleWatchLaterToggle}>
         {saved ? <><BookmarkCheck className="h-5 w-5 fill-current text-primary" /><span className="text-primary">Saved</span></> : <><Clock className="h-5 w-5" /><span>Save to Watch later</span></>}
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowPlaylistDialog(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={() => setShowPlaylistDialog(true)}>
         <Bookmark className="h-5 w-5" /><span>Save to playlist</span>
       </DropdownMenuItem>
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleDontRecommend}>
@@ -143,7 +143,7 @@ export default function VideoCard({
       <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={handleNotInterested}>
         <EyeOff className="h-5 w-5" /><span>Not interested</span>
       </DropdownMenuItem>
-      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}>
+      <DropdownMenuItem className="flex items-center gap-4 px-4 py-2 text-sm cursor-pointer" afterClose={() => setShowReportDialog(true)}>
         <Flag className="h-5 w-5" /><span>Report</span>
       </DropdownMenuItem>
     </>

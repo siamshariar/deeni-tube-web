@@ -18,7 +18,7 @@ export const MoreButton = React.forwardRef<HTMLButtonElement, MoreButtonProps>(
       type={type}
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex flex-shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex flex-shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         size === "sm" ? "h-9 w-9" : "h-10 w-10",
         className
       )}

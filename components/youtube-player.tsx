@@ -15,6 +15,10 @@
 // Also: the video's thumbnail shows until it plays (no black box), and if the browser blocks sound it plays
 // muted with a "Click to unmute" button. Keyboard: space/k play, j/l ±10s, ←/→ ±5s, f full screen, m mute,
 // c captions. On touch screens the controls hide 3s after the video starts or after a tap, as in YouTube's app.
+// The progress bar is YouTube's (measured): a 4px line, 6px under the pointer, 56px above the bottom on desktop. Over
+// it, a box with the video's frame there (YouTube's storyboard, components/storyboard.tsx) and the time; dragging
+// also covers the video with that frame, dimmed. With a finger: the frame over the whole video and the time in the
+// middle, with the other controls out of the way, as on YouTube's mobile site.
 // How far the video has been watched is saved (lib/watch-progress: the red bar on its thumbnails), and the video
 // goes on from there next time, as on YouTube (from History too); a finished video starts again.
 //
@@ -32,6 +36,7 @@ import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
 import { takePreviewResume } from "@/components/inline-preview";
 import { progressSaver, resumeTime } from "@/lib/watch-progress";
+import { STORYBOARD_LARGE, STORYBOARD_MEDIUM, StoryboardFrame, useStoryboard } from "@/components/storyboard";
 import {
   armHost,
   attachHost,
@@ -65,6 +70,11 @@ const CROP = 120; // px of the frame hidden above and below the box while not pl
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const COUNTDOWN_SECONDS = 8;
 const AUTOPLAY_KEY = "deeni-autoplay";
+// Progress bar: the storyboard box is 240px wide (less on a small player), and a press that moves less than DRAG_PX is
+// a click (seeks there), not a drag (shows the frames over the video)
+const BOARD_WIDTH = { max: 240, min: 140, share: 0.42 };
+const DRAG_PX = 3;
+const BAR_EASE = "duration-200 ease-[cubic-bezier(0.05,0,0,1)]";
 
 export type UpNextVideo = { title: string; channel: string; videoId: string; href?: string };
 
@@ -124,9 +134,18 @@ export function YouTubePlayer({
   const [captions, setCaptions] = useState(false);
   const [mutedByBrowser, setMutedByBrowser] = useState(false);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
-  const [hover, setHover] = useState<{ time: number; x: number } | null>(null);
+  const [hover, setHover] = useState<{ time: number; x: number; width: number } | null>(null);
+  // The bar is being dragged (not just pressed), and by a finger rather than the mouse
+  const [dragging, setDragging] = useState(false);
+  const [touchScrub, setTouchScrub] = useState(false);
+  const barDownRef = useRef(0);
+  // The frames for the progress bar: loaded once the controls are about to be used
+  const [wantBoard, setWantBoard] = useState(false);
+  const board = useStoryboard(videoId, wantBoard);
   const [controlsShown, setControlsShown] = useState(true);
   const [menu, setMenu] = useState<null | "main" | "speed">(null);
+  // The menu scrolls when the player is too short for it (phones)
+  const [menuMax, setMenuMax] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const [feedback, setFeedback] = useState<{ label: "play" | "pause" | "back" | "forward"; key: number } | null>(null);
@@ -562,6 +581,7 @@ export function YouTubePlayer({
       showControls();
       return;
     }
+    setWantBoard(true);
     const rect = e.currentTarget.getBoundingClientRect();
     const side = e.clientX < rect.left + rect.width / 2 ? -1 : 1;
     const nowMs = Date.now();
@@ -581,22 +601,36 @@ export function YouTubePlayer({
     return Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * timeRef.current.duration;
   };
   const onBarDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!timeRef.current.duration) return;
+    if (!timeRef.current.duration || (e.pointerType === "mouse" && e.button !== 0)) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    barDownRef.current = e.clientX;
+    setTouchScrub(e.pointerType !== "mouse");
+    setWantBoard(true);
     setScrubTime(timeAt(e.clientX, e.currentTarget));
   };
   const onBarMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!timeRef.current.duration) return;
     const t = timeAt(e.clientX, e.currentTarget);
     const r = e.currentTarget.getBoundingClientRect();
-    setHover({ time: t, x: Math.max(24, Math.min(r.width - 24, e.clientX - r.left)) });
-    if (scrubTime !== null) setScrubTime(t);
+    if (e.pointerType === "mouse") {
+      setWantBoard(true);
+      setHover({ time: t, x: Math.max(0, Math.min(r.width, e.clientX - r.left)), width: r.width });
+    }
+    if (scrubTime !== null) {
+      setScrubTime(t);
+      if (Math.abs(e.clientX - barDownRef.current) >= DRAG_PX) setDragging(true);
+    }
     showControls();
+  };
+  const endScrub = () => {
+    setScrubTime(null);
+    setDragging(false);
+    setTouchScrub(false);
   };
   const onBarUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (scrubTime === null) return;
     seekTo(timeAt(e.clientX, e.currentTarget));
-    setScrubTime(null);
+    endScrub();
   };
 
   // The next video, started inside the tap (shared player: with sound)
@@ -606,6 +640,11 @@ export function YouTubePlayer({
   };
 
   const played = duration ? Math.min(100, (shownTime / duration) * 100) : 0;
+  // Progress bar: lifted while the pointer is on it. Over the pointer: the frame there and its time
+  const barActive = hover !== null || scrubTime !== null;
+  const hoverPercent = hover && scrubTime === null && duration ? Math.min(100, (hover.time / duration) * 100) : null;
+  const boardWidth = hover ? Math.round(Math.min(BOARD_WIDTH.max, Math.max(BOARD_WIDTH.min, hover.width * BOARD_WIDTH.share))) : 0;
+  const pickedTime = scrubTime ?? hover?.time ?? 0;
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   const canGoNext = !!(upNext && onNext);
   const btn =
@@ -656,6 +695,19 @@ export function YouTubePlayer({
         </div>
       )}
 
+      {/* Dragging the progress bar: the frame there covers the video (dimmed with a mouse, as on YouTube) */}
+      {board && dragging && scrubTime !== null && (
+        <div aria-hidden="true" data-storyboard-big="" className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center bg-black">
+          <StoryboardFrame board={board} level={STORYBOARD_MEDIUM} time={scrubTime} duration={duration} className={touchScrub ? undefined : "opacity-40"} />
+        </div>
+      )}
+      {/* …and with a finger, the time in the middle, above the bar */}
+      {touchScrub && scrubTime !== null && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-[76px] z-30 flex justify-center">
+          <span className="rounded-2xl bg-black/60 px-4 py-2 text-xs font-bold leading-[18px]">{formatTime(scrubTime)}</span>
+        </div>
+      )}
+
       {/* Play/pause/seek feedback in the middle, as on YouTube */}
       {feedback && (
         <div key={feedback.key} aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
@@ -666,7 +718,7 @@ export function YouTubePlayer({
       )}
 
       {/* Touch: big play/pause in the middle while the controls show */}
-      {controlsVisible && (
+      {controlsVisible && !touchScrub && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center can-hover:hidden">
           <button
             type="button"
@@ -695,13 +747,17 @@ export function YouTubePlayer({
       <div
         className={cn("absolute inset-x-0 bottom-0 z-20 transition-opacity duration-200", controlsVisible ? "opacity-100" : "pointer-events-none opacity-0")}
         // Mouse only: a tap on a phone also sends mouseenter, which would keep the controls up for good
-        onPointerEnter={(e) => { if (e.pointerType === "mouse") overControlsRef.current = true; }}
+        onPointerEnter={(e) => {
+          if (e.pointerType !== "mouse") return;
+          overControlsRef.current = true;
+          setWantBoard(true);
+        }}
         onPointerLeave={(e) => { if (e.pointerType === "mouse") overControlsRef.current = false; }}
       >
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
 
         {menu && (
-          <div role="menu" aria-label="Settings" className="absolute bottom-14 right-3 z-30 w-60 overflow-hidden rounded-xl bg-[#1c1c1c]/95 py-2 text-sm shadow-xl">
+          <div role="menu" aria-label="Settings" style={{ maxHeight: menuMax }} className="yt-scrollbar absolute bottom-16 right-3 z-30 w-60 overflow-y-auto overscroll-contain rounded-xl bg-[#1c1c1c]/95 py-2 text-sm shadow-xl sm:bottom-20">
             {menu === "main" ? (
               <>
                 {canGoNext && (
@@ -735,7 +791,8 @@ export function YouTubePlayer({
         )}
 
         <div className="relative px-2 sm:px-3">
-          {/* Progress bar: hover to preview a time, click or drag to jump there */}
+          {/* Progress bar: hover to see the frame and time there, click or drag to go there. The pointer can be up to
+              10px above the line (a finger more) */}
           <div
             role="slider"
             aria-label="Seek"
@@ -744,28 +801,53 @@ export function YouTubePlayer({
             aria-valuenow={Math.round(shownTime)}
             aria-valuetext={`${formatTime(shownTime)} of ${formatTime(duration)}`}
             tabIndex={-1}
-            className="group/bar relative mx-1 flex h-4 cursor-pointer touch-none items-end pb-1.5"
+            className="relative h-4 cursor-pointer touch-none before:absolute before:inset-x-0 before:-top-3 before:bottom-0 can-hover:before:hidden"
             onPointerDown={onBarDown}
             onPointerMove={onBarMove}
             onPointerUp={onBarUp}
+            onPointerCancel={endScrub}
             onPointerLeave={() => setHover(null)}
           >
-            <div className={cn("relative w-full bg-white/25 transition-[height] duration-100", scrubTime !== null ? "h-[5px]" : "h-[3px] group-hover/bar:h-[5px]")}>
+            <div
+              data-seek-line=""
+              className={cn(
+                "absolute inset-x-0 bottom-0 h-1.5 overflow-hidden rounded-[3px] bg-[rgba(40,40,40,0.6)] transition-transform",
+                BAR_EASE,
+                barActive ? "scale-y-100" : "scale-y-[0.667]"
+              )}
+            >
               <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: `${loaded * 100}%` }} />
-              <div className="absolute inset-y-0 left-0 bg-[#f00]" style={{ width: `${played}%` }} />
-              <div
-                className={cn("absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f00] transition-transform", scrubTime !== null ? "scale-100" : "scale-0 group-hover/bar:scale-100")}
-                style={{ left: `${played}%` }}
-              />
+              <div className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#f03_80%,#ff2791)]" style={{ width: `${played}%` }} />
+              {/* Between the playhead and the pointer */}
+              {hoverPercent !== null && (
+                <div
+                  className={cn("absolute inset-y-0", hoverPercent > played ? "bg-white/50" : "bg-black/[0.125]")}
+                  style={{ left: `${Math.min(played, hoverPercent)}%`, width: `${Math.abs(hoverPercent - played)}%` }}
+                />
+              )}
             </div>
-            {hover && (
-              <span className="pointer-events-none absolute bottom-5 -translate-x-1/2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-medium" style={{ left: hover.x }}>
-                {formatTime(hover.time)}
-              </span>
+            <div
+              data-seek-head=""
+              className={cn("absolute bottom-[3px] h-3 w-3 rounded-full bg-[#f03] transition-transform", BAR_EASE)}
+              style={{ left: `${played}%`, transform: `translate(-50%, 50%) scale(${touchScrub ? 1.333 : barActive ? 1.667 : 1})` }}
+            />
+            {hover && !touchScrub && duration > 0 && (
+              <div
+                className="pointer-events-none absolute bottom-[calc(100%+9px)] flex -translate-x-1/2 flex-col items-center gap-[9px]"
+                // Centred on the pointer, but never past the ends of the bar
+                style={{ left: Math.max((board ? boardWidth + 2 : 60) / 2, Math.min(hover.width - (board ? boardWidth + 2 : 60) / 2, hover.x)) }}
+              >
+                {board && (
+                  <div className="box-content overflow-hidden rounded-lg border border-white bg-black" style={{ width: boardWidth, aspectRatio: board.aspect }} data-storyboard-box="">
+                    <StoryboardFrame board={board} level={STORYBOARD_LARGE} time={pickedTime} duration={duration} className="w-full" />
+                  </div>
+                )}
+                <span className="rounded-[18px] bg-black/30 px-4 py-2 text-[13px] font-medium leading-[15px] [text-shadow:0_0_2px_rgba(0,0,0,0.5)]">{formatTime(pickedTime)}</span>
+              </div>
             )}
           </div>
 
-          <div className="flex h-11 items-center gap-0.5 sm:h-12">
+          <div className={cn("flex h-11 items-center gap-0.5 sm:h-14", touchScrub && "invisible")}>
             <button type="button" aria-label={isPlaying ? "Pause (k)" : "Play (k)"} title={isPlaying ? "Pause (k)" : "Play (k)"} onClick={togglePlay} className={btn}>
               {isPlaying ? <Pause className="fill-current" /> : <Play className="fill-current" />}
             </button>
@@ -785,7 +867,7 @@ export function YouTubePlayer({
                 value={muted ? 0 : volume}
                 aria-label="Volume"
                 onChange={(e) => changeVolume(Number(e.target.value))}
-                className="hidden h-1 w-0 cursor-pointer accent-white opacity-0 transition-all duration-200 group-hover/vol:w-16 group-hover/vol:opacity-100 focus-visible:w-16 focus-visible:opacity-100 can-hover:block"
+                className="hidden h-1 w-0 cursor-pointer accent-white opacity-0 transition-all duration-200 group-hover/vol:w-16 group-hover/vol:opacity-100 kb:focus-visible:w-16 kb:focus-visible:opacity-100 can-hover:block"
               />
             </div>
             <span className="ml-1 whitespace-nowrap text-[13px] tabular-nums text-white/90 sm:ml-2 sm:text-sm">
@@ -813,7 +895,10 @@ export function YouTubePlayer({
               <Captions />
               {captions && <span className="absolute bottom-1.5 left-1/2 h-[3px] w-5 -translate-x-1/2 rounded-full bg-[#f00]" />}
             </button>
-            <button type="button" aria-label="Settings" aria-expanded={menu !== null} title="Settings" onClick={() => setMenu(menu ? null : "main")} className={btn}>
+            <button type="button" aria-label="Settings" aria-expanded={menu !== null} title="Settings" onClick={() => {
+                setMenuMax((rootRef.current?.clientHeight ?? 400) - 88);
+                setMenu(menu ? null : "main");
+              }} className={btn}>
               <Settings className={cn("transition-transform duration-200", menu && "rotate-45")} />
             </button>
             <button type="button" aria-label={fullscreen || pseudoFullscreen ? "Exit full screen (f)" : "Full screen (f)"} title="Full screen (f)" onClick={toggleFullscreen} className={btn}>

@@ -94,7 +94,7 @@ function MultiSelect({
         onClick={() => setOpen(o => !o)}
         className={cn(
           "w-full min-h-[42px] px-3 py-2 flex items-center gap-2 flex-wrap rounded-xl border text-left transition-colors bg-background",
-          open ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/60"
+          open ? "border-primary" : "border-border hover:border-muted-foreground/60"
         )}
       >
         <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
@@ -239,10 +239,10 @@ function ResultList({
                     <DropdownMenuItem onSelect={() => onWatchLaterToggle(video)}>
                       <Clock className="h-4 w-4" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch Later"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onPlaylist(video); }}>
+                    <DropdownMenuItem afterClose={() => onPlaylist(video)}>
                       <Bookmark className="h-4 w-4" /> Save to playlist
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onShare(video); }}>
+                    <DropdownMenuItem afterClose={() => onShare(video)}>
                       <Share className="h-4 w-4" /> Share
                     </DropdownMenuItem>
                   </DropdownMenuContent>

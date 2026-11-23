@@ -159,7 +159,7 @@ function ShortsRow({ shorts, onShare, prioritize = false }: { shorts: HistoryIte
                   }}>
                     <Clock className="h-5 w-5" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onSelect={(e) => { e.preventDefault(); setDrawerShort(short); setShowShortPlaylistDialog(true); }}>
+                  <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => { setDrawerShort(short); setShowShortPlaylistDialog(true); }}>
                     <Bookmark className="h-5 w-5" /> Save to Playlist
                   </DropdownMenuItem>
                   <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => onShare(short)}>
@@ -336,7 +336,7 @@ export default function HistoryPage() {
             aria-label={`Remove "${video.title}" from history`}
             title="Remove from watch history"
             onClick={() => handleRemove(video.id)}
-            className="hidden h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent focus-visible:opacity-100 md:inline-flex can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-within:opacity-100"
+            className="hidden h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent md:inline-flex can-hover:opacity-0 can-hover:group-hover:opacity-100 kb:group-focus-within:opacity-100"
           >
             <X className="h-6 w-6" />
           </button>
@@ -361,7 +361,7 @@ export default function HistoryPage() {
                 }}>
                   <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Saved to Watch Later" : "Save to Watch later"}
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onSelect={(e) => { e.preventDefault(); setSelectedVideo(video); setShowPlaylistDialog(true); }}>
+                <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" afterClose={() => { setSelectedVideo(video); setShowPlaylistDialog(true); }}>
                   <Bookmark className="h-5 w-5" /> Save to playlist
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer gap-3 py-2 text-sm" onClick={() => handleShare(video)}>

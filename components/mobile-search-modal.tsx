@@ -82,7 +82,7 @@ function MultiSelect({
         onClick={() => setOpen(o => !o)}
         className={cn(
           "w-full min-h-[42px] px-3 py-2 flex items-center gap-2 flex-wrap rounded-xl border text-left transition-colors bg-background",
-          open ? "border-primary ring-2 ring-primary/20" : "border-border"
+          open ? "border-primary" : "border-border"
         )}
       >
         <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">

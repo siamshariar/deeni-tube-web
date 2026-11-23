@@ -51,6 +51,12 @@ export default function RootLayout({
             __html: `try{if(localStorage.getItem("sidebar-collapsed")==="true")document.documentElement.dataset.sidebar="collapsed"}catch(e){}`,
           }}
         />
+        {/* Focus rings only while the visitor uses Tab; a click or touch removes them (html[data-keyboard], globals.css) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(d){addEventListener("keydown",function(e){if(e.key==="Tab")d.dataset.keyboard=""},true);addEventListener("pointerdown",function(){delete d.dataset.keyboard},true)})(document.documentElement)`,
+          }}
+        />
       </head>
       <body className={`${roboto.variable} font-sans antialiased`}>
         <ThemeProvider

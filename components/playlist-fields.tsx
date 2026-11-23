@@ -85,7 +85,7 @@ export function OptionSelect<T>({
           className={cn(
             FIELD,
             "group flex w-full items-center gap-3 text-left focus-visible:outline-none",
-            "focus-visible:border-[#065fd4] data-[state=open]:border-[#065fd4] dark:focus-visible:border-[#3ea6ff] dark:data-[state=open]:border-[#3ea6ff]",
+            "kb:focus-visible:border-[#065fd4] data-[state=open]:border-[#065fd4] dark:kb:focus-visible:border-[#3ea6ff] dark:data-[state=open]:border-[#3ea6ff]",
             className
           )}
         >

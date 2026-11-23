@@ -4,6 +4,8 @@ import plugin from "tailwindcss/plugin"
 
 const config: Config = {
   darkMode: ["class"],
+  // `hover:` only where there is a mouse: on touch screens a tapped button kept its hover colour until the next tap
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -85,6 +87,9 @@ const config: Config = {
       // Devices with a mouse. Hover-only controls use it (`can-hover:opacity-0 can-hover:group-hover:opacity-100`),
       // so on touch screens, which can't hover, they stay visible
       addVariant("can-hover", "@media (hover: hover) and (pointer: fine)")
+      // The visitor is using the keyboard (Tab; html[data-keyboard], set in app/layout.tsx). For anything a click must
+      // not leave behind, such as a hover-only button staying visible because its menu gave the focus back
+      addVariant("kb", "html[data-keyboard] &")
       // Short phone screens (e.g. iPhone SE), where tall overlays need to be more compact
       addVariant("short-screen", "@media (max-width: 1023px) and (max-height: 680px)")
     }),

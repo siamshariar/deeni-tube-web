@@ -303,7 +303,7 @@ export default function ScholarView() {
                   <MoreButton />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-4 w-4" /> Report</DropdownMenuItem>
+                  <DropdownMenuItem afterClose={() => setShowReportDialog(true)}><Flag className="h-4 w-4" /> Report</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => dontRecommend(scholar.channelId, scholar.name)}><Ban className="h-4 w-4" /> Don&apos;t recommend</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -385,7 +385,7 @@ export default function ScholarView() {
                             }}>
                               <Clock className="h-4 w-4" /> {isInWatchLater(short.id) ? "Saved to Watch Later" : "Save to Watch Later"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
+                            <DropdownMenuItem className="cursor-pointer" afterClose={() => { setSelectedShort(short); setShowShortPlaylistDialog(true); }}>
                               <Bookmark className="h-4 w-4" /> Save to Playlist
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer" onSelect={() => { setShareUrl(`${window.location.origin}/shorts?v=${short.videoId}`); setShareModalOpen(true); }}>

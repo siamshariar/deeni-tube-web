@@ -70,9 +70,9 @@ import { getChannelHref } from "@/lib/channel-data";
 
 // YouTube-style action pill (36px tall, 24px icon) and round icon button
 const PILL =
-  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
 const ROUND =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
 const MENU_ITEM = "flex items-center gap-4 px-4 py-2 text-sm cursor-pointer";
 const DRAWER_ITEM = "flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer";
 
@@ -763,7 +763,7 @@ export default function PlaylistDetailPage() {
                           <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
                             <DropdownMenuItem className={MENU_ITEM} onSelect={() => toast("Channel removed from feed")}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
                             <DropdownMenuItem className={MENU_ITEM} onSelect={() => { toast("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
-                            <DropdownMenuItem className={MENU_ITEM} onSelect={(e) => { e.preventDefault(); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
+                            <DropdownMenuItem className={MENU_ITEM} afterClose={() => setShowReportDialog(true)}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -1185,7 +1185,7 @@ export default function PlaylistDetailPage() {
                             aria-label={`More actions for ${video.title}`}
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
-                            className="-ml-1 self-start can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:group-focus-within:opacity-100 data-[state=open]:opacity-100"
+                            className="-ml-1 self-start can-hover:opacity-0 can-hover:group-hover:opacity-100 kb:group-focus-within:opacity-100 data-[state=open]:opacity-100"
                           />
                         </DropdownMenuTrigger>
                         {/* Menu is portaled, but React still bubbles its clicks to the row; stop that */}

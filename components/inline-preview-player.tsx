@@ -4,11 +4,14 @@
 // when a preview starts, so pages with cards don't carry it in their first JavaScript.
 // Like YouTube's inline playback, it starts where the video was left (lib/watch-progress), saves how far it
 // gets, and adds the video to History once it has played HISTORY_AFTER_S seconds.
+// Hovering the progress bar shows the video's frame there (YouTube's storyboard) in a small box over the pointer;
+// dragging shows it over the whole card, with the time in the middle. Without a storyboard: just the time.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { progressSaver, resumeTime } from "@/lib/watch-progress";
+import { STORYBOARD_MEDIUM, StoryboardFrame, useStoryboard } from "@/components/storyboard";
 import { recordWatch } from "@/hooks/useWatchHistory";
 import { findVideo } from "@/lib/media-lookup";
 import { historyEntryForVideo } from "@/lib/history-entry";
@@ -26,8 +29,17 @@ const BAR = {
   mouse: { line: 5, lift: 10, inset: 12 },
   touch: { line: 3, lift: 0, inset: 0 },
 } as const;
-// While dragging, the video follows at most this often (allowSeekAhead off), then seeks fully on release
+// While dragging without a storyboard, the video follows at most this often (allowSeekAhead off), then seeks fully
+// on release
 const LIVE_SEEK_MS = 250;
+// Storyboard box over the pointer, as on youtube.com: a 90px tall frame in a 2px white border, its time below,
+// right above the bar's 28px, at least 8px from the card's edges (and no taller than the card has room for)
+const BOARD_HEIGHT = 90;
+const BOARD_MIN_HEIGHT = 48;
+const BOARD_EDGE = 8;
+const BOARD_AROUND = 28 + 22 + 6 + 4 + BOARD_EDGE;
+// A press that moves less than this is a click (seeks there), not a drag (shows the frames over the card)
+const DRAG_PX = 3;
 // Played this many seconds in the card: it goes into History
 const HISTORY_AFTER_S = 5;
 
@@ -89,6 +101,13 @@ export default function PreviewLayer({
   const touchRef = useRef<{ x: number; y: number } | null>(null);
   const draggedRef = useRef(false);
   const liveSeekRef = useRef(0);
+  // Where the mouse went down, and whether it has moved since (a drag) or not (a click)
+  const downXRef = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  // The frames: loaded once the bar is used
+  const [wantBoard, setWantBoard] = useState(false);
+  const board = useStoryboard(videoId, wantBoard);
+  const [boardHeight, setBoardHeight] = useState(BOARD_HEIGHT);
   // After a seek, YouTube reports the old time for a moment: don't jump back
   const seekRef = useRef<{ to: number; until: number } | null>(null);
   // Seconds actually played (not skipped by seeking), for History
@@ -211,9 +230,9 @@ export default function PreviewLayer({
   const scrubTo = (fraction: number) => {
     dragRef.current = fraction;
     setDragAt(fraction);
-    // The video follows the playhead, without loading more than it has
+    // The frames cover the card; without them the video follows the playhead, without loading more than it has
     const now = Date.now();
-    if (duration && now - liveSeekRef.current > LIVE_SEEK_MS) {
+    if (!board && duration && now - liveSeekRef.current > LIVE_SEEK_MS) {
       liveSeekRef.current = now;
       command("seekTo", [timeAt(fraction), false]);
     }
@@ -222,6 +241,7 @@ export default function PreviewLayer({
     const fraction = dragRef.current;
     dragRef.current = null;
     setDragAt(null);
+    setDragging(false);
     if (!seek || fraction === null || !duration) return;
     const to = timeAt(fraction);
     seekRef.current = { to, until: Date.now() + 2000 };
@@ -237,6 +257,10 @@ export default function PreviewLayer({
   const lineBottom = lifted ? bar.lift : 0;
   const headSize = dragAt !== null ? 16 : 12;
   const showHead = !mouse || lifted;
+  // The time being picked, and its frame: in a box over the pointer, or over the whole card while dragging
+  const pickedTime = dragAt !== null ? timeAt(dragAt) : hoverAt !== null ? timeAt(hoverAt) : null;
+  const showBox = mouse && board !== null && !dragging && pickedTime !== null;
+  const boxHalf = board ? (boardHeight * board.aspect + 4) / 2 : 0;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[1]" data-preview={videoId}>
@@ -254,6 +278,11 @@ export default function PreviewLayer({
         />
         {playing && (
           <>
+            {board && dragging && pickedTime !== null && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black" data-storyboard-big="">
+                <StoryboardFrame board={board} level={STORYBOARD_MEDIUM} time={pickedTime} duration={duration} />
+              </div>
+            )}
             {/* Mouse: the bottom darkens while the bar is hovered */}
             {mouse && (
               <div
@@ -298,7 +327,7 @@ export default function PreviewLayer({
           >
             <span
               aria-hidden="true"
-              className="absolute inset-1 rounded-full bg-black/60 opacity-0 transition-opacity duration-100 group-focus-visible/volume:opacity-100 can-hover:group-hover/volume:opacity-100"
+              className="absolute inset-1 rounded-full bg-black/60 opacity-0 transition-opacity duration-100 kb:group-focus-visible/volume:opacity-100 can-hover:group-hover/volume:opacity-100"
             />
             <svg viewBox="0 0 24 24" className="relative h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.45)]" fill="currentColor" aria-hidden="true">
               <path d={muted ? VOLUME_OFF : VOLUME_ON} />
@@ -333,10 +362,17 @@ export default function PreviewLayer({
               // Touch: vertical swipes still scroll the page; sideways drags seek
               mouse ? "bottom-0" : "-bottom-[7px] touch-pan-y"
             )}
-            onPointerEnter={mouse ? (e) => setHoverAt(positionAt(e)) : undefined}
+            onPointerEnter={(e) => {
+              setWantBoard(true);
+              if (!mouse) return;
+              const card = e.currentTarget.parentElement?.clientHeight ?? 0;
+              setBoardHeight(Math.max(BOARD_MIN_HEIGHT, Math.min(BOARD_HEIGHT, card - BOARD_AROUND)));
+              setHoverAt(positionAt(e));
+            }}
             onPointerMove={(e) => {
               const at = positionAt(e);
               if (mouse) setHoverAt(at);
+              if (mouse && dragRef.current !== null && Math.abs(e.clientX - downXRef.current) >= DRAG_PX) setDragging(true);
               const touch = touchRef.current;
               if (touch && dragRef.current === null) {
                 // Touch: a sideways drag seeks; anything else is a tap or the page scrolling
@@ -344,6 +380,7 @@ export default function PreviewLayer({
                 if (dx < 8 || dx < Math.abs(e.clientY - touch.y)) return;
                 touchRef.current = null;
                 draggedRef.current = true;
+                setDragging(true);
                 e.currentTarget.setPointerCapture(e.pointerId);
                 liveSeekRef.current = 0;
               }
@@ -362,6 +399,7 @@ export default function PreviewLayer({
               e.preventDefault();
               e.currentTarget.setPointerCapture(e.pointerId);
               liveSeekRef.current = 0;
+              downXRef.current = e.clientX;
               scrubTo(positionAt(e));
             }}
             onPointerUp={(e) => {
@@ -387,17 +425,30 @@ export default function PreviewLayer({
             onContextMenu={(e) => e.preventDefault()}
           />
 
-          {/* The time being picked: over the pointer while hovering, in the middle while dragging (as on YouTube) */}
-          {duration > 0 && (dragAt !== null || (lifted && hoverAt !== null)) && (
+          {/* Hovering: the frame there in a box over the pointer, with its time below (as on youtube.com) */}
+          {duration > 0 && showBox && (
+            <div
+              className="absolute bottom-7 flex -translate-x-1/2 flex-col items-center gap-1.5"
+              style={{ left: `clamp(${BOARD_EDGE + boxHalf}px, ${along(dragAt ?? hoverAt!)}, calc(100% - ${BOARD_EDGE + boxHalf}px))` }}
+            >
+              <div className="box-content overflow-hidden rounded-lg border-2 border-white bg-black" style={{ height: boardHeight }} data-storyboard-box="">
+                <StoryboardFrame board={board!} level={STORYBOARD_MEDIUM} time={pickedTime!} duration={duration} className="max-w-none" />
+              </div>
+              <span className="text-base font-medium leading-[22px] text-white [text-shadow:0_0_4px_rgba(0,0,0,0.6)]">{formatTime(pickedTime!)}</span>
+            </div>
+          )}
+
+          {/* Just the time: in the middle while dragging, or over the pointer when there are no frames */}
+          {duration > 0 && !showBox && (dragAt !== null || (lifted && hoverAt !== null)) && (
             <span
-              className="pointer-events-none absolute -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black/60 px-4 py-2 text-sm font-medium leading-[18px] text-white"
+              className="pointer-events-none absolute -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black/60 px-4 py-2 text-xs font-bold leading-[18px] text-white"
               style={
                 dragAt !== null
-                  ? { left: "50%", bottom: 48 }
+                  ? { left: "50%", bottom: 52 }
                   : { left: `clamp(32px, ${along(hoverAt!)}, calc(100% - 32px))`, bottom: 24 }
               }
             >
-              {formatTime(timeAt(dragAt ?? hoverAt!))}
+              {formatTime(pickedTime!)}
             </span>
           )}
         </>
