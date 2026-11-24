@@ -55,9 +55,9 @@ test.describe('Save card', () => {
     await card(page).getByRole('button', { name: 'New playlist' }).click();
     await expect(card(page).getByRole('button', { name: 'Create', exact: true })).toBeDisabled();
     await card(page).getByLabel('Name').fill('Voice test list');
-    await card(page).getByRole('button', { name: 'Privacy: Private' }).click();
+    await card(page).getByRole('button', { name: /^Privacy\s*Private/ }).click();
     await page.getByRole('menuitemradio', { name: /Public/ }).click();
-    await expect(card(page).getByRole('button', { name: 'Privacy: Public' })).toBeVisible();
+    await expect(card(page).getByRole('button', { name: /^Privacy\s*Public/ })).toBeVisible();
     await card(page).getByRole('button', { name: 'Create', exact: true }).click();
     await expect(card(page)).toBeHidden();
     await expect(message(page)).toContainText('Saved to Voice test list');

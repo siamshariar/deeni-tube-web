@@ -4,7 +4,8 @@
 import { useCallback, useMemo } from "react";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
 import { historySeed, HistoryItem } from "@/lib/history-data";
-import { findVideo } from "@/lib/media-lookup";
+import { findShort, findVideo } from "@/lib/media-lookup";
+import { historyEntryForShort, historyEntryForVideo } from "@/lib/history-entry";
 import { removedShorts } from "@/lib/shorts-data";
 
 export type { HistoryItem };
@@ -20,36 +21,46 @@ export function recordWatch(item: Omit<HistoryItem, "watchedDate">) {
   );
 }
 
-// Real lengths: the catalogue's for videos, the seed's for shorts. History saved with an older catalogue kept
-// copies of made-up durations that didn't match the video
-let seedDurations: Map<string, string> | null = null;
-function realDuration(item: HistoryItem): string {
-  const id = item.videoId || item.id;
+const keyOf = (item: Pick<HistoryItem, "id" | "videoId">) => item.videoId || item.id;
+const watchedAt = (item: HistoryItem) => new Date(item.watchedDate).getTime() || 0;
+
+// The catalogue's details win over the copy saved with an entry (an older catalogue had made-up lengths and, for some
+// shorts, titles of other videos)
+function fresh(item: HistoryItem): HistoryItem {
+  const id = keyOf(item);
   const video = findVideo(id);
-  if (video) return video.duration;
-  seedDurations ??= new Map(historySeed().map((h) => [h.videoId || h.id, h.duration]));
-  return seedDurations.get(id) ?? item.duration;
+  const short = video ? undefined : findShort(id);
+  const entry = video ? historyEntryForVideo(video) : short && historyEntryForShort(short);
+  return entry ? { ...item, ...entry, id: item.id } : item;
 }
 
 export function useWatchHistory() {
   const stored = useLocalStore(historyStore, EMPTY);
   const history = useMemo(
-    () => stored.filter((item) => !removedShorts.has(item.videoId)).map((item) => {
-      const duration = realDuration(item);
-      return duration === item.duration ? item : { ...item, duration };
-    }),
+    () => {
+      // Each video once, where it was watched last (an older list held some shorts several times)
+      const seen = new Set<string>();
+      return [...stored]
+        .sort((a, b) => watchedAt(b) - watchedAt(a))
+        .filter((item) => {
+          const key = keyOf(item);
+          return !removedShorts.has(key) && !seen.has(key) && !!seen.add(key);
+        })
+        .map(fresh);
+    },
     [stored]
   );
 
-  /** Remove an entry; returns a function that puts it back where it was (Undo). */
+  /** Remove an entry (by its id); returns a function that puts it back where it was (Undo). */
   const removeFromHistory = useCallback((id: string) => {
-    const before = historyStore.get();
-    const at = before.findIndex((v) => v.id === id);
-    historyStore.set((prev) => prev.filter((v) => v.id !== id));
-    return () => {
-      if (at < 0) return;
-      historyStore.set((prev) => (prev.some((v) => v.id === id) ? prev : [...prev.slice(0, at), before[at], ...prev.slice(at)]));
-    };
+    const entry = historyStore.get().find((v) => v.id === id);
+    const key = entry ? keyOf(entry) : id;
+    const removed = historyStore.get().filter((v) => keyOf(v) === key);
+    historyStore.set((prev) => prev.filter((v) => keyOf(v) !== key));
+    return () =>
+      historyStore.set((prev) =>
+        prev.some((v) => keyOf(v) === key) ? prev : [...prev, ...removed].sort((a, b) => watchedAt(b) - watchedAt(a))
+      );
   }, []);
 
   const replaceHistory = useCallback((next: HistoryItem[]) => {

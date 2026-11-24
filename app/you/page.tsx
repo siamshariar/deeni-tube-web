@@ -7,8 +7,6 @@ import {
   Globe,
   Tv,
   LogOut,
-  Check,
-  ChevronRight,
   History,
   ListVideo,
   Settings,
@@ -19,11 +17,14 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { OptionSelect } from "@/components/playlist-fields";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { LinkBox, LinkRow } from "@/components/link-row";
+import { BOX, BOX_TITLE, PAGE, PAGE_NARROW, PAGE_SUBTITLE, PAGE_TITLE } from "@/components/page-layout";
+import { Tick } from "@/components/tick";
 import { mockLanguages } from "@/lib/mock-data";
 import { signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 
@@ -40,11 +41,6 @@ export default function YouPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const [isGuest, setIsGuest] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const userData = localStorage.getItem("deeni-user-data");
@@ -67,6 +63,7 @@ export default function YouPage() {
         if (parsed.default) setDefaultLanguage(parsed.default);
       } catch {}
     }
+    setIsLoading(false);
   }, []);
 
   const [prefSaved, setPrefSaved] = useState(false);
@@ -89,83 +86,28 @@ export default function YouPage() {
     router.push("/signin");
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16 max-w-3xl mx-auto">
-          {/* Desktop title skeleton */}
-          <div className="mb-6">
-            <Skeleton className="h-8 w-20 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-
-          {/* Profile card skeleton */}
-          <div className="mb-6 rounded-xl border p-4 flex items-center gap-4">
-            <Skeleton className="h-14 w-14 md:h-16 md:w-16 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-4 w-48" />
-              <Skeleton className="h-4 w-24" />
-            </div>
-          </div>
-
-          {/* Language card skeleton */}
-          <div className="mb-6 rounded-xl border overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b">
-              <Skeleton className="h-4 w-4 rounded" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="space-y-1">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-3 w-36" />
-                </div>
-                <Skeleton className="h-10 w-full sm:w-44 rounded-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-36" />
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                ))}
-                <Skeleton className="h-4 w-48" />
-              </div>
-              <Skeleton className="h-10 w-full sm:w-auto rounded-full" />
-            </div>
-          </div>
-
-          {/* Channel card skeleton */}
-          <div className="rounded-xl border overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b">
-              <Skeleton className="h-4 w-4 rounded" />
-              <Skeleton className="h-4 w-36" />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <div className="space-y-1">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-40" />
-              </div>
-              <Skeleton className="h-4 w-4" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <div className="px-3 md:px-6 py-4 md:py-6 mt-14 md:mt-16 max-w-3xl mx-auto">
-        <div className="mb-5 md:mb-6">
-          <h1 className="text-xl font-bold md:text-2xl">You</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your profile and preferences
-          </p>
+      <div className={cn(PAGE, PAGE_NARROW)}>
+        <div className="mb-6">
+          <h1 className={PAGE_TITLE}>You</h1>
+          <p className={PAGE_SUBTITLE}>Manage your profile and preferences</p>
         </div>
 
         {/* User Profile Card */}
-        <div className="mb-6 overflow-hidden rounded-2xl border">
-          <div className="flex items-center gap-4 p-4 md:gap-5 md:p-6">
+        <div className={cn(BOX, "mb-6 overflow-hidden")}>
+          <div className="flex min-h-[152px] items-center gap-4 p-4 max-[399px]:min-h-[226px] max-[399px]:flex-col max-[399px]:justify-center max-[399px]:gap-3 max-[399px]:text-center md:min-h-[148px] md:gap-5 md:p-6">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-16 w-16 flex-shrink-0 rounded-full md:h-20 md:w-20" />
+                <div className="flex-1 space-y-2.5 max-[399px]:flex max-[399px]:flex-none max-[399px]:flex-col max-[399px]:items-center">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-48 max-w-full" />
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                </div>
+              </>
+            ) : (
+            <>
             <Avatar className="h-16 w-16 flex-shrink-0 md:h-20 md:w-20">
               {userAvatar && !isGuest ? (
                 <AvatarImage src={userAvatar} alt={userName} />
@@ -176,7 +118,7 @@ export default function YouPage() {
               )}
             </Avatar>
             {isGuest ? (
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1 max-[399px]:w-full max-[399px]:flex-none">
                 <p className="text-lg font-bold leading-6 md:text-xl">You&apos;re browsing as a guest</p>
                 <p className="mt-1 text-sm text-muted-foreground">Sign in to sync your playlists and preferences.</p>
                 <Link
@@ -187,7 +129,7 @@ export default function YouPage() {
                 </Link>
               </div>
             ) : (
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1 max-[399px]:w-full max-[399px]:flex-none">
                 <p className="truncate text-lg font-bold leading-6 md:text-xl">{userName}</p>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">{userEmail}</p>
                 <button
@@ -199,39 +141,22 @@ export default function YouPage() {
                 </button>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
 
-        {/* Library Section — visible on mobile only; web screen uses sidebar links */}
-        <div className="mb-6 overflow-hidden rounded-2xl border md:hidden">
-          {[
-            { href: "/history", icon: History, label: "History", desc: "Your watch history" },
-            // { href: "/liked-videos", icon: ThumbsUp, label: "Liked Videos", desc: "Videos you've liked" },
-            // { href: "/watch-later", icon: Clock, label: "Watch Later", desc: "Saved for later" },
-            { href: "/playlists", icon: ListVideo, label: "Playlists", desc: "Your playlists" },
-          ].map(({ href, icon: Icon, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group flex items-center justify-between border-b px-4 py-3 transition-colors last:border-0 hover:bg-muted active:bg-accent"
-            >
-              <div className="flex items-center gap-4">
-                <Icon className="h-6 w-6 flex-shrink-0" />
-                <div>
-                  <p className="text-[15px] font-medium leading-5">{label}</p>
-                  <p className="text-[13px] leading-[18px] text-muted-foreground">{desc}</p>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          ))}
-        </div>
+        {/* Library — phones only; the web's sidebar has these */}
+        <LinkBox className="mb-6 md:hidden">
+          <LinkRow href="/history" icon={History} label="History" description="Your watch history" />
+          <LinkRow href="/playlists" icon={ListVideo} label="Playlists" description="Your playlists" />
+        </LinkBox>
 
         {/* Language Preference Card */}
-        <div className="mb-6 overflow-hidden rounded-2xl border">
+        <div className={cn(BOX, "mb-6 overflow-hidden")}>
           <div className="flex items-center gap-3 border-b px-4 py-3.5 md:px-5">
             <Globe className="h-5 w-5" />
-            <h2 className="text-base font-medium">Language preference</h2>
+            <h2 className={BOX_TITLE}>Language preferences</h2>
           </div>
           <div className="space-y-5 p-4 md:p-5">
             {/* Default language */}
@@ -272,19 +197,10 @@ export default function YouPage() {
                       type="button"
                       role="checkbox"
                       aria-checked={isSelected}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors active:bg-accent can-hover:hover:bg-muted/60"
                     >
                       <span className="text-[15px]">{lang.name}</span>
-                      <span
-                        className={cn(
-                          "h-5 w-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all",
-                          isSelected
-                            ? "bg-primary border-primary text-primary-foreground"
-                            : "border-muted-foreground/30"
-                        )}
-                      >
-                        {isSelected && <Check className="h-3.5 w-3.5" />}
-                      </span>
+                      <Tick checked={isSelected} />
                     </button>
                   );
                 })}
@@ -293,58 +209,24 @@ export default function YouPage() {
 
             {/* Save button */}
             <div className="flex justify-end items-center gap-3">
-              <Button
-                onClick={savePreferences}
-                className="h-10 rounded-full px-6 font-medium"
-              >
-                {prefSaved ? "Saved preferences" : "Save preferences"}
+              <Button onClick={savePreferences} className="px-6">
+                {prefSaved ? "Preferences saved" : "Save preferences"}
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Settings & More Section — visible on mobile only; web screen uses sidebar links */}
-        <div className="mb-6 overflow-hidden rounded-2xl border md:hidden">
-          {[
-            { href: "/settings", icon: Settings, label: "Settings", desc: "App preferences" },
-            { href: "/donate", icon: Heart, label: "Donate", desc: "Support the platform" },
-            { href: "/help", icon: HelpCircle, label: "Help & Support", desc: "Get help, guidelines" },
-            { href: "/more", icon: MoreHorizontal, label: "More", desc: "About, feedback & more" },
-          ].map(({ href, icon: Icon, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group flex items-center justify-between border-b px-4 py-3 transition-colors last:border-0 hover:bg-muted active:bg-accent"
-            >
-              <div className="flex items-center gap-4">
-                <Icon className="h-6 w-6 flex-shrink-0" />
-                <div>
-                  <p className="text-[15px] font-medium leading-5">{label}</p>
-                  <p className="text-[13px] leading-[18px] text-muted-foreground">{desc}</p>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          ))}
-        </div>
+        {/* Settings and more — phones only; the web's sidebar has these */}
+        <LinkBox className="mb-6 md:hidden">
+          <LinkRow href="/settings" icon={Settings} label="Settings" description="App preferences" />
+          <LinkRow href="/donate" icon={Heart} label="Donate" description="Support the platform" />
+          <LinkRow href="/help" icon={HelpCircle} label="Help & support" description="Get help, guidelines" />
+          <LinkRow href="/more" icon={MoreHorizontal} label="More" description="About, feedback and more" />
+        </LinkBox>
 
-        {/* Channel Preference Card */}
-        <div className="overflow-hidden rounded-2xl border">
-          <div className="flex items-center gap-3 border-b px-4 py-3.5 md:px-5">
-            <Tv className="h-5 w-5" />
-            <h2 className="text-base font-medium">Channel preference</h2>
-          </div>
-          <Link
-            href="/channels"
-            className="group flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-muted md:px-5"
-          >
-            <div>
-              <p className="text-[15px] font-medium">Manage channels</p>
-              <p className="text-[13px] text-muted-foreground">Customise your channel feed</p>
-            </div>
-            <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </div>
+        <LinkBox>
+          <LinkRow href="/channels" icon={Tv} label="Channel preferences" description="Choose the channels on your Home feed" />
+        </LinkBox>
       </div>
 
       {/* Sign Out Dialog */}
@@ -356,22 +238,10 @@ export default function YouPage() {
               Are you sure you want to sign out? Your preferences will be saved.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex gap-3 mt-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowSignOutDialog(false)}
-              className="flex-1 rounded-full"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleSignOut}
-              className="flex-1 rounded-full"
-            >
-              <LogOut className="h-4 w-4 mr-2" /> Sign out
-            </Button>
-          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowSignOutDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleSignOut}>Sign out</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

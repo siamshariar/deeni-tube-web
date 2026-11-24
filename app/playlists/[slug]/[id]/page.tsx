@@ -3,43 +3,21 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  Play,
-  Shuffle,
-  Search,
-  X,
-  Globe,
-  Lock,
-    Trash2,
-  Edit,
-  ChevronDown,
-  GripVertical,
-  Repeat,
-  ThumbsUp,
-  ThumbsDown,
-  MessageCircle,
-  Send,
-  Clock,
-  UserX,
-  Flag,
-  MoreHorizontal,
-  EyeOff,
-    Check,
-} from "lucide-react";
-import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
+import { Play, Shuffle, Globe, Lock, ListVideo, Trash2, ChevronDown, GripVertical, Repeat, ThumbsUp, ThumbsDown, MessageCircle, Send, X } from "lucide-react";
+import { DurationBadge } from "@/components/duration-badge";
+import { RowMeta } from "@/components/media-details";
+import { EmptyState } from "@/components/empty-state";
+import { MediaMenu } from "@/components/media-menu";
 import { MoreButton } from "@/components/more-button";
+import { PageBar, PageBarSkeleton } from "@/components/page-bar";
+import { PlaylistMenu } from "@/components/playlist-menu";
+import { SearchField } from "@/components/search-field";
+import { WatchInfo } from "@/components/watch-info";
 import Image from "next/image";
 import Link from "next/link";
 import { WatchedBar } from "@/components/watched-bar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Drawer,
   DrawerContent,
@@ -48,36 +26,20 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShareModal } from "@/components/share-modal";
-import { DescriptionText } from "@/components/description-text";
 import { YouTubePlayer } from "@/components/youtube-player";
-import { WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
-import { openSaveCard } from "@/lib/save-card";
-import { ReportDialog } from "@/components/report-dialog";
+import { PLAYER_BOX, PLAYER_FRAME, WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { VideoItem } from "@/lib/video-data";
 import { extendedPlaylists } from "@/lib/playlist-data";
-import { usePlaylists, isSystemPlaylist } from "@/hooks/usePlaylists";
+import { usePlaylists, isSystemPlaylist, WATCH_LATER_PLAYLIST_ID } from "@/hooks/usePlaylists";
 import { useHydrated } from "@/lib/local-store";
-import { findVideo, youtubeThumb, mediaThumb } from "@/lib/media-lookup";
+import { findPlayable, youtubeThumb, mediaThumb } from "@/lib/media-lookup";
 import { recordWatch } from "@/hooks/useWatchHistory";
 import { historyEntryForVideo } from "@/lib/history-entry";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
-import { useDontRecommend } from "@/hooks/useDontRecommend";
-import { useWatchLater } from "@/hooks/useWatchLater";
-import { getChannelHref } from "@/lib/channel-data";
-
-// YouTube-style action pill (36px tall, 24px icon) and round icon button
-const PILL =
-  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-muted pl-3 pr-4 text-sm font-medium transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
-const ROUND =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-6 [&_svg]:w-6";
-const MENU_ITEM = "flex items-center gap-4 px-4 py-2 text-sm cursor-pointer";
-const DRAWER_ITEM = "flex items-center gap-4 px-4 py-3 text-[15px] hover:bg-muted active:bg-accent cursor-pointer";
 
 import type { CommentReply } from "@/lib/types";
-import { videoPath } from "@/lib/video-url";
 // ─── Mock comments ─────────────────────────────────
 const mockCommentsWithReplies = [
   {
@@ -337,13 +299,13 @@ export default function PlaylistDetailPage() {
   const isChannelPlaylist = searchParams.get("source") === "channel";
 
   const hydrated = useHydrated();
-  const { getPlaylist, isSaved, removeVideoFromPlaylist, reorderPlaylist, deletePlaylist } = usePlaylists();
+  const { getPlaylist, removeVideoFromPlaylist, reorderPlaylist } = usePlaylists();
   // Channel playlists are read-only and always available, even if removed from the user's library
   const playlist = hydrated
     ? getPlaylist(playlistId) ?? (isChannelPlaylist ? extendedPlaylists.find((p) => p.id === playlistId) : undefined) ?? null
     : null;
   const savedVideos = useMemo(
-    () => (playlist?.videoIds ?? []).map((id) => findVideo(id)).filter((v): v is VideoItem => v !== undefined),
+    () => (playlist?.videoIds ?? []).map((id) => findPlayable(id)).filter((v): v is VideoItem => v !== undefined),
     [playlist]
   );
   // Live order while dragging; persisted on drop
@@ -352,15 +314,7 @@ export default function PlaylistDetailPage() {
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const isLoading = !hydrated;
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [showVideoShareModal, setShowVideoShareModal] = useState(false);
-  const dontRecommend = useDontRecommend();
-  const { toggleWatchLater: toggleSaved, isInWatchLater } = useWatchLater();
-  const toggleWatchLater = (v: VideoItem) =>
-    toggleSaved({ id: v.id, title: v.title, channel: v.channel, channelAvatar: v.channelAvatar || "", thumbnail: youtubeThumb(v.videoId), views: v.views, timeAgo: v.timeAgo, duration: v.duration });
-  const shareUrl = playlist && typeof window !== "undefined" ? `${window.location.origin}/playlists/${playlist.slug}/${playlist.id}` : "";
   const [collapsed, setCollapsed] = useState(false);
-  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);   // ✅ added
 
   const [dragItem, setDragItem] = useState<number | null>(null);
 
@@ -369,8 +323,6 @@ export default function PlaylistDetailPage() {
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
   const [commentsDrawerOpen, setCommentsDrawerOpen] = useState(false);
-  const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
-  const [showReportDialog, setShowReportDialog] = useState(false);
 
   const [autoPlay, setAutoPlay] = useState(true);
   const filteredVideos = useMemo(() => {
@@ -392,6 +344,7 @@ export default function PlaylistDetailPage() {
       key={currentVideo.id}
       videoId={currentVideo.videoId}
       title={currentVideo.title}
+      tall={currentVideo.isShort}
       autoplay={autoPlay}
       onAutoplayChange={setAutoPlay}
       onNext={nextVideo ? () => setCurrentVideoId(nextVideo.id) : undefined}
@@ -417,12 +370,6 @@ export default function PlaylistDetailPage() {
       setCurrentVideoId((videos[i + 1] ?? videos[i - 1])?.id ?? null);
     }
     notify(`Removed from ${playlist.name}`, { undo: removeVideoFromPlaylist(playlist.id, video.id), thumb: mediaThumb(video.id) });
-  };
-
-  const handleDeletePlaylist = () => {
-    if (!playlist) return;
-    notify("Playlist deleted", deletePlaylist(playlist.id));
-    router.push("/playlists");
   };
 
   const handleDragStart = (index: number) => {
@@ -552,70 +499,43 @@ export default function PlaylistDetailPage() {
     setReplyingTo(null);
   };
 
-  const handleShare = () => {
-    if (playlist?.isPublic) setShowShareModal(true);
-  };
-
   const toggleCollapse = () => setCollapsed(!collapsed);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pt-14">
-        {/* Mobile: sticky back bar */}
-        <div className="md:hidden sticky top-14 z-10 bg-background/95 border-b h-11 flex items-center px-4 gap-2">
-          <Skeleton className="h-5 w-5 rounded" />
-          <Skeleton className="h-4 w-40 rounded" />
-        </div>
+        <PageBarSkeleton />
 
-        {/* Mobile: full-width video */}
-        <div className="md:hidden w-full bg-black">
-          <Skeleton className="w-full aspect-video" />
-        </div>
-
-        <div className="px-3 pt-3 md:px-6 md:pt-4 pb-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left: video + info */}
-            <div className="flex-1 min-w-0 space-y-3">
-              {/* Desktop video */}
-              <Skeleton className="hidden md:block w-full aspect-video rounded-xl" />
-              {/* Title + channel row */}
-              <div className="flex gap-2 items-start">
-                <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-3 w-32 rounded" />
-                  <Skeleton className="h-3 w-24 rounded" />
-                </div>
+        <div className={cn(WATCH_PAGE, "pb-6")}>
+          <div className={WATCH_COLUMNS}>
+            <div className={WATCH_PRIMARY}>
+              <div className={PLAYER_FRAME}>
+                <Skeleton className={cn(PLAYER_BOX, "rounded-none bg-muted")} />
               </div>
-              {/* Action buttons */}
-              <div className="flex gap-2">
-                <Skeleton className="h-8 w-16 rounded-full" />
-                <Skeleton className="h-8 w-16 rounded-full" />
-                <Skeleton className="h-8 w-16 rounded-full" />
+              <div className="mt-3 space-y-3">
+                <Skeleton className="h-6 w-4/5 md:h-7" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 flex-shrink-0 rounded-full md:h-10 md:w-10" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                  <Skeleton className="h-9 w-32 rounded-full" />
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                </div>
+                <Skeleton className="h-24 w-full rounded-xl" />
               </div>
             </div>
-
-            {/* Right: playlist panel */}
-            <div className="lg:w-[402px] flex-shrink-0 self-start rounded-xl border bg-card overflow-hidden">
-              {/* Panel header */}
-              <div className="p-4 border-b space-y-2">
-                <Skeleton className="h-5 w-36 rounded" />
-                <Skeleton className="h-3 w-24 rounded" />
-                <div className="flex gap-2 mt-2">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                </div>
-              </div>
-              {/* Search */}
-              <div className="p-3 border-b">
-                <Skeleton className="h-9 w-full rounded-full" />
-              </div>
-              {/* Video rows */}
-              <div className="divide-y">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <VideoSkeleton key={i} />
-                ))}
-              </div>
+            <div className={cn(WATCH_SECONDARY, "space-y-3 self-start overflow-hidden rounded-xl border p-4")}>
+              <Skeleton className="h-6 w-40" />
+              <Skeleton className="h-9 w-28 rounded-full" />
+              <Skeleton className="h-10 w-full rounded-full" />
+              {Array.from({ length: 5 }).map((_, i) => (
+                <VideoSkeleton key={i} />
+              ))}
             </div>
           </div>
         </div>
@@ -625,13 +545,11 @@ export default function PlaylistDetailPage() {
 
   if (!playlist) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center py-16">
-          <h2 className="text-xl font-semibold">Playlist not found</h2>
-          <Button variant="outline" className="mt-4 rounded-full" onClick={() => router.back()}>
-            Go back
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background pt-14">
+        <PageBar title="Playlist" parent="/playlists" />
+        <EmptyState as="h1" icon={ListVideo} title="Playlist not found" description="It may have been deleted, or the link is incorrect.">
+          <Button onClick={() => router.push("/playlists")}>All playlists</Button>
+        </EmptyState>
       </div>
     );
   }
@@ -639,47 +557,24 @@ export default function PlaylistDetailPage() {
   if (videos.length === 0) {
     return (
       <div className="min-h-screen bg-background pt-14">
-        <div className="max-w-md mx-auto text-center px-4 py-20">
-          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <Play className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <h1 className="text-xl font-semibold">{playlist.name}</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            No videos in this playlist yet. Use &quot;Save to playlist&quot; on any video to add it here.
-          </p>
-          <div className="mt-6 flex justify-center gap-2">
-            <Button variant="outline" className="rounded-full" onClick={() => router.push("/playlists")}>
-              All playlists
-            </Button>
-            <Button className="rounded-full" onClick={() => router.push("/")}>
-              Browse videos
-            </Button>
-          </div>
-        </div>
+        <PageBar title={playlist.name} parent="/playlists" />
+        <EmptyState as="h1" icon={ListVideo} title={playlist.name} description={'No videos in this playlist yet. Use "Save to playlist" on any video to add it here.'}>
+          <Button variant="outline" onClick={() => router.push("/playlists")}>All playlists</Button>
+          <Button onClick={() => router.push("/")}>Browse videos</Button>
+        </EmptyState>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background pt-14">
-      {/* Mobile back button + title */}
-      {isMobile && (
-        <div className="sticky top-14 z-10 bg-background/95 backdrop-blur-sm border-b">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 px-4 py-2 w-full min-h-[44px]"
-          >
-            <ArrowLeft className="h-5 w-5 shrink-0" />
-            <span className="text-[15px] font-medium line-clamp-1 text-left">
-              {currentVideo?.title || playlist.name}
-            </span>
-          </button>
-        </div>
-      )}
+      <PageBar title={playlist.name} parent="/playlists" />
 
       {/* Mobile: full-width video (edge-to-edge) */}
       {isMobile && (
-        <div className="relative w-full aspect-video bg-black">{player}</div>
+        <div className="bg-black">
+          <div className={PLAYER_BOX}>{player}</div>
+        </div>
       )}
 
       <div className="pb-6">
@@ -689,114 +584,12 @@ export default function PlaylistDetailPage() {
             <div className={WATCH_PRIMARY}>
               {/* Desktop video player: always exactly 16:9, so no black bars at the sides */}
               {!isMobile && (
-                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">{player}</div>
+                <div className={PLAYER_BOX}>{player}</div>
               )}
 
               {currentVideo && (
-                <div className="mt-3">
-                  <h1 className="text-lg md:text-xl font-semibold md:font-bold leading-6 md:leading-7 line-clamp-2 md:line-clamp-none [overflow-wrap:anywhere]">
-                    {currentVideo.title}
-                  </h1>
-
-                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    {/* Channel */}
-                    <Link href={getChannelHref(currentVideo.channelId)} className="flex min-w-0 items-center gap-3 self-start md:self-auto">
-                      <Avatar className="h-9 w-9 md:h-10 md:w-10 flex-shrink-0">
-                        <AvatarImage src={currentVideo.channelAvatar} alt="" />
-                        <AvatarFallback className="font-medium">{currentVideo.channel?.charAt(0) || "C"}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] md:text-base font-medium leading-5">{currentVideo.channel}</p>
-                        <p className="text-xs leading-[18px] text-muted-foreground">780K subscribers</p>
-                      </div>
-                    </Link>
-
-                    {/* Actions — a scrollable row of pills on phones */}
-                    <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 scrollbar-none md:mx-0 md:overflow-visible md:px-0">
-                      <button type="button" className={PILL} onClick={() => setShowVideoShareModal(true)}>
-                        <ShareIcon /> Share
-                      </button>
-                      <button
-                        type="button"
-                        className={PILL}
-                        aria-pressed={isInWatchLater(currentVideo.id)}
-                        onClick={() => toggleWatchLater(currentVideo)}
-                      >
-                        {isInWatchLater(currentVideo.id) ? <><Check /> Saved</> : <><Clock /> Watch later</>}
-                      </button>
-                      <button type="button" className={PILL} onClick={(e) => openSaveCard(currentVideo, e.currentTarget)}>
-                        <SaveIcon filled={isSaved(currentVideo.id)} /> Save
-                      </button>
-                      {isMobile ? (
-                        <Drawer open={menuDrawerOpen} onOpenChange={setMenuDrawerOpen}>
-                          <DrawerTrigger asChild>
-                            <button type="button" aria-label="More actions" className={ROUND}>
-                              <MoreHorizontal />
-                            </button>
-                          </DrawerTrigger>
-                          <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
-                            <div className="mt-2 pb-6">
-                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); if (currentVideo) dontRecommend(currentVideo.channelId, currentVideo.channel); }}><UserX className="h-6 w-6" /> Don&apos;t recommend channel</div>
-                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-6 w-6" /> Not interested</div>
-                              <div className={DRAWER_ITEM} onClick={() => { setMenuDrawerOpen(false); setTimeout(() => setShowReportDialog(true), 150); }}><Flag className="h-6 w-6" /> Report</div>
-                            </div>
-                          </DrawerContent>
-                        </Drawer>
-                      ) : (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button type="button" aria-label="More actions" className={ROUND}>
-                              <MoreHorizontal />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
-                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => { if (currentVideo) dontRecommend(currentVideo.channelId, currentVideo.channel); }}><UserX className="h-5 w-5" /> Don&apos;t recommend channel</DropdownMenuItem>
-                            <DropdownMenuItem className={MENU_ITEM} onSelect={() => { notify("Video removed"); setTimeout(() => router.back(), 1000); }}><EyeOff className="h-5 w-5" /> Not interested</DropdownMenuItem>
-                            <DropdownMenuItem className={MENU_ITEM} afterClose={() => setShowReportDialog(true)}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Description – modal on mobile, inline on desktop */}
-                  <div className="mt-3 rounded-xl bg-muted p-3 text-sm leading-5">
-                    <p className="font-medium">
-                      {currentVideo.views}
-                      <span className="ml-2">{currentVideo.timeAgo}</span>
-                    </p>
-                    {isMobile ? (
-                      <>
-                        <p className="mt-1 line-clamp-2 [overflow-wrap:anywhere]">{currentVideo.description}</p>
-                        <button
-                          type="button"
-                          onClick={() => setDescriptionModalOpen(true)}
-                          className="mt-1 font-medium"
-                        >
-                          ...more
-                        </button>
-                      </>
-                    ) : (
-                      <DescriptionText text={currentVideo.description} className="mt-1" />
-                    )}
-                  </div>
-
-                  {/* Description for phones: a sheet from the bottom, as on YouTube */}
-                  <Drawer open={descriptionModalOpen} onOpenChange={setDescriptionModalOpen}>
-                    <DrawerContent accessibleTitle={null} className="max-h-[85dvh] px-0">
-                      <div className="flex flex-shrink-0 items-center justify-between border-b px-4 py-1">
-                        <DrawerTitle className="text-lg font-bold">Description</DrawerTitle>
-                        <button type="button" onClick={() => setDescriptionModalOpen(false)} aria-label="Close" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent">
-                          <X className="h-6 w-6" />
-                        </button>
-                      </div>
-                      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6 pt-3">
-                        <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentVideo.title}</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">{currentVideo.views} · {currentVideo.timeAgo}</p>
-                        <DescriptionText text={currentVideo.description} className="mt-3 text-sm leading-relaxed" />
-                      </div>
-                    </DrawerContent>
-                  </Drawer>
+                <div>
+                  <WatchInfo key={currentVideo.id} video={currentVideo} parent="/playlists" />
 
                   {/* Comments section — commented out; remove the false && wrapper to re-enable */}
                   {false && (<div className="mt-4">
@@ -965,7 +758,7 @@ export default function PlaylistDetailPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold leading-7 line-clamp-2">
-                      <Link href={`/playlists/${playlist.slug}/${playlist.id}`} className="">
+                      <Link href={`/playlists/${playlist.slug}/${playlist.id}`}>
                         {playlist.name}
                       </Link>
                     </h2>
@@ -1008,61 +801,31 @@ export default function PlaylistDetailPage() {
                     <button
                       type="button"
                       aria-label="Shuffle"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent"
+                      disabled={videos.length < 2}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
                       onClick={() => {
-                        if (videos.length) {
-                          const random = videos[Math.floor(Math.random() * videos.length)];
-                          handleSelectVideo(random);
-                        }
+                        // Another one, or a press would sometimes do nothing
+                        const others = videos.filter((v) => v.id !== currentVideo?.id);
+                        const random = others[Math.floor(Math.random() * others.length)];
+                        if (random) handleSelectVideo(random);
                       }}
                     >
                       <Shuffle className="h-6 w-6" />
                     </button>
                     <div className="flex-1" />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <MoreButton className="-mr-2" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 rounded-xl py-2">
-                        {playlist.isPublic && (
-                          <DropdownMenuItem className={MENU_ITEM} onClick={handleShare}>
-                            <ShareIcon className="h-5 w-5" /> Share
-                          </DropdownMenuItem>
-                        )}
-                        {canEdit && !isSystemPlaylist(playlist.id) && (
-                          <>
-                            <DropdownMenuItem className={MENU_ITEM} onClick={() => router.push("/playlists")}>
-                              <Edit className="h-5 w-5" /> Edit playlist
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className={cn(MENU_ITEM, "text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400")} onClick={handleDeletePlaylist}>
-                              <Trash2 className="h-5 w-5" /> Delete playlist
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <PlaylistMenu
+                      playlist={playlist}
+                      readOnly={!canEdit}
+                      onDeleted={() => router.push("/playlists")}
+                      trigger={<MoreButton className="-mr-2" aria-label="Playlist actions" />}
+                    />
                   </div>
                 )}
               </div>
 
               {!collapsed && (
                 <div className="px-3 py-2 flex-shrink-0">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      aria-label="Search in playlist"
-                      placeholder="Search in playlist"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-9 w-full rounded-full border border-transparent bg-muted pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-input focus:bg-background"
-                    />
-                    {searchQuery && (
-                      <button aria-label="Clear search" onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
+                  <SearchField value={searchQuery} onChange={setSearchQuery} label="Search in playlist" />
                 </div>
               )}
 
@@ -1086,18 +849,9 @@ export default function PlaylistDetailPage() {
                     return (
                     <div
                       key={video.id}
-                      role="button"
-                      tabIndex={0}
                       aria-current={isCurrent ? "true" : undefined}
-                      onClick={() => handleSelectVideo(video)}
-                      onKeyDown={(e) => {
-                        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-                          e.preventDefault();
-                          handleSelectVideo(video);
-                        }
-                      }}
                       className={cn(
-                        "w-full flex items-center gap-2 py-1 pl-1 pr-1 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                        "group relative flex w-full items-center gap-2 py-1 pl-1 pr-1 transition-colors",
                         isCurrent
                           ? "bg-accent"
                           : "hover:bg-muted"
@@ -1136,62 +890,61 @@ export default function PlaylistDetailPage() {
                       <div className="relative w-[120px] h-[68px] rounded-lg overflow-hidden flex-shrink-0 bg-muted">
                         <Image
                           src={youtubeThumb(video.videoId, "small")}
-                          alt={video.title}
+                          alt=""
                           fill
                           className="object-cover"
                         />
-                        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 text-xs font-medium leading-4 text-white">
-                          {video.duration}
-                        </span>
+                        <DurationBadge>{video.duration}</DurationBadge>
                         <WatchedBar videoId={video.videoId} />
-                        {isCurrent && (
-                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/30">
-                            <div className="h-full bg-red-600" style={{ width: "60%" }} />
-                          </div>
-                        )}
                       </div>
 
                       {/* Text: title → channel → timeAgo, left-aligned, centred in row */}
                       <div className="flex-1 min-w-0 self-start pt-0.5 text-left">
-                        <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">
-                          {video.title}
+                        {/* The title's button covers the row (its menu is above it) */}
+                        <h3>
+                          {/* Not a <button>: in Firefox a row can't be dragged by one */}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleSelectVideo(video)}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault();
+                              handleSelectVideo(video);
+                            }}
+                            className="block cursor-pointer after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+                          >
+                            <span className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{video.title}</span>
+                          </span>
                         </h3>
                         {video.channel && (
                           <p className="mt-1 truncate text-[13px] leading-[18px] text-muted-foreground">
                             {video.channel}
                           </p>
                         )}
-                        <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
-                          {video.timeAgo}
-                        </p>
+                        <RowMeta views={video.views} timeAgo={video.timeAgo} className="text-[13px] leading-[18px] text-muted-foreground" />
                       </div>
 
                       {/* Three-dot: compact; with a mouse only shown on row hover/focus or while open (always shown on touch screens) */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                      <div className="relative z-[1] -ml-1 self-start">
+                      <MediaMenu
+                        scope="own"
+                        media={video}
+                        inWatchLater={playlist.id === WATCH_LATER_PLAYLIST_ID}
+                        extra={
+                          canEdit
+                            ? [{ id: "remove", label: `Remove from ${isSystemPlaylist(playlist.id) ? playlist.name : "playlist"}`, icon: Trash2, danger: true, onSelect: () => handleRemoveVideo(video) }]
+                            : []
+                        }
+                        trigger={
                           <MoreButton
                             size="sm"
                             aria-label={`More actions for ${video.title}`}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            className="-ml-1 self-start can-hover:opacity-0 can-hover:group-hover:opacity-100 kb:group-focus-within:opacity-100 data-[state=open]:opacity-100"
+                            className="can-hover:opacity-0 can-hover:group-hover:opacity-100 kb:group-focus-within:opacity-100 data-[state=open]:opacity-100"
                           />
-                        </DropdownMenuTrigger>
-                        {/* Menu is portaled, but React still bubbles its clicks to the row; stop that */}
-                        <DropdownMenuContent align="end" className="w-56 rounded-xl py-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                          <DropdownMenuItem className={MENU_ITEM} onClick={() => handleSelectVideo(video)}>
-                            <Play className="h-5 w-5" /> Play now
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onClick={() => toggleWatchLater(video)}>
-                            <Clock className="h-5 w-5" /> {isInWatchLater(video.id) ? "Remove from Watch later" : "Save to Watch later"}
-                          </DropdownMenuItem>
-                          {canEdit && (
-                            <DropdownMenuItem className={cn(MENU_ITEM, "text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400")} onClick={() => handleRemoveVideo(video)}>
-                              <Trash2 className="h-5 w-5" /> Remove from playlist
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        }
+                      />
+                      </div>
                     </div>
                     );
                   })}
@@ -1201,23 +954,6 @@ export default function PlaylistDetailPage() {
           </div>
         </div>
       </div>
-
-      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} videoUrl={shareUrl} />
-      <ShareModal
-        isOpen={showVideoShareModal}
-        onClose={() => setShowVideoShareModal(false)}
-        videoUrl={currentVideo && typeof window !== "undefined" ? `${window.location.origin}${videoPath(currentVideo)}` : ""}
-      />
-      {currentVideo && (
-        <>
-          <ReportDialog
-            videoTitle={currentVideo.title}
-            videoId={currentVideo.id}
-            open={showReportDialog}
-            onOpenChange={setShowReportDialog}
-          />
-        </>
-      )}
     </div>
   );
 }

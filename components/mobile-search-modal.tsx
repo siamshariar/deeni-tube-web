@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search, X, ArrowLeft, History, Check, ChevronDown, Mic,
-} from "lucide-react";
+import { Search, X, History, Mic } from "lucide-react";
+import { MultiSelect } from "@/components/multi-select";
+import { BackButton } from "@/components/page-bar";
+import { CHIP, CHIP_OFF, CHIP_ON } from "@/components/page-layout";
+import { SearchField } from "@/components/search-field";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { VoiceSearchDialog } from "@/components/voice-search";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,113 +39,6 @@ function saveRecent(list: string[]) {
   try { localStorage.setItem("recentSearches", JSON.stringify(list)); } catch {}
 }
 
-// ── Searchable multi-select dropdown ─────────────────────────────────────────
-// Closes immediately after each item tap so user moves on to the Search button
-
-function MultiSelect({
-  label, options, selected, onChange, searchable = false,
-}: {
-  label: string; options: string[]; selected: string[];
-  onChange: (v: string[]) => void; searchable?: boolean;
-}) {
-  const [open, setOpen]       = useState(false);
-  const [text, setText]       = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false); setText("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const toggle = (v: string) => {
-    onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]);
-    setOpen(false); setText(""); // auto-close
-  };
-
-  const remove = (v: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange(selected.filter(s => s !== v));
-  };
-
-  const filtered = text
-    ? options.filter(o => o.toLowerCase().includes(text.toLowerCase()))
-    : options;
-
-  return (
-    <div ref={ref} className="relative">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{label}</p>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={cn(
-          "w-full min-h-[42px] px-3 py-2 flex items-center gap-2 flex-wrap rounded-xl border text-left transition-colors bg-background",
-          open ? "border-primary" : "border-border"
-        )}
-      >
-        <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
-          {selected.length === 0 ? (
-            <span className="text-sm text-muted-foreground">Any {label.toLowerCase()}…</span>
-          ) : selected.map(val => (
-            <span key={val} className="flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full font-medium">
-              {val}
-              <span
-                role="button" tabIndex={0}
-                onClick={e => remove(val, e as unknown as React.MouseEvent)}
-                className="cursor-pointer hover:opacity-70"
-              >
-                <X className="h-3 w-3" />
-              </span>
-            </span>
-          ))}
-        </div>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200", open && "rotate-180")} />
-      </button>
-
-      {open && (
-        <div className="absolute z-[70] mt-1 w-full bg-popover border rounded-xl shadow-xl overflow-hidden">
-          {searchable && (
-            <div className="p-2 border-b">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <input
-                  autoFocus type="text" value={text}
-                  onChange={e => setText(e.target.value)}
-                  onClick={e => e.stopPropagation()}
-                  placeholder={`Search ${label.toLowerCase()}…`}
-                  className="w-full h-8 pl-8 pr-2 text-sm rounded-lg border bg-muted/40 focus:outline-none"
-                />
-              </div>
-            </div>
-          )}
-          <div className="max-h-52 overflow-y-auto">
-            {filtered.length === 0
-              ? <p className="px-4 py-3 text-sm text-muted-foreground text-center">No results</p>
-              : filtered.map(opt => {
-                  const sel = selected.includes(opt);
-                  return (
-                    <button key={opt} type="button" onClick={() => toggle(opt)}
-                      className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-muted transition-colors", sel && "bg-muted/50 font-medium")}
-                    >
-                      <span className={cn("h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors", sel ? "bg-primary border-primary" : "border-muted-foreground/30")}>
-                        {sel && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </span>
-                      {opt}
-                    </button>
-                  );
-                })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Global mobile search modal ────────────────────────────────────────────────
 // Always mounted in the layout. Opens via: window.dispatchEvent(new CustomEvent("open-search-modal"))
 // After Search is pressed: navigates to /search?q=...&filters...
@@ -160,6 +56,7 @@ export default function MobileSearchModal() {
   const [recentList, setRecentList]             = useState<string[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const keyboard = useKeyboardInset(isOpen);
 
   // Listen for the open event dispatched by the header search icon
   useEffect(() => {
@@ -168,7 +65,7 @@ export default function MobileSearchModal() {
       const params = new URLSearchParams(window.location.search);
       const urlQ   = params.get("q") || "";
       if (urlQ) setQuery(urlQ);
-      setActiveLangs(parseSearchLangs(window.location.pathname === "/search" ? params.get("lang") : null));
+      setActiveLangs(parseSearchLangs(/^\/search(\/|$)/.test(window.location.pathname) ? params.get("lang") : null));
 
       setRecentList(loadRecent());
       setIsOpen(true);
@@ -244,51 +141,35 @@ export default function MobileSearchModal() {
   if (!isOpen) return null;
 
   return (
-    <div className="md:hidden fixed inset-0 z-[60] bg-background flex flex-col">
+    // Above the phone's keyboard, so the Search button isn't behind it
+    <div className="md:hidden safe-x fixed inset-0 z-[60] bg-background flex flex-col" style={{ paddingBottom: keyboard }}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 h-14 border-b flex-shrink-0">
-        <button aria-label="Close search"
-          onClick={close}
-          className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <span className="font-semibold flex-1">Search</span>
+      <div className="flex h-14 flex-shrink-0 items-center gap-1 border-b pl-0.5 pr-2">
+        <BackButton label="Close search" onClick={close} />
+        <span className="flex-1 text-base font-medium leading-6">Search</span>
         {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
-          <button onClick={resetFilters} className="text-sm text-primary">
+          <Button variant="ghost" className="h-9 px-3" onClick={resetFilters}>
             Clear filters
-          </button>
+          </Button>
         )}
       </div>
 
       {/* ── Search input ────────────────────────────────────────────── */}
-      <div className="px-4 pt-3 pb-2 flex-shrink-0 flex items-center gap-2">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && (query.trim() || hasActiveFilters)) handleSearch(); }}
-            placeholder="Search videos, scholars, channels…"
-            className="w-full h-11 pl-10 pr-10 rounded-full bg-muted/60 text-sm focus:outline-none focus:bg-muted transition-colors"
-          />
-          {query && (
-            <button aria-label="Clear search"
-              onClick={() => setQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+      <div className="flex flex-shrink-0 items-center gap-2 px-3 py-3">
+        <SearchField
+          inputRef={inputRef}
+          value={query}
+          onChange={setQuery}
+          onEnter={() => { if (query.trim() || hasActiveFilters) handleSearch(); }}
+          label="Search videos, scholars, channels"
+          className="flex-1"
+        />
         <button
           type="button"
           aria-label="Search with your voice"
           onClick={() => setVoiceOpen(true)}
-          className="h-11 w-11 flex-shrink-0 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted transition-colors active:bg-accent"
         >
           <Mic className="h-6 w-6" />
         </button>
@@ -300,103 +181,59 @@ export default function MobileSearchModal() {
       </div>
 
       {/* ── Scrollable filter body ───────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Recent searches — only when query is empty */}
         {!query && recentList.length > 0 && (
-          <div className="border-b">
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent</span>
-              <button
-                onClick={() => { setRecentList([]); saveRecent([]); }}
-                className="text-xs text-primary"
-              >
+          <div className="border-b pb-2">
+            <div className="flex items-center justify-between pl-3 pr-2">
+              <span className="text-sm font-medium">Recent searches</span>
+              <Button variant="ghost" className="h-9 px-3" onClick={() => { setRecentList([]); saveRecent([]); }}>
                 Clear all
-              </button>
+              </Button>
             </div>
-            {recentList.map(s => (
-              <button
-                key={s}
-                onClick={() => handleRecentTap(s)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-              >
-                <History className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="flex-1 text-sm truncate">{s}</span>
-                <button aria-label="Remove from recent searches"
-                  onClick={e => { e.stopPropagation(); removeFromRecent(s); }}
-                  className="p-1 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
+            {recentList.map((s) => (
+              <div key={s} className="flex items-center pr-1">
+                <button type="button" onClick={() => handleRecentTap(s)} className="flex min-h-11 min-w-0 flex-1 items-center gap-4 px-3 text-left transition-colors active:bg-accent">
+                  <History className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="flex-1 truncate text-[15px]">{s}</span>
                 </button>
-              </button>
+                <button type="button" aria-label={`Remove "${s}" from recent searches`} onClick={() => removeFromRecent(s)} className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-accent">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             ))}
           </div>
         )}
 
         {/* ── Filter sections ────────────────────────────────────────── */}
-        <div className="px-4 py-5 space-y-6">
-
-          {/* Language */}
+        <div className="space-y-6 px-3 py-5">
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2.5">Language</p>
+            <p className="mb-2 text-sm font-medium">Language</p>
             <div className="flex flex-wrap gap-2">
-              {LANGUAGES.map(lang => (
-                <button
-                  key={lang.code}
-                  onClick={() => toggleLang(lang.code)}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                    activeLangs.includes(lang.code)
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-background text-foreground border-border hover:bg-muted"
-                  )}
-                >
+              {LANGUAGES.map((lang) => (
+                <button key={lang.code} type="button" aria-pressed={activeLangs.includes(lang.code)} onClick={() => toggleLang(lang.code)} className={cn(CHIP, activeLangs.includes(lang.code) ? CHIP_ON : CHIP_OFF)}>
                   {lang.name}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Category — same dropdown style as Scholars & Channels */}
-          <MultiSelect
-            label="Category"
-            options={categoryOptions}
-            selected={selectedCategories}
-            onChange={setSelectedCategories}
-            searchable
-          />
-
-          {/* Scholars */}
-          <MultiSelect
-            label="Scholars"
-            options={scholarOptions}
-            selected={selectedScholars}
-            onChange={setSelectedScholars}
-            searchable
-          />
-
-          {/* Channels */}
-          <MultiSelect
-            label="Channels"
-            options={channelOptions}
-            selected={selectedChannels}
-            onChange={setSelectedChannels}
-            searchable
-          />
+          <MultiSelect closeOnPick label="Categories" options={categoryOptions} selected={selectedCategories} onChange={setSelectedCategories} />
+          <MultiSelect closeOnPick label="Scholars" options={scholarOptions} selected={selectedScholars} onChange={setSelectedScholars} />
+          <MultiSelect closeOnPick label="Channels" options={channelOptions} selected={selectedChannels} onChange={setSelectedChannels} />
         </div>
       </div>
 
       {/* ── Sticky Search button ─────────────────────────────────────── */}
       <div
-        className="px-4 py-2 border-t flex-shrink-0"
+        className="flex-shrink-0 border-t px-3 py-2"
         style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <Button
           onClick={handleSearch}
           disabled={!query.trim() && !hasActiveFilters}
-          className="w-full rounded-full h-10 font-semibold"
+          className="h-11 w-full text-[15px]"
         >
-          <Search className="h-4 w-4 mr-2" />
+          <Search />
           Search
         </Button>
       </div>

@@ -41,7 +41,7 @@ export function PlaylistNameField({
           onKeyDown={(e) => { if (e.key === "Enter" && onEnter) { e.preventDefault(); onEnter(); } }}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          className="block w-full bg-transparent text-sm font-medium outline-none placeholder:font-normal placeholder:text-muted-foreground"
+          className="block w-full bg-transparent text-base font-medium outline-none md:text-sm placeholder:font-normal placeholder:text-muted-foreground"
         />
       </div>
       <p className="mt-1 text-right text-xs text-muted-foreground">{value.length}/{PLAYLIST_NAME_MAX}</p>
@@ -81,7 +81,6 @@ export function OptionSelect<T>({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`${label}: ${current?.label ?? ""}`}
           className={cn(
             FIELD,
             "group flex w-full items-center gap-3 text-left focus-visible:outline-none",

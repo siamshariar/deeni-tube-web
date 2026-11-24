@@ -1,4 +1,5 @@
 // lib/channel-data.ts
+import { compactNumber } from "@/lib/format";
 
 export interface ChannelItem {
   id: string;
@@ -159,6 +160,16 @@ export const channelData: ChannelItem[] = [
 ];
 /** Route for a channel page, given a video's `channelId` (ids and slugs differ for some channels). */
 export function getChannelHref(channelId: string): string {
-  const channel = channelData.find((ch) => ch.id === channelId || ch.slug === channelId);
+  const channel = findChannel(channelId);
   return `/channels/${channel?.slug ?? channelId}`;
+}
+
+export function findChannel(channelId: string): ChannelItem | undefined {
+  return channelData.find((ch) => ch.id === channelId || ch.slug === channelId);
+}
+
+/** "780K subscribers" (empty for a channel that isn't in the list) */
+export function subscribersText(channelId: string): string {
+  const channel = findChannel(channelId);
+  return channel ? `${compactNumber(channel.subscribers, 3)} subscribers` : "";
 }

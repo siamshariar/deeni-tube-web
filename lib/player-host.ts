@@ -53,6 +53,7 @@ let attached: { el: HTMLElement; token: number; fit: HostFit } | null = null;
 let nextToken = 1;
 let cropped = true;
 let fullscreen = false;
+let tall = false;
 let resetTimer: ReturnType<typeof setTimeout> | undefined;
 // After a tap: YouTube can switch back to muted once the new video has loaded (seen in Quran Tube on iPhones);
 // until then, say unMute again (allowed now: the tap gave this player sound)
@@ -315,6 +316,12 @@ export function setHostCropped(on: boolean) {
   cropped = on;
   applyCrop();
 }
+/** A short in a watch player's 16:9 box: shown whole (see tallFrame in components/youtube-player). */
+export function setHostTall(on: boolean) {
+  if (tall === on) return;
+  tall = on;
+  applyCrop();
+}
 /** Fill the window (the page player's full screen). */
 export function setHostFullscreen(on: boolean) {
   if (fullscreen === on) return;
@@ -329,6 +336,16 @@ function applyCrop() {
   if (attached?.fit === "short") return place(); // sized in place()
   frame.style.left = "0";
   frame.style.width = "100%";
+  if (tall) {
+    frame.style.left = "50%";
+    frame.style.width = fullscreen ? "min(112.5vh, 200%)" : `${(2 * 9 * 9 * 100) / 256}%`;
+    if (fullscreen) frame.style.width = "min(112.5dvh, 200%)"; // where the browser knows dvh
+    frame.style.top = cropped ? `-${CROP / 2}px` : "0";
+    frame.style.height = cropped ? `calc(200% + ${CROP * 2}px)` : "200%";
+    frame.style.transformOrigin = "top center";
+    frame.style.transform = "translateX(-50%) scale(0.5)";
+    return;
+  }
   // Full screen on a screen wider than 16:9 (phones): no wider than the video, or the crop would cut into it
   if (fullscreen) {
     frame.style.left = "50%";
@@ -437,7 +454,7 @@ function linkTarget(el: Element | null): { videoId: string; short: boolean } | n
     const v = url.searchParams.get("v");
     return { videoId: v && /^[\w-]{11}$/.test(v) ? v : FIRST_SHORT_ID, short: true };
   }
-  const m = url.pathname.match(/^\/videos\/[^/]+\/([\w-]{11})\/?$/);
+  const m = url.pathname.match(/^\/(?:videos|search)\/[^/]+\/([\w-]{11})\/?$/);
   return m ? { videoId: m[1], short: false } : null;
 }
 

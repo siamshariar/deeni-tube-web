@@ -12,6 +12,8 @@ export interface VideoItem {
   description: string;
   language: string;
   category: string;
+  /** A short in a list of videos (playlists); see findPlayable in lib/media-lookup */
+  isShort?: boolean;
 }
 
 const MONZUR_AVATAR =
@@ -117,7 +119,7 @@ export const videoData: VideoItem[] = [
     id: "v6",
     videoId: "908GzCFuysY",
     title: "জীবন ঘনিষ্ঠ গুরুত্বপূর্ণ কিছু প্রশ্নোত্তর│Question & Answer│Dr. Khondokar Abdullah Jahangir",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channel: "Dr. Khandaker Abdullah Jahangir",
     channelId: "abdullah-jahangir",
     channelAvatar: ABDULLAH_AVATAR,
     duration: "1:08:00",
@@ -131,7 +133,7 @@ export const videoData: VideoItem[] = [
     id: "v8",
     videoId: "rtVnA9EA0xg",
     title: "আত্মার তৃপ্তি কোথায়? | Dr. Abdullah Jahangir R. | অন্তরের প্রকৃত শান্তি পাওয়ার উপায়",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channel: "Dr. Khandaker Abdullah Jahangir",
     channelId: "abdullah-jahangir",
     channelAvatar: ABDULLAH_AVATAR,
     duration: "5:07",
@@ -145,7 +147,7 @@ export const videoData: VideoItem[] = [
     id: "v9",
     videoId: "kVbpcXFFeWQ",
     title: "এত সুন্দর করে আর কে বুঝাবে || খন্দকার আবদুল্লাহ জাহাঙ্গীর",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channel: "Dr. Khandaker Abdullah Jahangir",
     channelId: "abdullah-jahangir",
     channelAvatar: ABDULLAH_AVATAR,
     duration: "26:07",
@@ -159,7 +161,7 @@ export const videoData: VideoItem[] = [
     id: "v10",
     videoId: "9K_wuVawflg",
     title: "আখিরাতের চিন্তা এবং আব্দুল কাদের জিলানী রহমতুল্লাহি আলাইহির জীবনী",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channel: "Dr. Khandaker Abdullah Jahangir",
     channelId: "abdullah-jahangir",
     channelAvatar: ABDULLAH_AVATAR,
     duration: "1:15:24",
@@ -237,7 +239,7 @@ export const videoData: VideoItem[] = [
     id: "v21",
     videoId: "Ivlnd39NH1w",
     title: "আল্লাহ রাব্বুল আলামিনের তাওহীদ || হালাকাহ || Dr. Mohammad Imam Hossain",
-    channel: "Dr. Mohammad Imam Hossain",
+    channel: "Tafseerul Quran",
     channelId: "imam-hossain",
     channelAvatar: TAFSEERUL_QURAN_AVATAR,
     duration: "1:16:28",
@@ -251,7 +253,7 @@ export const videoData: VideoItem[] = [
     id: "v22",
     videoId: "AMfzv5VrYEE",
     title: "কিছু গুরুত্বপূর্ণ ফতোয়া ।। বইঃ দারসুল আম ।। Dr. Mohammad Imam Hossain",
-    channel: "Dr. Mohammad Imam Hossain",
+    channel: "Tafseerul Quran",
     channelId: "imam-hossain",
     channelAvatar: TAFSEERUL_QURAN_AVATAR,
     duration: "54:10",

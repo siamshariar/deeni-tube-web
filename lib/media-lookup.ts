@@ -1,21 +1,39 @@
 // lib/media-lookup.ts
-// Pages identify the same video differently (internal id like "v3" vs YouTube id).
-// These helpers resolve either form so saved items are stored under one id.
+// Pages identify the same video or short differently (internal id like "v3" or "s2", or its YouTube id).
+// These helpers resolve either form, so a saved item is stored under one id.
 
-import { videoData, VideoItem } from "@/lib/video-data";
+import { viewsText } from "@/lib/format";
 import { shortsVideos, ShortVideo } from "@/lib/shorts-data";
+import { videoData, VideoItem } from "@/lib/video-data";
+import { videoPath } from "@/lib/video-url";
 
 export function findVideo(id: string): VideoItem | undefined {
   return videoData.find((v) => v.id === id) ?? videoData.find((v) => v.videoId === id);
 }
 
 export function findShort(id: string): ShortVideo | undefined {
-  return shortsVideos.find((s) => s.id === id) ?? shortsVideos.find((s) => s.youtubeId === id);
+  return shortsVideos.find((s) => s.id === id) ?? shortsVideos.find((s) => s.videoId === id);
 }
 
-/** Canonical id for a main-feed video (falls back to the given id). */
-export function canonicalVideoId(id: string): string {
-  return findVideo(id)?.id ?? id;
+/** The one id a video or short is stored under (the given id when it isn't in the catalogue). */
+export function canonicalMediaId(id: string): string {
+  return findVideo(id)?.id ?? findShort(id)?.id ?? id;
+}
+
+/** A short in a video's shape, for lists that hold both (playlists). */
+function shortAsVideo(s: ShortVideo): VideoItem {
+  return {
+    id: s.id, videoId: s.videoId, title: s.title, channel: s.channel, channelId: s.channelId, channelAvatar: s.channelAvatar,
+    duration: s.duration, views: viewsText(s.views), timeAgo: s.timeAgo, description: s.description, language: "", category: "Shorts", isShort: true,
+  };
+}
+
+/** A video or short by either id, as a video: what a playlist holds. */
+export function findPlayable(id: string): VideoItem | undefined {
+  const video = findVideo(id);
+  if (video) return video;
+  const short = findShort(id);
+  return short && shortAsVideo(short);
 }
 
 /** Extracts the YouTube id from an img.youtube.com thumbnail URL. */
@@ -32,10 +50,13 @@ export function youtubeThumb(videoId: string, size: "small" | "medium" = "medium
   return `https://img.youtube.com/vi/${videoId}/${size === "small" ? "mqdefault" : "hqdefault"}.jpg`;
 }
 
+/** Where a video or short opens. */
+export function mediaPath(media: { title: string; videoId: string; isShort?: boolean }): string {
+  return media.isShort ? `/shorts?v=${media.videoId}` : videoPath(media);
+}
+
 /** The small picture of a video or short (by either id), for messages; undefined when it isn't in the catalogue. */
 export function mediaThumb(id: string): { src: string; short: boolean } | undefined {
-  const video = findVideo(id);
-  if (video) return { src: youtubeThumb(video.videoId, "small"), short: false };
-  const short = findShort(id);
-  return short && { src: youtubeThumb(short.youtubeId, "small"), short: true };
+  const media = findPlayable(id);
+  return media && { src: youtubeThumb(media.videoId, "small"), short: !!media.isShort };
 }

@@ -62,6 +62,7 @@ import {
   playFromTap,
   revealHost,
   setHostCropped,
+  setHostTall,
   setHostFullscreen,
 } from "@/lib/player-host";
 
@@ -124,6 +125,20 @@ function formatTime(seconds: number) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
+/**
+ * A short's frame in the 16:9 box: as high as the box and 9:16 wide, so the whole short shows, with YouTube's overlays in
+ * the bands above and below it as usual (a frame of the box's width cut its top and bottom off). It is drawn at twice that
+ * size and halved, because YouTube's player must be at least 200px wide. (lib/player-host does the same.)
+ */
+const tallFrame = (cropped: boolean, full: boolean): React.CSSProperties => ({
+  left: "50%",
+  width: full ? "min(112.5dvh, 200%)" : `${(2 * 9 * 9 * 100) / 256}%`, // 9:16 of the box's height, itself 9:16 of its width
+  top: cropped ? -CROP / 2 : 0,
+  height: cropped ? `calc(200% + ${CROP * 2}px)` : "200%",
+  transform: "translateX(-50%) scale(0.5)",
+  transformOrigin: "top center",
+});
+
 export function YouTubePlayer({
   videoId,
   title,
@@ -131,9 +146,12 @@ export function YouTubePlayer({
   onNext,
   autoplay: controlledAutoplay,
   onAutoplayChange,
+  tall = false,
 }: {
   videoId: string;
   title: string;
+  /** A short (9:16), in a playlist: shown whole, with black at its sides */
+  tall?: boolean;
   /** The video that plays after this one */
   upNext?: UpNextVideo | null;
   /** Go to the next video (end of the countdown, the Next button, the "Up next" card) */
@@ -535,6 +553,11 @@ export function YouTubePlayer({
     if (hosted) setHostCropped(cropped);
   }, [hosted, cropped]);
   useEffect(() => {
+    if (!hosted || !tall) return;
+    setHostTall(true);
+    return () => setHostTall(false);
+  }, [hosted, tall]);
+  useEffect(() => {
     if (hosted) setHostFullscreen(full);
   }, [hosted, full]);
 
@@ -849,6 +872,8 @@ export function YouTubePlayer({
       <span className="font-normal"> / {formatTime(duration)}</span>
     </>
   );
+  // Filling the window: the controls keep clear of a notch, the rounded corners and the home indicator
+  const safe = full ? { left: "var(--sal)", right: "var(--sar)", bottom: "env(safe-area-inset-bottom, 0px)" } : undefined;
   const openMenu = () => {
     // Above the bar with a mouse; over the controls on touch screens, where there's less room
     setMenuMax((rootRef.current?.clientHeight ?? 400) - (pointerTypeRef.current === "mouse" ? 78 : 24));
@@ -882,10 +907,10 @@ export function YouTubePlayer({
         className={cn(
           "pointer-events-none absolute transition-opacity duration-200",
           // Full screen on a screen wider than 16:9 (phones): no wider than the video, or the crop would cut into it
-          full ? "left-1/2 w-full max-w-[177.78vh] -translate-x-1/2 supports-[height:1dvh]:max-w-[177.78dvh]" : "left-0 w-full",
+          tall ? "" : full ? "left-1/2 w-full max-w-[177.78vh] -translate-x-1/2 supports-[height:1dvh]:max-w-[177.78dvh]" : "left-0 w-full",
           started ? "opacity-100" : "opacity-0"
         )}
-        style={cropped ? { top: -CROP, height: `calc(100% + ${CROP * 2}px)` } : { top: 0, height: "100%" }}
+        style={tall ? tallFrame(cropped, full) : cropped ? { top: -CROP, height: `calc(100% + ${CROP * 2}px)` } : { top: 0, height: "100%" }}
         onLoad={startHandshake}
       />}
 
@@ -930,7 +955,7 @@ export function YouTubePlayer({
 
       {/* ── Touch: the controls over the video ── */}
       {controlsVisible && !touchScrub && (
-        <div className={cn("pointer-events-none absolute inset-0 animate-in fade-in duration-200 can-hover:hidden", ended ? "z-[35]" : "z-20")}>
+        <div style={safe} className={cn("pointer-events-none absolute inset-0 animate-in fade-in duration-200 can-hover:hidden", ended ? "z-[35]" : "z-20")}>
           <div className={cn("absolute inset-0 flex items-center justify-center gap-[34px]", ended && "hidden")}>
             {canGoNext && <span className="w-12" />}
             <button
@@ -969,6 +994,7 @@ export function YouTubePlayer({
         <button
           type="button"
           onClick={() => { command("unMute"); setMuted(false); setMutedByBrowser(false); }}
+          style={safe && { marginLeft: safe.left }}
           className="absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-sm font-medium backdrop-blur-sm transition-colors hover:bg-black/85"
         >
           <VolumeIcon level="off" className="h-5 w-5" />
@@ -979,6 +1005,7 @@ export function YouTubePlayer({
 
       {/* ── Controls ── */}
       <div
+        style={safe}
         // At the end over the end screen, as on YouTube (on phones only to leave full screen: there's no room for both)
         className={cn(
           "absolute inset-x-0 bottom-0 transition-opacity duration-200",
@@ -1123,7 +1150,7 @@ export function YouTubePlayer({
         <div
           role="menu"
           aria-label="Settings"
-          style={{ maxHeight: menuMax }}
+          style={{ maxHeight: menuMax, ...(safe && { marginRight: safe.right, marginBottom: safe.bottom }) }}
           className="yt-scrollbar absolute bottom-3 right-3 z-40 w-[min(320px,calc(100%-24px))] overflow-y-auto overscroll-contain rounded-xl bg-black/60 p-2 text-sm backdrop-blur-sm can-hover:bottom-[62px]"
           onPointerEnter={(e) => { if (e.pointerType === "mouse") overControlsRef.current = true; }}
           onPointerLeave={(e) => { if (e.pointerType === "mouse") overControlsRef.current = false; }}

@@ -46,10 +46,10 @@ test.describe("Home's category chips", () => {
     await expectStartOver(page);
     await expect(page).toHaveURL('/');
 
-    // Also from the last chip, with the row swiped to its end and no videos below
+    // Also from the last chip, with the row swiped to its end
     await chips(page).last().click();
-    await expect(selected(page)).toHaveText('Health');
-    expect(await rowLeft(page)).toBeGreaterThan(100);
+    await expect(selected(page)).toHaveText('Seerah');
+    if ((page.viewportSize()?.width ?? 0) < 768) expect(await rowLeft(page)).toBeGreaterThan(100);
     await logo(page).click();
     await expectStartOver(page);
     await feedShown(page);

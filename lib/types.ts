@@ -18,13 +18,3 @@ export interface CommentReply {
 }
 
 export type VideoComment = CommentReply;
-
-/** A short listed on a channel or scholar page */
-export interface ChannelShort {
-  id: string;
-  videoId: string;
-  title: string;
-  views: string;
-  timeAgo: string;
-  duration: string;
-}

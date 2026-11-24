@@ -2,9 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Check } from "lucide-react";
+import { Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tick } from "@/components/tick";
 import { mockLanguages } from "@/lib/mock-data";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,7 @@ export default function LanguagePrompt({
         className={cn(
           "p-0 gap-0 overflow-hidden flex flex-col bg-background",
           isMobile
-            ? "max-w-full h-[100dvh] rounded-none border-0"
+            ? "h-[100dvh] max-h-none w-full max-w-full rounded-none border-0"
             : "sm:max-w-md max-h-[90vh] overflow-y-auto",
           !canDismiss && "[&>button:first-of-type]:hidden"
         )}
@@ -74,7 +75,7 @@ export default function LanguagePrompt({
             <Globe className="h-8 w-8 text-primary" />
           </div>
           <DialogTitle className="text-2xl font-bold mb-2">
-            Choose Your Language
+            Choose your language
           </DialogTitle>
           <DialogDescription className="text-base text-muted-foreground">
             Select one or more languages to personalize your content. You can
@@ -90,20 +91,14 @@ export default function LanguagePrompt({
               return (
                 <button
                   key={lang.code}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isSelected}
                   onClick={() => toggle(lang.code)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/40 transition-colors"
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors active:bg-accent can-hover:hover:bg-muted/60"
                 >
-                  <span className="text-base font-medium">{lang.name}</span>
-                  <span
-                    className={cn(
-                      "h-6 w-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all",
-                      isSelected
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "border-muted-foreground/30"
-                    )}
-                  >
-                    {isSelected && <Check className="h-4 w-4" />}
-                  </span>
+                  <span className="text-[15px]">{lang.name}</span>
+                  <Tick checked={isSelected} />
                 </button>
               );
             })}

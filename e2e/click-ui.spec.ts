@@ -99,10 +99,13 @@ test.describe('After a tap (touch)', () => {
     await useFakeYouTube(page);
     await page.goto('/videos/x/v2');
     const dots = page.locator('section[aria-labelledby="related-heading-mobile"]').getByRole('button', { name: 'More actions' }).first();
-    await dots.scrollIntoViewIfNeeded();
+    // (The list is in the server's page; its buttons work once the page's script has run)
+    await expect(async () => {
+      await dots.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await dots.tap({ timeout: 2000 });
+      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1500 });
+    }).toPass();
     await page.waitForTimeout(500);
-    await dots.tap();
-    await expect(page.getByRole('dialog')).toBeVisible();
     await page.touchscreen.tap(200, 100);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(dots).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

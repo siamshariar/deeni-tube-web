@@ -5,10 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Bell,
-  Settings,
-} from "lucide-react";
+import { Bell, Settings, BellOff, EyeOff } from "lucide-react";
 import { MoreButton } from "@/components/more-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -55,7 +52,7 @@ const notifications: Notification[] = [
   },
   {
     id: "n2",
-    channelName: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channelName: "Dr. Khandaker Abdullah Jahangir",
     channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
     message: "uploaded: জীবন ঘনিষ্ঠ গুরুত্বপূর্ণ কিছু প্রশ্নোত্তর",
     timeAgo: "5 hours ago",
@@ -66,7 +63,7 @@ const notifications: Notification[] = [
   },
   {
     id: "n3",
-    channelName: "Dr Zakir Naik",
+    channelName: "Dr. Zakir Naik",
     channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s176-c-k-c0x00ffffff-no-rj-mo",
     message: "uploaded: How to Enter Paradise in the Eyes of Islam",
     timeAgo: "1 day ago",
@@ -88,7 +85,7 @@ const notifications: Notification[] = [
   },
   {
     id: "n5",
-    channelName: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channelName: "Dr. Khandaker Abdullah Jahangir",
     channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
     message: "uploaded: আত্মার তৃপ্তি কোথায়?",
     timeAgo: "3 days ago",
@@ -99,7 +96,7 @@ const notifications: Notification[] = [
   },
   {
     id: "n6",
-    channelName: "Dr Zakir Naik",
+    channelName: "Dr. Zakir Naik",
     channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s176-c-k-c0x00ffffff-no-rj-mo",
     message: "uploaded: খ্রিস্টান শিক্ষক VS ডাঃ জাকির নায়েক",
     timeAgo: "4 days ago",
@@ -121,7 +118,7 @@ const notifications: Notification[] = [
   },
   {
     id: "n8",
-    channelName: "Dr. Khandaker Abdullah Jahangir Rh.",
+    channelName: "Dr. Khandaker Abdullah Jahangir",
     channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
     message: "posted: একটি গুরুত্বপূর্ণ বার্তা",
     timeAgo: "6 days ago",
@@ -153,12 +150,12 @@ const moreNotifications = notifications.filter(n => !n.isUnread);
 function NotificationSkeleton() {
   return (
     <div className="flex gap-3 pl-6 pr-4 py-3">
-      <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+      <Skeleton className="h-10 w-10 rounded-full flex-shrink-0 md:h-12 md:w-12" />
       <div className="flex-1 min-w-0 space-y-2">
         <Skeleton className="h-3.5 w-full" />
         <Skeleton className="h-3 w-16" />
       </div>
-      <Skeleton className="h-[52px] w-[86px] rounded-lg flex-shrink-0" />
+      <Skeleton className="h-[45px] w-20 rounded-lg flex-shrink-0 max-[339px]:hidden md:h-[52px] md:w-[86px]" />
       <div className="w-8 flex-shrink-0" />
     </div>
   );
@@ -301,18 +298,18 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
   return (
     <div
       className={cn(
-        "relative flex items-start gap-3 pl-6 pr-2 py-3 hover:bg-muted transition-colors group cursor-pointer"
+        "relative flex items-start gap-2 pl-5 pr-1 py-3 hover:bg-muted transition-colors group cursor-pointer md:gap-3 md:pl-6 md:pr-2"
       )}
     >
       {/* Unread dot */}
       {notification.isUnread && (
-        <span aria-label="Unread" className="absolute left-2 top-[36px] -translate-y-1/2 w-1.5 h-1.5 bg-[#065fd4] dark:bg-[#3ea6ff] rounded-full flex-shrink-0" />
+        <span aria-label="Unread" className="absolute left-1.5 top-8 -translate-y-1/2 md:left-2 md:top-[36px] w-1.5 h-1.5 bg-[#065fd4] dark:bg-[#3ea6ff] rounded-full flex-shrink-0" />
       )}
 
       {/* Clickable link area */}
       <Link href={notification.link} onClick={onNavigate} className="flex gap-3 flex-1 min-w-0">
         {/* Channel Avatar */}
-        <Avatar className="h-12 w-12 flex-shrink-0 ring-1 ring-border/50">
+        <Avatar className="h-10 w-10 flex-shrink-0 ring-1 ring-border/50 md:h-12 md:w-12">
           <AvatarImage src={notification.channelAvatar} alt={notification.channelName} />
           <AvatarFallback className="text-xs bg-muted">
             {notification.channelName.charAt(0)}
@@ -321,7 +318,7 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
 
         {/* Text */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm leading-snug line-clamp-2 text-foreground/90">
+          <p className="text-sm leading-snug line-clamp-3 text-foreground/90 [overflow-wrap:anywhere] md:line-clamp-2">
             <span className="font-medium text-foreground">{notification.channelName}</span>
             <span className="text-muted-foreground"> {notification.message}</span>
           </p>
@@ -332,7 +329,7 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
 
         {/* Thumbnail — always visible */}
         {notification.thumbnail ? (
-          <div className="relative w-[86px] h-[52px] rounded-lg overflow-hidden flex-shrink-0 bg-muted">
+          <div className="relative h-[45px] w-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted max-[339px]:hidden md:h-[52px] md:w-[86px]">
             <Image
               src={notification.thumbnail}
               alt=""
@@ -353,7 +350,7 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
           </div>
         ) : (
           /* Placeholder for non-video notifications */
-          <div className="w-[86px] flex-shrink-0" />
+          <div className="hidden w-[86px] flex-shrink-0 md:block" />
         )}
       </Link>
 
@@ -362,18 +359,18 @@ function NotificationItem({ notification, onNavigate }: { notification: Notifica
         <SubDropdownTrigger asChild>
           <MoreButton onClick={(e) => e.stopPropagation()} />
         </SubDropdownTrigger>
-        <SubDropdownContent align="end" className="w-48 rounded-xl">
+        <SubDropdownContent align="end" className="w-64">
           <SubDropdownItem
-            className="cursor-pointer py-2.5"
-            onClick={() => dismiss("hidden")}
+            className="gap-4"
+            onSelect={() => dismiss("hidden")}
           >
-            Hide this notification
+            <EyeOff /> Hide this notification
           </SubDropdownItem>
           <SubDropdownItem
-            className="cursor-pointer py-2.5"
-            onClick={() => dismiss("muted")}
+            className="gap-4"
+            onSelect={() => dismiss("muted")}
           >
-            Mute from {notification.channelName}
+            <BellOff /> <span className="min-w-0 flex-1 truncate">Turn off all from {notification.channelName}</span>
           </SubDropdownItem>
         </SubDropdownContent>
       </SubDropdownMenu>

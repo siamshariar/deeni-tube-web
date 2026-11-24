@@ -1,7 +1,7 @@
 // hooks/useLikedVideos.ts
 "use client";
 
-import { createSavedList, demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
+import { createSavedList, savedItem, SavedVideo } from "@/hooks/useSavedList";
 import { extendedPlaylists } from "@/lib/playlist-data";
 import { shortsVideos } from "@/lib/shorts-data";
 
@@ -13,7 +13,7 @@ function seed(): SavedVideo[] {
   const videoIds = extendedPlaylists.find((p) => p.id === "pl-liked-videos")?.videoIds ?? [];
   const ids = [...videoIds, ...shortsVideos.slice(2, 6).map((s) => s.id)];
   return ids
-    .map((id, i) => demoSavedItem(id, now - i * 3_600_000))
+    .map((id, i) => savedItem(id, now - i * 3_600_000))
     .filter((v): v is SavedVideo => v !== undefined);
 }
 

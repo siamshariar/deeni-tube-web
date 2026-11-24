@@ -4,7 +4,8 @@
 
 import { useCallback, useMemo } from "react";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
-import { findShort, findVideo, youtubeIdFromThumbnail } from "@/lib/media-lookup";
+import { canonicalMediaId, findPlayable, youtubeIdFromThumbnail, youtubeThumb } from "@/lib/media-lookup";
+import { viewsText } from "@/lib/format";
 import { removedShorts } from "@/lib/shorts-data";
 
 export interface SavedVideo {
@@ -22,65 +23,40 @@ export interface SavedVideo {
   type?: "video" | "short";
 }
 
-/** Resolve an incoming item to one canonical id/type so the same video is never saved twice. */
-export function normalizeSaved(video: SavedVideo): SavedVideo {
-  const v = findVideo(video.id);
-  // The catalogue's duration (the video's real length) wins over a copy saved with an older catalogue
-  if (v) return { ...video, id: v.id, videoId: v.videoId, type: "video", duration: v.duration };
-  const s = findShort(video.id);
-  if (s) return { ...video, id: s.id, videoId: s.youtubeId, type: "short" };
-  return {
-    ...video,
-    videoId: video.videoId ?? youtubeIdFromThumbnail(video.thumbnail),
-    type: video.type ?? (/^sh?\d+$/.test(video.id) ? "short" : "video"),
-  };
+/** A video or short of the catalogue (by internal or YouTube id), as a saved item. */
+export function savedItem(id: string, addedAt: number): SavedVideo | undefined {
+  const media = findPlayable(id);
+  return (
+    media && {
+      id: media.id,
+      videoId: media.videoId,
+      type: media.isShort ? "short" : "video",
+      title: media.title,
+      channel: media.channel,
+      channelAvatar: media.channelAvatar,
+      thumbnail: youtubeThumb(media.videoId),
+      views: media.views,
+      timeAgo: media.timeAgo,
+      duration: media.duration,
+      addedAt,
+    }
+  );
 }
 
-export function canonicalMediaId(id: string): string {
-  return findVideo(id)?.id ?? findShort(id)?.id ?? id;
+/** Resolve an incoming item to one canonical id/type, so the same video is never saved twice; the catalogue's details
+ *  win over a copy saved with an older one. */
+export function normalizeSaved(video: SavedVideo): SavedVideo {
+  const videoId = video.videoId ?? youtubeIdFromThumbnail(video.thumbnail);
+  // By YouTube id first: some lists once gave shorts ids of their own ("sh3"), which meant different shorts
+  const known = (videoId && savedItem(videoId, video.addedAt)) || savedItem(video.id, video.addedAt);
+  if (known) return known;
+  return { ...video, videoId, views: viewsText(video.views), type: video.type ?? (/^sh?\d+$/.test(video.id) ? "short" : "video") };
 }
 
 // Items saved before ids were normalised may use YouTube ids; clean them up on read and write (also removed shorts)
 function normalizeAll(list: SavedVideo[]) {
   const seen = new Set<string>();
   return list.map(normalizeSaved).filter((v) => !removedShorts.has(v.videoId ?? "") && !seen.has(v.id) && !!seen.add(v.id));
-}
-
-/** A demo item for a main-feed video or short (by internal or YouTube id). */
-export function demoSavedItem(id: string, addedAt: number): SavedVideo | undefined {
-  const v = findVideo(id);
-  if (v) {
-    return {
-      id: v.id,
-      videoId: v.videoId,
-      type: "video",
-      title: v.title,
-      channel: v.channel,
-      channelAvatar: v.channelAvatar,
-      thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`,
-      views: v.views,
-      timeAgo: v.timeAgo,
-      duration: v.duration,
-      addedAt,
-    };
-  }
-  const s = findShort(id);
-  if (s) {
-    return {
-      id: s.id,
-      videoId: s.youtubeId,
-      type: "short",
-      title: s.title,
-      channel: s.channel,
-      channelAvatar: s.channelAvatar,
-      thumbnail: `https://img.youtube.com/vi/${s.youtubeId}/hqdefault.jpg`,
-      views: s.views,
-      timeAgo: s.timeAgo,
-      duration: "",
-      addedAt,
-    };
-  }
-  return undefined;
 }
 
 const EMPTY: SavedVideo[] = [];

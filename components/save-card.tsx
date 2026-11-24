@@ -9,7 +9,7 @@
 import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { ChevronLeft, Clock, ListVideo, Plus } from "lucide-react";
+import { ArrowLeft, Clock, ListVideo, Plus, X } from "lucide-react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { SaveIcon } from "@/components/icons/action-icons";
@@ -18,7 +18,7 @@ import { LIKED_PLAYLIST_ID, WATCH_LATER_PLAYLIST_ID, usePlaylists } from "@/hook
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useMenuDismiss } from "@/hooks/use-menu-dismiss";
 import { useWatchLater } from "@/hooks/useWatchLater";
-import { canonicalVideoId, findVideo, mediaThumb, youtubeThumb } from "@/lib/media-lookup";
+import { canonicalMediaId, findPlayable, mediaThumb, youtubeThumb } from "@/lib/media-lookup";
 import { closeSaveCard, openSaveCard, type SaveCardVideo } from "@/lib/save-card";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,7 @@ export default function SaveCard({ open, video, anchor }: { open: boolean; video
     },
   });
 
-  const body = <SaveCardBody video={video} creating={creating} onCreating={setCreating} />;
+  const body = <SaveCardBody video={video} creating={creating} onCreating={setCreating} sheet={isMobile} />;
   const onOpenChange = (next: boolean) => {
     if (!next) closeSaveCard();
   };
@@ -77,13 +77,13 @@ export default function SaveCard({ open, video, anchor }: { open: boolean; video
   );
 }
 
-function SaveCardBody({ video, creating, onCreating }: { video: SaveCardVideo; creating: boolean; onCreating: (on: boolean) => void }) {
+function SaveCardBody({ video, creating, onCreating, sheet }: { video: SaveCardVideo; creating: boolean; onCreating: (on: boolean) => void; sheet: boolean }) {
   const { playlists, addVideoToPlaylist, removeVideoFromPlaylist, createPlaylist } = usePlaylists();
   const { isInWatchLater } = useWatchLater();
   const [name, setName] = useState("");
   const [isPublic, setIsPublic] = useState(false);
 
-  const key = canonicalVideoId(video.id);
+  const key = canonicalMediaId(video.id);
   const thumb = mediaThumb(video.id);
   // Liked videos isn't offered (that's the Like button), as on YouTube
   const lists = playlists.filter((pl) => pl.id !== LIKED_PLAYLIST_ID);
@@ -105,18 +105,18 @@ function SaveCardBody({ video, creating, onCreating }: { video: SaveCardVideo; c
   if (creating)
     return (
       <>
-        <div className="flex min-h-12 flex-shrink-0 items-center gap-1 border-b py-1 pl-2 pr-4">
+        <div className={cn("flex flex-shrink-0 items-center gap-1 border-b", sheet ? "pb-1 pl-1 pr-4" : "min-h-12 py-1 pl-2 pr-4")}>
           <button type="button" aria-label="Back" onClick={() => onCreating(false)} className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-accent active:bg-accent">
-            <ChevronLeft className="h-6 w-6" />
+            <ArrowLeft className="h-6 w-6" />
           </button>
-          <h2 className="text-base font-medium">New playlist</h2>
+          <h2 className={sheet ? "text-lg font-semibold leading-7" : "text-base font-medium"}>New playlist</h2>
         </div>
-        <div className="space-y-3 px-4 pb-[max(16px,env(safe-area-inset-bottom,0px))] pt-4">
+        <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain px-4 pb-[max(16px,env(safe-area-inset-bottom,0px))] pt-4">
           <PlaylistNameField value={name} onChange={setName} onEnter={create} autoFocus />
           <PrivacySelect isPublic={isPublic} onChange={setIsPublic} />
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="ghost" className="rounded-full" onClick={() => onCreating(false)}>Cancel</Button>
-            <Button type="button" className="rounded-full" onClick={create} disabled={!name.trim()}>Create</Button>
+            <Button type="button" variant="ghost" onClick={() => onCreating(false)}>Cancel</Button>
+            <Button type="button" onClick={create} disabled={!name.trim()}>Create</Button>
           </div>
         </div>
       </>
@@ -124,15 +124,25 @@ function SaveCardBody({ video, creating, onCreating }: { video: SaveCardVideo; c
 
   return (
     <>
-      <div className="flex min-h-12 flex-shrink-0 items-center border-b px-4">
-        <h2 className="text-base font-medium">Save to...</h2>
-      </div>
+      {sheet ? (
+        // As every sheet's title (ui/drawer)
+        <div className="flex flex-shrink-0 items-center justify-between border-b pb-1 pl-4 pr-1">
+          <h2 className="text-lg font-semibold leading-7">Save to...</h2>
+          <button type="button" aria-label="Close" onClick={closeSaveCard} className="flex h-11 w-11 items-center justify-center rounded-full transition-colors active:bg-accent">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex min-h-12 flex-shrink-0 items-center border-b px-4">
+          <h2 className="text-base font-medium">Save to...</h2>
+        </div>
+      )}
       <ul className="yt-scrollbar max-h-[min(336px,50dvh)] min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
         {lists.map((pl) => {
           const watchLater = pl.id === WATCH_LATER_PLAYLIST_ID;
           const saved = watchLater ? isInWatchLater(video.id) : pl.videoIds.includes(key);
           const label = watchLater ? "Watch later" : pl.name;
-          const cover = pl.videoIds[0] ? findVideo(pl.videoIds[0])?.videoId : undefined;
+          const cover = pl.videoIds[0] ? findPlayable(pl.videoIds[0])?.videoId : undefined;
           return (
             <li key={pl.id}>
               <button

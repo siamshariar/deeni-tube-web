@@ -92,6 +92,9 @@ const config: Config = {
       addVariant("kb", "html[data-keyboard] &")
       // Short phone screens (e.g. iPhone SE), where tall overlays need to be more compact
       addVariant("short-screen", "@media (max-width: 1023px) and (max-height: 680px)")
+      // Phones held sideways, and windows as low: nothing may be taller than what shows. (Comes before md: and lg: in
+      // the CSS, so against those it needs `low:!...`)
+      addVariant("low", "@media (orientation: landscape) and (max-height: 560px)")
     }),
   ],
 }

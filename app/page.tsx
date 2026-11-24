@@ -2,15 +2,21 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Clapperboard } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
+import { CHIP, CHIP_OFF, CHIP_ON } from "@/components/page-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import VideoCard from "@/components/video-card";
+import VideoGrid, { videoColumns } from "@/components/video-grid";
 import LanguagePrompt from "@/components/language-prompt";
-import { videoData, VideoItem } from "@/lib/video-data";
+import { categoryData, videoData, VideoItem } from "@/lib/video-data";
 import { useHeader } from "@/app/contexts/header-context";
 import { useFeedPreferences } from "@/hooks/useFeedPreferences";
-import { priorityForIndex } from "@/lib/image-priority";
+import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
 import { cn } from "@/lib/utils";
+
+// A chip for each category that has videos, the ones on the Categories page
+const chipItems = ["All", ...categoryData.map((c) => c.name)];
 
 export default function Home() {
   const { headerVisible, setHeaderVisible } = useHeader();
@@ -23,58 +29,7 @@ export default function Home() {
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
   const { followedChannels: visibleChannelIds } = useFeedPreferences();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const allCategories: string[] = videoData
-    .map((v: VideoItem) => v.category)
-    .filter(Boolean) as string[];
-  const uniqueCategories: string[] = Array.from(new Set(allCategories));
-  const extraCategories = [
-    "Quran",
-    "Hadith",
-    "Fiqh",
-    "Tafsir",
-    "Seerah",
-    "Dua",
-    "Aqeedah",
-    "Manners",
-    "History",
-    "Youth",
-    "Family",
-    "Society",
-    "Science",
-    "Spirituality",
-    "Health",
-  ];
-  // Set removes categories that appear in both lists (e.g. "Quran")
-  const chipItems: string[] = Array.from(new Set(["All", ...uniqueCategories, ...extraCategories]));
-
-  // Listen for sidebar class changes using MutationObserver
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const sidebar = document.querySelector('aside');
-      if (sidebar) {
-        setSidebarCollapsed(sidebar.classList.contains('w-[72px]'));
-      }
-    };
-
-    // Initial check
-    checkSidebarState();
-
-    // Observe sidebar class changes
-    const sidebar = document.querySelector('aside');
-    if (sidebar) {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-            checkSidebarState();
-          }
-        });
-      });
-      observer.observe(sidebar, { attributes: true });
-      return () => observer.disconnect();
-    }
-  }, []);
+  const sidebarCollapsed = useSidebarCollapsed();
 
   // Runs synchronously before first paint — sets modal/language state so
   // the feed is never visible to the user before the language modal on first visit.
@@ -90,11 +45,7 @@ export default function Home() {
         setPreferredLanguages(parsed.languages || ["en"]);
       } catch {}
     }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setInitialLoading(false), 800);
-    return () => clearTimeout(timer);
+    setInitialLoading(false); // the visitor's languages are known: the feed shows at once
   }, []);
 
   const saveLanguagePrefs = (languages: string[], guest: boolean = true) => {
@@ -163,14 +114,10 @@ export default function Home() {
   const contentMarginTop = headerVisible ? "112px" : "56px";
   
   // Dynamic chip bar width based on sidebar state
-  const chipBarLeft = sidebarCollapsed ? "md:left-[72px]" : "md:left-[240px]";
-  const chipBarWidth = sidebarCollapsed ? "md:w-[calc(100%-72px)]" : "md:w-[calc(100%-240px)]";
+  const chipBarLeft = sidebarCollapsed ? "md:left-[calc(72px+var(--sal))]" : "md:left-[calc(240px+var(--sal))]";
+  const chipBarWidth = sidebarCollapsed ? "md:w-[calc(100%-72px-var(--sal)-var(--sar))]" : "md:w-[calc(100%-240px-var(--sal)-var(--sar))]";
 
-  // Grid columns: 3 per row with the full sidebar, 4 with the mini sidebar (more room),
-  // fewer on narrower screens.
-  const gridColumns = sidebarCollapsed
-    ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-    : "md:grid-cols-2 lg:grid-cols-3";
+  const gridColumns = videoColumns(sidebarCollapsed);
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -187,7 +134,7 @@ export default function Home() {
       {/* Category chip bar — hidden until first-time language selection is done */}
       <div
         className={cn(
-          "sidebar-offset fixed z-20 h-14 bg-background w-full transition-all duration-300",
+          "sidebar-offset fixed left-0 z-20 h-14 w-full bg-background pl-[var(--sal)] pr-[var(--sar)] transition-all duration-300 md:px-0",
           chipBarLeft,
           chipBarWidth,
           chipBarTop,
@@ -211,12 +158,7 @@ export default function Home() {
                 type="button"
                 aria-pressed={activeChip === chip}
                 onClick={() => setActiveChip(chip)}
-                className={cn(
-                  "h-8 px-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors duration-200 select-none",
-                  activeChip === chip
-                    ? "bg-foreground text-background"
-                    : "bg-muted hover:bg-accent text-foreground"
-                )}
+                className={cn(CHIP, activeChip === chip ? CHIP_ON : CHIP_OFF)}
               >
                 {chip}
               </button>
@@ -230,6 +172,7 @@ export default function Home() {
         style={{ marginTop: contentMarginTop }}
         className={cn("transition-[margin-top] duration-300", isFirstTime && showLanguagePrompt && "invisible")}
       >
+        <h2 className="sr-only">Videos</h2>
         {initialLoading ? (
           <>
             <div className={cn(
@@ -266,63 +209,24 @@ export default function Home() {
             </div>
           </>
         ) : displayedVideos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center px-6 py-24">
-            <h2 className="text-lg font-semibold mb-1">
-              {activeChip === "All" ? "No videos to show" : `No ${activeChip} videos yet`}
-            </h2>
-            <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-              {activeChip === "All"
+          <EmptyState
+            icon={Clapperboard}
+            title={activeChip === "All" ? "No videos to show" : `No ${activeChip} videos yet`}
+            description={
+              activeChip === "All"
                 ? "Try adding more languages or channels to your feed."
-                : "Nothing in this category matches your languages yet. Check back soon."}
-            </p>
+                : "Nothing in this category matches your languages yet. Check back soon."
+            }
+            className="py-24"
+          >
             {activeChip !== "All" && (
-              <Button variant="outline" className="rounded-full" onClick={() => setActiveChip("All")}>
+              <Button variant="outline" onClick={() => setActiveChip("All")}>
                 Show all videos
               </Button>
             )}
-          </div>
+          </EmptyState>
         ) : (
-          <>
-            <div className={cn(
-              "hidden md:grid gap-x-4 gap-y-10 px-4 pb-10 pt-6 lg:px-6",
-              gridColumns
-            )}>
-              {displayedVideos.map((video: VideoItem, index: number) => (
-                <VideoCard
-                  key={video.id}
-                  videoId={video.videoId}
-                  title={video.title}
-                  channel={video.channel}
-                  channelId={video.channelId}
-                  channelAvatar={video.channelAvatar}
-                  views={video.views}
-                  timestamp={video.timeAgo}
-                  duration={video.duration}
-                  thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                  isHorizontal={false}
-                  imagePriority={priorityForIndex(index)}
-                />
-              ))}
-            </div>
-            <div className="grid grid-cols-1 gap-6 pb-4 sm:grid-cols-2 sm:gap-x-4 sm:px-4 sm:pt-4 md:hidden">
-              {displayedVideos.map((video: VideoItem, index: number) => (
-                <VideoCard
-                  key={video.id}
-                  videoId={video.videoId}
-                  title={video.title}
-                  channel={video.channel}
-                  channelId={video.channelId}
-                  channelAvatar={video.channelAvatar}
-                  views={video.views}
-                  timestamp={video.timeAgo}
-                  duration={video.duration}
-                  thumbnail={`https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`}
-                  isHorizontal={true}
-                  imagePriority={priorityForIndex(index)}
-                />
-              ))}
-            </div>
-          </>
+          <VideoGrid videos={displayedVideos} className="pb-4 sm:pt-4 md:px-4 md:pb-10 md:pt-6 lg:px-6" />
         )}
       </div>
     </div>

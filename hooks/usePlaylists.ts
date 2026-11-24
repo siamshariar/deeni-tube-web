@@ -3,11 +3,11 @@
 
 import { useCallback, useMemo } from "react";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
-import { canonicalVideoId, findVideo } from "@/lib/media-lookup";
+import { canonicalMediaId, findPlayable } from "@/lib/media-lookup";
 import { extendedPlaylists, PlaylistItem } from "@/lib/playlist-data";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { useLikedVideos } from "@/hooks/useLikedVideos";
-import { demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
+import { savedItem, SavedVideo } from "@/hooks/useSavedList";
 
 export type Playlist = PlaylistItem;
 
@@ -29,7 +29,7 @@ function readLegacy(): PlaylistItem[] {
       id: p.id,
       slug: p.slug ?? slugify(p.name),
       name: p.name,
-      videoIds: [...new Set((p.videoIds ?? []).map(canonicalVideoId))],
+      videoIds: [...new Set((p.videoIds ?? []).map(canonicalMediaId))],
       updatedAt: p.updatedAt ?? "Just now",
       updatedAtMs: Date.now(),
       isPublic: p.isPublic ?? false,
@@ -45,7 +45,7 @@ function readLegacy(): PlaylistItem[] {
 function seed(): PlaylistItem[] {
   const statics = extendedPlaylists
     .filter((p) => !isSystemPlaylist(p.id))
-    .map((p) => ({ ...p, videoIds: p.videoIds.filter((id) => findVideo(id)) }));
+    .map((p) => ({ ...p, videoIds: p.videoIds.filter((id) => findPlayable(id)) }));
   return [...(typeof window === "undefined" ? [] : readLegacy()), ...statics];
 }
 
@@ -104,7 +104,7 @@ export function usePlaylists() {
       const latest = list.reduce((max, v) => Math.max(max, v.addedAt), 0);
       return {
         ...base,
-        videoIds: list.filter((v) => v.type !== "short" && findVideo(v.id)).map((v) => v.id),
+        videoIds: list.filter((v) => findPlayable(v.id)).map((v) => v.id),
         ...(latest ? { updatedAtMs: latest } : {}),
       };
     };
@@ -112,7 +112,10 @@ export function usePlaylists() {
       fromList(WATCH_LATER_PLAYLIST_ID, watchLater),
       fromList(LIKED_PLAYLIST_ID, likedVideos),
       // Older stored copies of the system playlists are ignored
-      ...stored.filter((p) => !isSystemPlaylist(p.id)),
+      ...stored
+        .filter((p) => !isSystemPlaylist(p.id))
+        // Only what can be played, so the count is what the playlist shows
+        .map((p) => (p.videoIds.every((id) => findPlayable(id)) ? p : { ...p, videoIds: p.videoIds.filter((id) => findPlayable(id)) })),
     ];
   }, [stored, watchLater, likedVideos]);
 
@@ -170,10 +173,10 @@ export function usePlaylists() {
   /** Returns false if the video was already in the playlist. */
   const addVideoToPlaylist = useCallback(
     (playlistId: string, video: { id: string }): boolean => {
-      const id = canonicalVideoId(video.id);
+      const id = canonicalMediaId(video.id);
       const list = listFor(playlistId);
       if (list) {
-        const item = demoSavedItem(id, Date.now());
+        const item = savedItem(id, Date.now());
         if (!item || list.items.some((w) => w.id === id)) return false;
         list.add(item);
         return true;
@@ -191,7 +194,7 @@ export function usePlaylists() {
   /** Remove a video; returns a function that puts it back where it was (Undo). */
   const removeVideoFromPlaylist = useCallback(
     (playlistId: string, videoId: string): (() => void) => {
-      const id = canonicalVideoId(videoId);
+      const id = canonicalMediaId(videoId);
       const list = listFor(playlistId);
       if (list) return list.remove(id);
       const at = playlistStore.get().find((p) => p.id === playlistId)?.videoIds.indexOf(id) ?? -1;
@@ -231,7 +234,7 @@ export function usePlaylists() {
   /** Whether a video is saved anywhere (Watch later or a playlist; Liked videos doesn't count). */
   const isSaved = useCallback(
     (videoId: string) => {
-      const id = canonicalVideoId(videoId);
+      const id = canonicalMediaId(videoId);
       return playlists.some((p) => p.id !== LIKED_PLAYLIST_ID && p.videoIds.includes(id));
     },
     [playlists]

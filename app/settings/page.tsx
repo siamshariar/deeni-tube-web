@@ -3,12 +3,10 @@
 
 import { useEffect, useId, useState } from "react";
 import type React from "react";
-import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   Bell,
   Check,
-  ChevronRight,
   CircleHelp,
   FileText,
   Globe,
@@ -22,7 +20,11 @@ import {
   Smartphone,
   Sun,
   UserRound,
+  type LucideIcon,
 } from "lucide-react";
+import { LinkBox, LinkRow, RowIcon } from "@/components/link-row";
+import { BOX_TITLE, PAGE, PAGE_NARROW, PAGE_SUBTITLE, PAGE_TITLE } from "@/components/page-layout";
+import { Tick } from "@/components/tick";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/lib/notify";
 import { readLanguagePrefs, updateLanguagePrefs } from "@/lib/language-prefs";
@@ -47,7 +49,7 @@ const THEME_OPTIONS: { value: ThemeValue; label: string; icon: React.ElementType
   { value: "dark", label: "Dark", icon: Moon },
 ];
 
-const NOTIFICATION_ROWS: { key: NotificationKey; label: string; description: string; icon: React.ElementType }[] = [
+const NOTIFICATION_ROWS: { key: NotificationKey; label: string; description: string; icon: LucideIcon }[] = [
   { key: "all", label: "All notifications", description: "New videos, replies and updates from Deeni.tube", icon: Bell },
   { key: "email", label: "Email", description: "Get a summary of new videos by email", icon: Mail },
   { key: "push", label: "Push notifications", description: "Alerts on this device when channels you follow upload", icon: Smartphone },
@@ -119,15 +121,13 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto mt-14 w-full max-w-3xl px-4 pb-16 pt-5 md:mt-16 md:px-6 md:pt-6">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Choose how Deeni.tube looks and what it shows you.
-          </p>
+      <div className={cn(PAGE, PAGE_NARROW, "pb-16 md:pb-16")}>
+        <header className="mb-6">
+          <h1 className={PAGE_TITLE}>Settings</h1>
+          <p className={PAGE_SUBTITLE}>Choose how Deeni.tube looks and what it shows you</p>
         </header>
 
-        <div className="space-y-10">
+        <div className="space-y-8">
           {/* Appearance */}
           <SettingsSection
             id="appearance"
@@ -161,7 +161,7 @@ export default function SettingsPage() {
                       <ThemePreview variant={value} />
                       <span className="flex items-center justify-center gap-1 px-0.5 pb-0.5 sm:justify-between">
                         <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-                          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <Icon className="h-4 w-4 shrink-0 max-[359px]:hidden" aria-hidden="true" />
                           <span className="truncate">{label}</span>
                         </span>
                         <span
@@ -191,9 +191,7 @@ export default function SettingsPage() {
             description="Your Home feed shows videos in the languages you tick."
           >
             <div className="flex items-center gap-4 px-4 py-3">
-              <RowIcon>
-                <Globe />
-              </RowIcon>
+              <RowIcon icon={Globe} />
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] leading-5">Content languages</span>
                 <span className="block text-[13px] leading-5 text-muted-foreground" aria-live="polite">
@@ -219,17 +217,7 @@ export default function SettingsPage() {
                       {lang.label}
                       {lang.native !== lang.label && <span className="ml-2 text-[13px] text-muted-foreground">{lang.native}</span>}
                     </span>
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
-                        checked
-                          ? "border-[#065fd4] bg-[#065fd4] text-white dark:border-[#3ea6ff] dark:bg-[#3ea6ff] dark:text-[#0f0f0f]"
-                          : "border-muted-foreground/60"
-                      )}
-                    >
-                      {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                    </span>
+                    <Tick checked={checked} />
                   </button>
                 );
               })}
@@ -239,14 +227,14 @@ export default function SettingsPage() {
           {/* Playback */}
           <SettingsSection id="playback" title="Playback" description="How videos play on this device.">
             <SwitchRow
-              icon={<MonitorPlay />}
+              icon={MonitorPlay}
               label="Playback in feeds"
               description="Videos play muted in their cards as you scroll, or when you point at one with a mouse"
               checked={feedPlayback}
               onCheckedChange={setFeedPlayback}
             />
             <SwitchRow
-              icon={<SkipForward />}
+              icon={SkipForward}
               label="Autoplay"
               description="When a video ends, the next one starts after a short countdown"
               checked={autoplay}
@@ -263,7 +251,7 @@ export default function SettingsPage() {
             {NOTIFICATION_ROWS.map(({ key, label, description, icon: Icon }) => (
               <SwitchRow
                 key={key}
-                icon={<Icon />}
+                icon={Icon}
                 label={label}
                 description={description}
                 checked={notifications[key]}
@@ -274,15 +262,15 @@ export default function SettingsPage() {
 
           {/* Account & privacy */}
           <SettingsSection id="account" title="Account & privacy">
-            <LinkRow href="/you" icon={<UserRound />} label="Account" description="Your profile, history and playlists" />
-            <LinkRow href="/help/privacy" icon={<Shield />} label="Privacy & safety" description="How Deeni.tube handles your data" />
+            <LinkRow href="/you" icon={UserRound} label="Account" description="Your profile, history and playlists" />
+            <LinkRow href="/help/privacy" icon={Shield} label="Privacy & safety" description="How Deeni.tube handles your data" />
           </SettingsSection>
 
           {/* Help & about */}
           <SettingsSection id="help" title="Help & about">
-            <LinkRow href="/help" icon={<CircleHelp />} label="Help & support" description="Get answers or contact us" />
-            <LinkRow href="/help/terms" icon={<FileText />} label="Terms of service" description="The rules for using Deeni.tube" />
-            <LinkRow href="/more/about" icon={<Info />} label="About Deeni.tube" description="Version 1.0.0" />
+            <LinkRow href="/help" icon={CircleHelp} label="Help & support" description="Get answers or contact us" />
+            <LinkRow href="/help/terms" icon={FileText} label="Terms of service" description="The rules for using Deeni.tube" />
+            <LinkRow href="/more/about" icon={Info} label="About Deeni.tube" description="Version 1.0.0" />
           </SettingsSection>
         </div>
       </div>
@@ -306,51 +294,14 @@ function SettingsSection({
 }) {
   return (
     <section aria-labelledby={`${id}-heading`}>
-      <div className="mb-3 px-1">
-        <h2 id={`${id}-heading`} className="text-base font-medium leading-6">
+      <div className="mb-3">
+        <h2 id={`${id}-heading`} className={BOX_TITLE}>
           {title}
         </h2>
         {description && <p className="text-[13px] leading-5 text-muted-foreground">{description}</p>}
       </div>
-      <div className="divide-y overflow-hidden rounded-xl border bg-card">{children}</div>
+      <LinkBox>{children}</LinkBox>
     </section>
-  );
-}
-
-function RowIcon({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground [&_svg]:h-5 [&_svg]:w-5"
-    >
-      {children}
-    </span>
-  );
-}
-
-function LinkRow({
-  href,
-  icon,
-  label,
-  description,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-    >
-      <RowIcon>{icon}</RowIcon>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] leading-5">{label}</span>
-        <span className="block truncate text-[13px] leading-5 text-muted-foreground">{description}</span>
-      </span>
-      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </Link>
   );
 }
 
@@ -361,7 +312,7 @@ function SwitchRow({
   checked,
   onCheckedChange,
 }: {
-  icon: React.ReactNode;
+  icon: LucideIcon;
   label: string;
   description: string;
   checked: boolean;
@@ -371,7 +322,7 @@ function SwitchRow({
   return (
     // The whole row is the switch's label, so clicking anywhere toggles it
     <label htmlFor={id} className="flex cursor-pointer items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/60">
-      <RowIcon>{icon}</RowIcon>
+      <RowIcon icon={icon} />
       <span className="min-w-0 flex-1">
         <span id={`${id}-label`} className="block text-[15px] leading-5">
           {label}

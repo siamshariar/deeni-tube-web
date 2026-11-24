@@ -23,10 +23,11 @@ Avatar.displayName = AvatarPrimitive.Root.displayName
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
   React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, referrerPolicy = 'no-referrer', ...props }, ref) => (
+>(({ className, alt = '', referrerPolicy = 'no-referrer', ...props }, ref) => (
   // yt3.googleusercontent.com rejects hot-linked avatars that send a Referer (HTTP 429)
   <AvatarPrimitive.Image
     ref={ref}
+    alt={alt}
     referrerPolicy={referrerPolicy}
     className={cn('aspect-square h-full w-full', className)}
     {...props}

@@ -14,6 +14,23 @@ export function videoPath(video: { title: string; videoId: string }): string {
   return `/videos/${videoSlug(video.title)}/${video.videoId}`;
 }
 
+/** A video opened from the search page: the same page and player, at the search page's address. `search` is what was
+ *  searched ("?q=…"), which the header's box and Back keep */
+export function searchVideoPath(video: { title: string; videoId: string }, search = ""): string {
+  return `/search/${videoSlug(video.title)}/${video.videoId}${search}`;
+}
+
+/** The pages with the video player: /videos/<title>/<id>, and /search/<title>/<id> */
+export function isVideoPath(pathname: string | null | undefined): boolean {
+  return /^\/(videos|search)\/[^/]+\/[^/]+/.test(pathname ?? "");
+}
+
+/** The video an address names: links use the YouTube id, older ones the internal id */
+export function findVideoByRoute(id: string) {
+  const key = decodeURIComponent(id);
+  return videoData.find((v) => v.videoId === key || v.id === key);
+}
+
 /** Link to a video by its YouTube id (looks up the title) */
 export function videoPathForId(videoId: string): string {
   const video = videoData.find((v) => v.videoId === videoId);

@@ -18,11 +18,11 @@ export interface PlaylistItem {
 const palette = ["#5A7A8C", "#8C6B5A", "#7A8C5A", "#6A5A8C", "#4A6A8C", "#8C4A6A", "#6A8C4A", "#5A8C7A", "#8C7A5A", "#6A7A8C"];
 
 export const extendedPlaylists: PlaylistItem[] = [
-  // System playlists (Watch Later & Liked Videos)
+  // System playlists (Watch later & Liked videos)
   {
     id: "pl-watch-later",
     slug: "watch-later",
-    name: "Watch Later",
+    name: "Watch later",
     videoIds: ["v3", "v11", "v18", "v22", "v27", "v30", "v34"],
     updatedAt: "2 hours ago",
     isPublic: false,
@@ -32,7 +32,7 @@ export const extendedPlaylists: PlaylistItem[] = [
   {
     id: "pl-liked-videos",
     slug: "liked-videos",
-    name: "Liked Videos",
+    name: "Liked videos",
     videoIds: ["v1", "v5", "v8", "v12", "v17", "v21", "v25", "v29", "v33", "v35"],
     updatedAt: "Yesterday",
     isPublic: false,

@@ -1,7 +1,7 @@
 // hooks/useWatchLater.ts
 "use client";
 
-import { createSavedList, demoSavedItem, SavedVideo } from "@/hooks/useSavedList";
+import { createSavedList, savedItem, SavedVideo } from "@/hooks/useSavedList";
 import { extendedPlaylists } from "@/lib/playlist-data";
 import { mediaThumb } from "@/lib/media-lookup";
 import { notify } from "@/lib/notify";
@@ -16,7 +16,7 @@ function seed(): SavedVideo[] {
   const videoIds = extendedPlaylists.find((p) => p.id === "pl-watch-later")?.videoIds ?? [];
   const ids = [...videoIds, ...shortsVideos.slice(0, 4).map((s) => s.id)];
   return ids
-    .map((id, i) => demoSavedItem(id, now - i * 60_000))
+    .map((id, i) => savedItem(id, now - i * 60_000))
     .filter((v): v is SavedVideo => v !== undefined);
 }
 

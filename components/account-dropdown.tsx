@@ -18,7 +18,6 @@ import {
   Monitor,
   Sun,
   Check,
-  Send,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -29,10 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import LanguagePrompt from "@/components/language-prompt";
+import { openFeedback } from "@/lib/dialogs";
 import { notify } from "@/lib/notify";
 import { readLanguagePrefs, signOutKeepingLanguages, updateLanguagePrefs } from "@/lib/language-prefs";
 import { mockLanguages } from "@/lib/mock-data";
@@ -69,9 +66,6 @@ export default function AccountDropdown() {
   });
   const [languageLabel, setLanguageLabel] = useState("English");
   const [showLanguagePrompt, setShowLanguagePrompt] = useState(false);
-  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     try {
@@ -109,16 +103,6 @@ export default function AccountDropdown() {
   const handleNavigate = (path: string) => {
     setOpen(false);
     router.push(path);
-  };
-
-  const handleSendFeedback = () => {
-    if (!feedbackText.trim()) return;
-    setFeedbackSent(true);
-    setTimeout(() => {
-      setFeedbackSent(false);
-      setFeedbackText("");
-      setShowFeedbackDialog(false);
-    }, 1500);
   };
 
   const currentTheme = THEME_OPTIONS.find((o) => o.value === theme) ?? THEME_OPTIONS[0];
@@ -210,7 +194,7 @@ export default function AccountDropdown() {
                 <DropdownMenuItem onSelect={() => handleNavigate("/help")}>
                   <HelpCircle /> Help
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => { setOpen(false); setShowFeedbackDialog(true); }}>
+                <DropdownMenuItem afterClose={openFeedback}>
                   <MessageSquare /> Send feedback
                 </DropdownMenuItem>
               </DropdownMenuGroup>
@@ -259,42 +243,6 @@ export default function AccountDropdown() {
         onSkip={() => setShowLanguagePrompt(false)}
         initialSelected={showLanguagePrompt ? readLanguagePrefs().languages ?? ["en"] : ["en"]}
       />
-
-      {/* Send Feedback Dialog */}
-      <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-primary" /> Send Feedback</DialogTitle>
-            <DialogDescription>Help us improve Deeni.tube. Share your thoughts, suggestions, or report issues.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {feedbackSent ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="h-8 w-8 text-green-500" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">Thank You!</h3>
-                <p className="text-sm text-muted-foreground">Your feedback has been sent successfully.</p>
-              </div>
-            ) : (
-              <>
-                <Textarea
-                  placeholder="Write your feedback here..."
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  className="min-h-[120px] resize-none"
-                />
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={() => setShowFeedbackDialog(false)}>Cancel</Button>
-                  <Button className="flex-1" onClick={handleSendFeedback} disabled={!feedbackText.trim()}>
-                    <Send className="h-4 w-4 mr-2" /> Send
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

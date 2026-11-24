@@ -95,6 +95,21 @@ test.describe('iPhone: tap to play with sound', () => {
     await expect.poll(() => fake(frame), { timeout: 10_000 }).toMatchObject({ playing: true, muted: true, videoId: PLACEHOLDER });
   });
 
+  test('a tap on a search result plays it with sound too, in the search page', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/search?q=allah');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: true, videoId: PLACEHOLDER });
+    const result = page.locator('main a[href^="/search/"]:visible').first();
+    const id = new URL((await result.getAttribute('href'))!, 'http://x').pathname.split('/').pop()!;
+    await result.tap();
+    await expect(page).toHaveURL(new RegExp(`/search/.+/${id}\\?q=allah$`));
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: id });
+    await expect(page.getByRole('button', { name: /to unmute/ })).toHaveCount(0);
+    await expect(page.locator('iframe')).toHaveCount(1);
+  });
+
   test('a tap on a video watched before goes on from where it was left, with sound', async ({ page }) => {
     await seed(page);
     await page.addInitScript(() => localStorage.setItem('deeni-watch-progress', JSON.stringify({ UugARckPloo: { t: 12, d: 30, at: Date.now() } })));

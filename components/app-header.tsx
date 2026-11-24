@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import AccountDropdown from "@/components/account-dropdown";
 import NotificationDropdown from "@/components/notification-dropdown";
 import { VoiceSearchDialog } from "@/components/voice-search";
-import { cn } from "@/lib/utils";
+import { cn, isActivePath } from "@/lib/utils";
 import { useHeader } from "@/app/contexts/header-context";
 
 export default function AppHeader() {
@@ -48,7 +48,7 @@ export default function AppHeader() {
 
   // Keep the input in sync with ?q when landing on /search (e.g. via a link or reload)
   useEffect(() => {
-    if (pathname !== "/search") return;
+    if (!isActivePath(pathname, "/search")) return; // the results, and a video opened from them
     const q = new URLSearchParams(window.location.search).get("q");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads ?q from the browser URL after navigation
     if (q) setDesktopSearchQuery(q);
@@ -141,13 +141,13 @@ export default function AppHeader() {
       {/* ── Mobile Header ─────────────────────────────────────────────── */}
       <header
         className={cn(
-          "md:hidden fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] transition-transform duration-300 ease-in-out",
+          "safe-x md:hidden fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] transition-transform duration-300 ease-in-out",
           (!headerVisible || pathname === "/shorts") && "-translate-y-full"
         )}
       >
         <div className="flex items-center justify-between px-2 py-2 w-full h-14">
-          <Link href="/" className="flex-shrink-0 pl-1">
-            <Logo height={24} className="h-6 w-auto" />
+          <Link href="/" className="min-w-0 pl-1">
+            <Logo height={24} className="h-6 w-auto max-w-full object-contain object-left" />
           </Link>
 
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -170,7 +170,7 @@ export default function AppHeader() {
       {/* ── Desktop Header ────────────────────────────────────────────── */}
       <header
         className={cn(
-          "hidden md:flex fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] flex-col transition-transform duration-300 ease-in-out",
+          "safe-x hidden md:flex fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] flex-col transition-transform duration-300 ease-in-out",
           !headerVisible && "-translate-y-full"
         )}
       >
@@ -205,7 +205,7 @@ export default function AppHeader() {
                 {desktopSearchQuery && (
                   <button
                     onClick={() => setDesktopSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     type="button"
                     aria-label="Clear search"
                   >
@@ -237,9 +237,9 @@ export default function AppHeader() {
                             type="button"
                             onClick={() => removeRecent(search)}
                             aria-label={`Remove "${search}" from recent searches`}
-                            className="p-1 rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           >
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                       ))}
@@ -278,7 +278,7 @@ export default function AppHeader() {
                 <Button asChild variant="outline" className="rounded-full flex items-center gap-1.5 h-9 text-sm font-medium pl-2 pr-3 text-[#065fd4] dark:text-[#3ea6ff] border-border bg-transparent hover:bg-[#def1ff] dark:hover:bg-[#263850] hover:text-[#065fd4] dark:hover:text-[#3ea6ff] hover:border-transparent">
                   <Link href="/signin">
                     <UserCircle className="h-6 w-6" />
-                    <span>Sign In</span>
+                    <span>Sign in</span>
                   </Link>
                 </Button>
               )}

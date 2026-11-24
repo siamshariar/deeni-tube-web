@@ -144,7 +144,7 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
       {/* More from Deeni.tube */}
       <div className="border-t mt-3 pt-3">
         <div className="px-6 pb-1.5 pt-1.5">
-          <h3 className="whitespace-nowrap text-base font-medium leading-[22px]">More from Deeni.tube</h3>
+          <h3 className="text-base font-medium leading-[22px]">More from Deeni.tube</h3>
         </div>
         <SidebarItem href="/more" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="More" active={isActivePath(pathname, "/more")} collapsed={false} onClick={onLinkClick} />
       </div>
@@ -157,14 +157,14 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
 
       {/* Footer, as on YouTube: small grey links, then the copyright (mt-auto keeps it at the bottom) */}
       <div className="mt-auto border-t px-6 py-4">
-        <nav aria-label="About Deeni.tube" className="flex flex-wrap gap-x-2 gap-y-0.5 text-[13px] font-medium leading-[18px] text-muted-foreground">
+        <nav aria-label="About Deeni.tube" className="flex flex-wrap gap-x-2 text-[13px] font-medium leading-[18px] text-muted-foreground">
           {FOOTER_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} onClick={onLinkClick} className="hover:text-foreground">
+            <Link key={l.href} href={l.href} onClick={onLinkClick} className="inline-flex min-h-6 items-center hover:text-foreground">
               {l.label}
             </Link>
           ))}
         </nav>
-        <p className="mt-3 text-xs leading-[18px] text-muted-foreground/80">© 2026 Deeni.tube</p>
+        <p className="mt-3 text-xs leading-[18px] text-muted-foreground">© 2026 Deeni.tube</p>
       </div>
     </>
   );

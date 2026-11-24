@@ -159,35 +159,42 @@ test.describe('Phones: Shorts buttons', () => {
   test.skip(({ isMobile }) => !isMobile, 'phones only');
 
   for (const [w, h] of [[375, 548], [390, 664], [412, 839]] as const) {
-    test(`the like/comment/share/save/report column fits between the top buttons and the title (${w}×${h})`, async ({ page }) => {
+    test(`the like/comment/share/save/report column fits under the top buttons and beside the title (${w}×${h})`, async ({ page }) => {
       await seed(page);
       await page.setViewportSize({ width: w, height: h }); // 375×548: an iPhone SE in Safari, toolbars showing
       await page.route(/youtube(-nocookie)?\.com\/embed/, (r) => r.abort());
       await page.goto('/shorts');
       const section = page.locator('section').first();
-      const like = section.getByRole('button', { name: /^(Like|Unlike)$/ });
+      const like = section.getByRole('button', { name: /^(Like|Unlike), / });
       await expect(like).toBeVisible();
       const more = (await section.getByRole('button', { name: 'More options' }).boundingBox())!;
       const top = (await like.boundingBox())!;
       const report = (await section.getByRole('button', { name: 'Report' }).last().boundingBox())!;
       const title = (await section.locator('button p').first().boundingBox())!;
       expect(top.y).toBeGreaterThan(more.y + more.height + 16);
-      expect(report.y + report.height).toBeLessThanOrEqual(title.y);
+      // Beside the title and the channel, as on YouTube: they end before the buttons begin, whatever their length
+      for (const button of await section.locator('button:has(span > svg)').all()) {
+        const b = await button.boundingBox();
+        if (b && b.y > more.y + more.height) expect(title.x + title.width).toBeLessThanOrEqual(b.x);
+      }
+      const channel = (await section.locator('span.truncate').first().boundingBox())!;
+      expect(channel.x + channel.width).toBeLessThanOrEqual(report.x);
+      expect(report.y + report.height).toBeLessThanOrEqual((await section.boundingBox())!.y + (await section.boundingBox())!.height - 24);
     });
   }
 });
 
 test.describe('Everywhere', () => {
-  test('History: the channel name opens the video; YouTube text sizes', async ({ page, isMobile }) => {
+  test('History: the channel name opens the video; YouTube text sizes on desktop, every list\'s on phones', async ({ page, isMobile }) => {
     await seed(page);
     await page.goto('/history');
     const row = page.locator('main h3').locator('visible=true').filter({ hasText: /\S/ }).last();
     await expect(row).toBeVisible({ timeout: 10_000 });
     const title = page.locator('main a[href^="/videos/"] h3').locator('visible=true').first();
-    await expect(title).toHaveCSS('font-size', isMobile ? '14px' : '18px');
-    await expect(title).toHaveCSS('font-weight', '400');
+    await expect(title).toHaveCSS('font-size', isMobile ? '15px' : '18px');
+    await expect(title).toHaveCSS('font-weight', isMobile ? '500' : '400');
     const details = title.locator('xpath=following-sibling::p[1]');
-    await expect(details).toHaveCSS('font-size', '12px');
+    await expect(details).toHaveCSS('font-size', isMobile ? '13px' : '12px');
     // The channel name is part of the link to the video, not a link to the channel
     const link = title.locator('xpath=ancestor::a[1]');
     await expect(link).toHaveAttribute('href', /^\/videos\//);
@@ -199,7 +206,7 @@ test.describe('Everywhere', () => {
     await seed(page);
     await page.goto('/settings');
     const english = page.getByRole('checkbox', { name: /^English/ });
-    const bangla = page.getByRole('checkbox', { name: /^Bengali/ });
+    const bangla = page.getByRole('checkbox', { name: /^Bangla/ });
     await expect(english).toHaveAttribute('aria-checked', 'true');
     await expect(bangla).toHaveAttribute('aria-checked', 'true');
     await english.click();
@@ -224,8 +231,9 @@ test.describe('Everywhere', () => {
     await expect(page.getByText('Still here, on its page and in search')).toBeVisible();
     await page.getByRole('menuitemradio', { name: /Hide from Home/ }).click();
 
-    const hidden = page.getByRole('button', { name: `${name}: hidden from your Home feed` });
-    await expect(hidden).toHaveText('Hidden');
+    // Filled, as YouTube's Subscribe: one press adds it again
+    const hidden = page.getByRole('button', { name: `${name}: Add to Home, hidden from your Home feed` });
+    await expect(hidden).toHaveText('Add to Home');
     await expect(page.getByText('9 of 10 channels show on your Home feed')).toBeVisible();
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('feed-visible-channels')!).length)).toBeGreaterThan(0);
     // The Hidden filter lists it
@@ -244,7 +252,7 @@ test.describe('Everywhere', () => {
     const menu = page.getByRole('menu');
     await expect(menu).toBeVisible();
     // A real wheel scroll over the page (a scroll lock would swallow it)
-    await page.mouse.move(isMobile ? 40 : 400, 400); // over the list (not the desktop sidebar)
+    await page.mouse.move(isMobile ? 40 : 400, 90); // over the page's title (not the menu or the desktop sidebar)
     await page.mouse.wheel(0, 300);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
     await expect(menu).toHaveCount(0);

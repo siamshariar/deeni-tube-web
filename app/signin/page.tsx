@@ -5,14 +5,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/logo";
 import Link from "next/link";
-import { Globe, ChevronLeft, Eye, EyeOff, Mail, Loader2 } from "lucide-react";
+import { ArrowLeft, Globe, Eye, EyeOff, Mail, Loader2 } from "lucide-react";
+import { BackButton } from "@/components/page-bar";
 import { Button } from "@/components/ui/button";
+import { useBack } from "@/hooks/use-back";
 import { Input } from "@/components/ui/input";
 import LanguagePrompt from "@/components/language-prompt";
 import { mockLanguages, mockAccounts } from "@/lib/mock-data";
 
 export default function SignInPage() {
   const router = useRouter();
+  const back = useBack("/");
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["en"]);
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -92,16 +95,16 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-background/95 backdrop-blur-sm z-10">
-        <button type="button" aria-label="Go back" onClick={() => router.back()} className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted"><ChevronLeft className="h-5 w-5" /></button>
+      <header className="sticky top-0 z-10 grid h-14 grid-cols-[1fr_auto_1fr] items-center border-b bg-background px-1 md:px-3">
+        <BackButton onClick={back} />
         <Link href="/" aria-label="Deeni.tube home"><Logo height={28} className="h-7 w-auto object-contain" /></Link>
-        <button type="button" aria-label="Language" onClick={() => setShowLanguagePopup(true)} className="flex items-center gap-1.5 text-sm text-primary font-medium"><Globe className="h-4 w-4" /><span className="hidden sm:inline">Language</span></button>
+        <Button type="button" variant="ghost" aria-label="Language" onClick={() => setShowLanguagePopup(true)} className="h-11 justify-self-end px-2.5 md:px-4 [&_svg]:size-6 md:[&_svg]:size-5"><Globe /><span className="hidden md:inline">Language</span></Button>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-[400px] space-y-6">
           <div className="text-center space-y-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Welcome to Deeni.tube</h1>
+            <h1 className="text-2xl font-bold leading-8">Welcome to Deeni.tube</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">Authentic Islamic videos from trusted scholars. Watch, learn, and grow your knowledge.</p>
           </div>
 
@@ -124,25 +127,25 @@ export default function SignInPage() {
                 }
                 {isLoading ? "Signing in..." : "Continue with Google"}
               </Button>
-              <Button onClick={() => setShowEmailForm(true)} variant="outline" className="w-full h-12 rounded-full flex items-center justify-center gap-3 text-sm font-medium bg-background hover:bg-muted border-border shadow-sm"><Mail className="h-4 w-4" /> Continue with Email</Button>
+              <Button onClick={() => setShowEmailForm(true)} variant="outline" className="w-full h-12 rounded-full flex items-center justify-center gap-3 text-sm font-medium bg-background hover:bg-muted border-border shadow-sm"><Mail className="h-4 w-4" /> Continue with email</Button>
               <div className="relative py-2"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div><div className="relative flex justify-center"><span className="bg-background px-4 text-xs text-muted-foreground font-medium">or</span></div></div>
-              <Button onClick={handleSkip} variant="ghost" className="w-full h-11 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted">Browse as Guest</Button>
+              <Button onClick={handleSkip} variant="ghost" className="w-full h-11 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted">Browse as guest</Button>
             </div>
           ) : (
             <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleEmailSignIn(); }}>
-              <button type="button" onClick={() => setShowEmailForm(false)} className="flex items-center gap-1 text-sm text-primary font-medium"><ChevronLeft className="h-4 w-4" /> Back</button>
+              <button type="button" onClick={() => setShowEmailForm(false)} className="-ml-2 flex h-9 items-center gap-1 rounded-full px-2 text-sm font-medium transition-colors active:bg-accent can-hover:hover:bg-accent"><ArrowLeft className="h-5 w-5" /> Back</button>
               <Input type="email" placeholder="Email address *" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-full" required />
               <div className="relative">
                 <Input type={showPassword ? "text" : "password"} placeholder="Password (optional)" value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 rounded-full pr-12" />
                 <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}</button>
               </div>
-              <Button type="submit" className="w-full h-12 rounded-full font-medium" disabled={isLoading}>{isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}{isLoading ? "Signing in..." : "Sign In"}</Button>
+              <Button type="submit" className="w-full h-12 rounded-full font-medium" disabled={isLoading}>{isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}{isLoading ? "Signing in..." : "Sign in"}</Button>
             </form>
           )}
 
-          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <Link href="/help/terms" className="text-primary">Terms of Service</Link> and <Link href="/help/privacy" className="text-primary">Privacy Policy</Link></p>
+          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">By continuing, you agree to our <Link href="/help/terms" className="font-medium text-foreground">Terms of service</Link> and <Link href="/help/privacy" className="font-medium text-foreground">Privacy &amp; safety</Link></p>
         </div>
-      </main>
+      </div>
 
       <LanguagePrompt open={showLanguagePopup} onSave={saveLanguagePrefs} onSkip={() => setShowLanguagePopup(false)} initialSelected={selectedLanguages} />
     </div>

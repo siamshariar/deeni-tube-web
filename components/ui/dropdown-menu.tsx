@@ -98,7 +98,7 @@ DropdownMenuSubContent.displayName =
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, onCloseAutoFocus, onPointerDownOutside, ...props }, ref) => {
+>(({ className, sideOffset = 4, collisionPadding = 8, onCloseAutoFocus, onPointerDownOutside, ...props }, ref) => {
   const shared = React.useContext(MenuContext)
   return (
     <DropdownMenuPrimitive.Portal>
@@ -109,6 +109,7 @@ const DropdownMenuContent = React.forwardRef<
           else if (ref) ref.current = el
         }}
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         onPointerDownOutside={(e) => {
           onPointerDownOutside?.(e)
           // Its own button opens and closes it; dismissing here too would close a menu opened again while it fades out
@@ -125,7 +126,7 @@ const DropdownMenuContent = React.forwardRef<
           if (run) setTimeout(run)
         }}
         className={cn(
-          'z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-popover py-2 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          'yt-scrollbar z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border bg-popover py-2 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
           className,
         )}
         {...props}

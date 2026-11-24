@@ -3,7 +3,7 @@
 export const mockLanguages = [
   { code: "en", name: "English", native: "English" },
   { code: "ar", name: "Arabic", native: "العربية" },
-  { code: "bn", name: "Bengali", native: "বাংলা" },
+  { code: "bn", name: "Bangla", native: "বাংলা" },
   { code: "hi", name: "Hindi", native: "हिन्दी" },
   { code: "ur", name: "Urdu", native: "اردو" },
   { code: "tr", name: "Turkish", native: "Türkçe" },

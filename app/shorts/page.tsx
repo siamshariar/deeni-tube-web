@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useSyncExternalStore, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { imagePriorityProps } from "@/lib/image-priority"
 import {
@@ -23,331 +23,36 @@ import {
   Send,
   Eye,
   Clock,
-  Copy,
-  Check,
-  ChevronLeft,
-  ChevronRight,
+  UserX,
+  ArrowLeft,
 } from "lucide-react"
+import { ActionMenu } from "@/components/action-menu"
+import { Drawer, DrawerContent, DrawerTitleBar } from "@/components/ui/drawer"
 import { SaveIcon, ShareIcon } from "@/components/icons/action-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { MoreVertIcon } from "@/components/icons/more-vert-icon"
 import { CCIconOff, CCIconOn, FullscreenIcon } from "@/components/icons/player-icons"
 
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { DescriptionText, hashtagHref } from "@/components/description-text"
-import { ReportDialog } from "@/components/report-dialog"
+import { openFeedback, openReport, openShare } from "@/lib/dialogs"
 import { notify } from "@/lib/notify";
+import { openSaveCard } from "@/lib/save-card"
+import { useBack } from "@/hooks/use-back"
+import { useDontRecommend } from "@/hooks/useDontRecommend"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { openShareIntent } from "@/lib/share"
 import { recordWatch } from "@/hooks/useWatchHistory"
-import { replacedShorts } from "@/lib/shorts-data"
+import { savedItem } from "@/hooks/useSavedList"
+import { historyEntryForShort } from "@/lib/history-entry"
+import { replacedShorts, shortsVideos as shortsData } from "@/lib/shorts-data"
+import { youtubeThumb } from "@/lib/media-lookup"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
-import { useMenuDismiss } from "@/hooks/use-menu-dismiss"
 import { useWatchLater } from "@/hooks/useWatchLater"
 import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, revealHost, setHostCropped, setHostVisible } from "@/lib/player-host"
 
 import type { CommentReply, VideoComment } from "@/lib/types"
-// ============ SHORTS DATA ============
-const shortsData = [
-  {
-    id: "s1",
-    videoId: "MBxDbbkk0gQ",
-    title: "একমাত্র আল্লাহর রাজত্বই চিরস্থায়ী",
-    channel: "Dr. Mohammad Monzur-E-Elahi",
-    channelId: "monzur",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/MBxDbbkk0gQ/hqdefault.jpg",
-    likes: "15K",
-    comments: "1.2K",
-    isSubscribed: false,
-    description: `প্রফেসর ড. মোহাম্মদ মানজুরে ইলাহী
-পিএইচডি, শারী'আহ অনুষদ, মদীনা ইসলামী বিশ্ববিদ্যালয়
-
-অফিসিয়াল ইউটিউব চ্যানেল : https://www.youtube.com/@DrMohammadMonzurEElahi
-অফিসিয়াল ওয়েবসাইট লিংক : https://www.monzureelahi.com/
-অফিসিয়াল ফেসবুক পেইজ লিংক : https://www.facebook.com/drmonzureelahiofficial
-অফিসিয়াল টেলিগ্রাম চ্যানেল লিংক : https://t.me/monzureelahi
-গুরুত্বপূর্ণ আলোচনার অডিওসমূহ : https://drive.google.com/drive/u/8/folders/1MpmM1kponF81E8giNkkDPehprqk_Eflu
-হোয়াটসঅ্যাপ চ্যানেল : https://whatsapp.com/channel/0029Vafrb5Q6rsQkw6IVV510
-
-অর্গানাইজেশনসমূহ :
-ইমাম বুখারী ট্রাস্ট : https://www.facebook.com/imambukharitrustbd
-তাইবাহ একাডেমি : https://taibahacademy.com/
-কুল্লিয়াতুল কুরআন : https://www.facebook.com/kulliyatulquran
-তাইবাহ পাবলিসার্স : https://www.facebook.com/taibahpublishers`,
-    views: "15,234",
-    timeAgo: "2 weeks ago",
-    hashtags: ["#monzureelahi", "#allah", "#islamicreminder"]
-  },
-  {
-    id: "s2",
-    videoId: "Pr5qe5nQfWc",
-    title: "কীভাবে দুনিয়ার লোভ থেকে বেঁচে থাকবেন?",
-    channel: "Dr. Mohammad Monzur-E-Elahi",
-    channelId: "monzur",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/Pr5qe5nQfWc/hqdefault.jpg",
-    likes: "25K",
-    comments: "2.1K",
-    isSubscribed: true,
-    description: `প্রফেসর ড. মোহাম্মদ মানজুরে ইলাহী
-পিএইচডি, শারী'আহ অনুষদ, মদীনা ইসলামী বিশ্ববিদ্যালয়
-
-অফিসিয়াল ইউটিউব চ্যানেল : https://www.youtube.com/@DrMohammadMonzurEElahi
-অফিসিয়াল ওয়েবসাইট লিংক : https://www.monzureelahi.com/
-অফিসিয়াল ফেসবুক পেইজ লিংক : https://www.facebook.com/drmonzureelahiofficial
-অফিসিয়াল টেলিগ্রাম চ্যানেল লিংক : https://t.me/monzureelahi
-গুরুত্বপূর্ণ আলোচনার অডিওসমূহ : https://drive.google.com/drive/u/8/folders/1MpmM1kponF81E8giNkkDPehprqk_Eflu
-হোয়াটসঅ্যাপ চ্যানেল : https://whatsapp.com/channel/0029Vafrb5Q6rsQkw6IVV510
-
-অর্গানাইজেশনসমূহ :
-ইমাম বুখারী ট্রাস্ট : https://www.facebook.com/imambukharitrustbd
-তাইবাহ একাডেমি : https://taibahacademy.com/
-কুল্লিয়াতুল কুরআন : https://www.facebook.com/kulliyatulquran
-তাইবাহ পাবলিসার্স : https://www.facebook.com/taibahpublishers`,
-    views: "25,890",
-    timeAgo: "3 days ago",
-    hashtags: ["#monzureelahi", "#allah", "#islamiclecture"]
-  },
-  {
-    id: "s3",
-    videoId: "8YfQCDjlQsc",
-    title: "ইমামের দূর্ব্যবহারের কারণে কেউ ওই মাসজিদে না গেলে কি অন্যায় হবে?",
-    channel: "Dr. Mohammad Monzur-E-Elahi",
-    channelId: "monzur",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/8YfQCDjlQsc/hqdefault.jpg",
-    likes: "50K",
-    comments: "3.5K",
-    isSubscribed: false,
-    description: "Dr. Mohammad Monzur-E-Elahi",
-    views: "50,123",
-    timeAgo: "1 week ago",
-    hashtags: ["#monzureelahi", "#masjid", "#islamicqa"]
-  },
-  {
-    id: "s4",
-    videoId: "o38RKuY_AUU",
-    title: "সিদ্দীকে আকবার রা.-এর দৃষ্টিতে প্রিয় নবী সা.",
-    channel: "Dr. Mohammad Monzur-E-Elahi",
-    channelId: "monzur",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/o38RKuY_AUU/hqdefault.jpg",
-    likes: "18K",
-    comments: "950",
-    isSubscribed: false,
-    description: "Dr. Mohammad Monzur-E-Elahi",
-    views: "18,456",
-    timeAgo: "5 days ago",
-    hashtags: ["#monzureelahi", "#seerah", "#prophetmuhammad"]
-  },
-  {
-    id: "s5",
-    videoId: "oEWnPbRvOrY",
-    title: "আল্লাহর পক্ষ থেকে তাওফীক প্রাপ্তি",
-    channel: "Dr. Mohammad Monzur-E-Elahi",
-    channelId: "monzur",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/oEWnPbRvOrY/hqdefault.jpg",
-    likes: "22K",
-    comments: "1.1K",
-    isSubscribed: false,
-    description: "Dr. Mohammad Monzur-E-Elahi",
-    views: "22,789",
-    timeAgo: "3 weeks ago",
-    hashtags: ["#monzureelahi", "#tawfiq", "#islamicreminder"]
-  },
-  {
-    id: "s6",
-    videoId: "PUwTf64igQk",
-    title: "এভাবে ঈমান নষ্ট করছেন নাতো?",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
-    channelId: "abdullah-jahangir",
-    channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/PUwTf64igQk/hqdefault.jpg",
-    likes: "35K",
-    comments: "2.8K",
-    isSubscribed: true,
-    description: `SunnahTrust
-আস-সুন্নাহ ট্রাস্ট
-Assunnah trust
-Dr. Khandaker Abdullah Jahangir Rh Official`,
-    views: "35,678",
-    timeAgo: "4 days ago",
-    hashtags: ["#abdullahjahangir", "#iman", "#islamicreminder"]
-  },
-  {
-    id: "s7",
-    videoId: "hHpoYE-v6og",
-    title: "রোগ-ব্যাধিতে ধৈর্য ধারণ করা",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
-    channelId: "abdullah-jahangir",
-    channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/hHpoYE-v6og/hqdefault.jpg",
-    likes: "28K",
-    comments: "1.9K",
-    isSubscribed: false,
-    description: `SunnahTrust
-আস-সুন্নাহ ট্রাস্ট
-Assunnah trust
-Dr. Khandaker Abdullah Jahangir Rh Official
-
-ভিডিও লিংক: https://youtube.com/shorts/hHpoYE-v6og`,
-    views: "28,901",
-    timeAgo: "1 week ago",
-    hashtags: ["#abdullahjahangir", "#sabr", "#patience"]
-  },
-  {
-    id: "s8",
-    videoId: "Kk1_-T-8MFU",
-    title: "মহান আল্লাহ'র কাছে চাওয়ার নিয়ম",
-    channel: "Dr. Khandaker Abdullah Jahangir Rh.",
-    channelId: "abdullah-jahangir",
-    channelAvatar: "https://yt3.googleusercontent.com/stJnVilfKhMtBiIq_hXTu-9DnanUT0GNtmsRePmQvLAi6c7bhXoIIHGlYL0HqUrdEjrL0KFs7Q=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/Kk1_-T-8MFU/hqdefault.jpg",
-    likes: "42K",
-    comments: "3.2K",
-    isSubscribed: false,
-    description: "ড.খন্দকার আব্দুল্লাহ জাহাঙ্গীর (রঃ)",
-    views: "42,345",
-    timeAgo: "2 weeks ago",
-    hashtags: ["#abdullahjahangir", "#dua", "#islamicdua"]
-  },
-  {
-    id: "s9",
-    videoId: "rTrh9VHgdwo",
-    title: "ওজুতে ঘাড় মাসাহ করা সুন্নাহ নাকি বিদ'আত - Dr. Abu Bakar Muhammad Zakaria",
-    channel: "Professor Dr. Abubakar Muhammad Zakaria",
-    channelId: "abu-bakar-zakariya",
-    channelAvatar: "https://yt3.googleusercontent.com/B5dEWmLpOG-j07FqzYJJW2snv2yep93R_AcnBx05lzn56r0CJdX8LtrEASS-FxW3r663GNzLHQ=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/rTrh9VHgdwo/hqdefault.jpg",
-    likes: "12K",
-    comments: "850",
-    isSubscribed: false,
-    description: "ওজুতে ঘাড় মাসাহ করা সুন্নাহ নাকি বিদ'আত - Dr. Abu Bakar Muhammad Zakaria - Mizanur Rahman Azhari",
-    views: "12,345",
-    timeAgo: "1 week ago",
-    hashtags: ["#abubakarzakaria", "#wudu", "#islamicqa"]
-  },
-  {
-    id: "s10",
-    videoId: "ihdO_G6Yk0E",
-    title: "দুনিয়াতেই জান্নাত আছে আপনি কি জানেন? ✨ Abu Bakar Zakaria",
-    channel: "Professor Dr. Abubakar Muhammad Zakaria",
-    channelId: "abu-bakar-zakariya",
-    channelAvatar: "https://yt3.googleusercontent.com/B5dEWmLpOG-j07FqzYJJW2snv2yep93R_AcnBx05lzn56r0CJdX8LtrEASS-FxW3r663GNzLHQ=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/ihdO_G6Yk0E/hqdefault.jpg",
-    likes: "28K",
-    comments: "1.5K",
-    isSubscribed: false,
-    description: "দুনিয়াতে জান্নাতের স্বাদ পাওয়ার গোপন রহস্য! ✨🌿 | Abu Bakar Zakaria\n\nআমরা সবাই পরকালের জান্নাতের কথা জানি, কিন্তু আপনি কি জানেন এই দুনিয়াতেই জান্নাত বিদ্যমান?",
-    views: "28,456",
-    timeAgo: "3 days ago",
-    hashtags: ["#abubakarzakaria", "#jannah", "#islamicshorts"]
-  },
-  {
-    id: "s11",
-    videoId: "_zCnmnCd7CU",
-    title: "আদমসুমারির খাতায় মুসলমান, বাস্তবে ইমানের খাতায় নাম নাই || Dr. Mohammad Imam Hossain",
-    channel: "Dr. Mohammad Imam Hossain",
-    channelId: "imam-hossain",
-    channelAvatar: "/placeholder.svg?height=48&width=48",
-    thumbnail: "https://img.youtube.com/vi/_zCnmnCd7CU/hqdefault.jpg",
-    likes: "18K",
-    comments: "950",
-    isSubscribed: false,
-    description: "ড. মোহাম্মাদ ইমাম হোসাইন (হাফিযাহুল্লাহ্‌)\n-(পিএইচডি, ইসলামী বিশ্ববিদ্যালয়, কুষ্টিয়া)",
-    views: "18,234",
-    timeAgo: "5 days ago",
-    hashtags: ["#imamhossain", "#iman", "#islamicreminder"]
-  },
-  {
-    id: "s12",
-    videoId: "Wgk2Hw5-m7Y",
-    title: "The Quran is the Most Untranslatable Book - Dr Zakir Naik",
-    channel: "Dr. Zakir Naik",
-    channelId: "zakir-naik",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/Wgk2Hw5-m7Y/hqdefault.jpg",
-    likes: "322",
-    comments: "24",
-    isSubscribed: false,
-    description: "The Quran is the Most Untranslatable Book - Dr Zakir Naik\n\n#drzakirnaik #Quran",
-    views: "7,959",
-    timeAgo: "3 weeks ago",
-    hashtags: ["#drzakirnaik", "#Quran"]
-  },
-  {
-    id: "s17",
-    videoId: "Qp4vZLEqizc",
-    title: "Belief in Bad Omen is Shirk - Dr Zakir Naik",
-    channel: "Dr. Zakir Naik",
-    channelId: "zakir-naik",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_kgWD-o3akIt5SI_BWvWHc6mHyPRm3BA5t69TAZlqQcpIF6=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/Qp4vZLEqizc/hqdefault.jpg",
-    likes: "276",
-    comments: "18",
-    isSubscribed: false,
-    description: "Belief in Bad Omen is Shirk - Dr Zakir Naik\n\n#drzakirnaik #BadOmen #Shirk",
-    views: "4,630",
-    timeAgo: "2 weeks ago",
-    hashtags: ["#drzakirnaik", "#BadOmen", "#Shirk"]
-  },
-  {
-    id: "s14",
-    videoId: "HKRq0DE-GTo",
-    title: "Just Don't Get Angry #muftimenk",
-    channel: "Mufti Menk",
-    channelId: "mufti-menk",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nFND09H6Vvk_P8L4djMdBusHPU8nIT6XuiRjL8M59hJsw=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/HKRq0DE-GTo/hqdefault.jpg",
-    likes: "6.3K",
-    comments: "1.1K",
-    isSubscribed: false,
-    description: "Just Don't Get Angry #muftimenk #motivation #respect #love #hadith #prophet #advice",
-    views: "126,540",
-    timeAgo: "1 month ago",
-    hashtags: ["#muftimenk", "#anger", "#hadith"]
-  },
-  {
-    id: "s15",
-    videoId: "Tnb74r4VZaY",
-    title: "Is it not permissible 2 get married in Muharram? assim al hakeem",
-    channel: "Assim Al Hakeem",
-    channelId: "assim-al-hakeem",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nc1yIpeXxXdQ02ZRrAQr6HZU_gMrzljS5HFCRO4a95KH8=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/Tnb74r4VZaY/hqdefault.jpg",
-    likes: "32K",
-    comments: "1.8K",
-    isSubscribed: false,
-    description: "Is it not permissible 2 get married in Muharram? #muharram #innovation #quran #halal assim al hakeem",
-    views: "32,456",
-    timeAgo: "3 days ago",
-    hashtags: ["#assimalhakeem", "#muharram", "#islamicqa"]
-  },
-  {
-    id: "s16",
-    videoId: "yLMQmr7qjcM",
-    title: "Read all duas of morning & evening adhkar or can we pick & choose? || assim al hakeem",
-    channel: "Assim Al Hakeem",
-    channelId: "assim-al-hakeem",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nc1yIpeXxXdQ02ZRrAQr6HZU_gMrzljS5HFCRO4a95KH8=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/yLMQmr7qjcM/hqdefault.jpg",
-    likes: "25K",
-    comments: "1.2K",
-    isSubscribed: false,
-    description: "Read all duas of morning & evening adhkar or can we pick & choose? || assim al hakeem",
-    views: "25,890",
-    timeAgo: "1 week ago",
-    hashtags: ["#assimalhakeem", "#adhkar", "#dua"]
-  },
-]
 
 // ============ COMMENTS DATA ============
 const initialCommentsByVideo: Record<string, VideoComment[]> = {
@@ -420,9 +125,12 @@ const commentsByVideo = loadComments()
 // Phones and tablets: sized by the screen's height (34-48px), so the whole rail fits between the top controls and
 // the title on any phone, also in Safari with its toolbars showing
 const actionCircleClass =
-  "h-[clamp(34px,6svh,48px)] w-[clamp(34px,6svh,48px)] lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent"
+  "h-[clamp(34px,6svh,48px)] w-[clamp(34px,6svh,48px)] lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition-colors bg-black/40 text-white group-hover:bg-black/60 group-active:scale-95 lg:bg-secondary lg:text-foreground lg:group-hover:bg-accent low:bg-secondary low:text-foreground low:group-hover:bg-accent"
 const actionLabelClass =
-  "text-xs font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] lg:text-sm lg:font-normal lg:text-foreground lg:[text-shadow:none]"
+  "text-xs font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)] lg:text-sm lg:font-normal lg:text-foreground lg:[text-shadow:none] low:text-foreground low:[text-shadow:none]"
+// The buttons at the top of the video. Phones held sideways (and windows as low; `low`): beside it, like the actions
+const topButtonClass =
+  "h-10 w-10 flex-shrink-0 rounded-full items-center justify-center bg-black/40 text-white transition-colors hover:bg-black/60 low:bg-secondary low:text-foreground low:hover:bg-accent"
 
 // ============ YOUTUBE PLAYER MESSAGING ============
 // Players are YouTube embeds driven through YouTube's postMessage protocol (enablejsapi=1).
@@ -588,18 +296,9 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
               <ThumbsDown className={cn("h-4 w-4", isDisliked && "fill-current")} />
             </button>
             <button onClick={() => setShowReplyInput(!showReplyInput)} className="text-xs font-medium text-foreground hover:bg-muted rounded-full px-2.5 py-1 transition-colors">Reply</button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button aria-label="More actions" className="h-10 w-10 -my-2 -mr-2 flex items-center justify-center hover:bg-muted rounded-full transition-colors text-foreground ml-auto">
-                  <MoreVertIcon className="h-5 w-5 md:h-6 md:w-6" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer">
-                  <Flag className="h-5 w-5" /><span>Report</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="-my-2 -mr-2 ml-auto">
+              <ActionMenu title="Comment actions" actions={[{ id: "report", label: "Report", icon: Flag, opens: true, onSelect: () => openReport("comment", reply.content) }]} />
+            </div>
           </div>
           {showReplyInput && (
             <div className="mt-2 flex gap-2">
@@ -611,7 +310,7 @@ function ReplyItem({ reply, onLike, onDislike, onReplyNested }: {
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleReplySubmit() }}
-                  className="flex-1 bg-transparent border-b border-border pb-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
+                  className="flex-1 bg-transparent border-b border-border pb-1 text-base text-foreground md:text-xs placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                   autoFocus
                 />
                 <button aria-label="Post comment" onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
@@ -674,18 +373,9 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
               <ThumbsDown className={cn("h-5 w-5", isDisliked && "fill-current")} />
             </button>
             <button onClick={() => setShowReplyInput(!showReplyInput)} className="text-xs font-medium text-foreground hover:bg-muted rounded-full px-3 py-1.5 transition-colors">Reply</button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button aria-label="More actions" className="h-10 w-10 -my-2 -mr-2 flex items-center justify-center hover:bg-muted rounded-full transition-colors text-foreground ml-auto">
-                  <MoreVertIcon className="h-5 w-5 md:h-6 md:w-6" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem className="flex items-center gap-3 px-4 py-3 cursor-pointer">
-                  <Flag className="h-5 w-5" /><span>Report</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="-my-2 -mr-2 ml-auto">
+              <ActionMenu title="Comment actions" actions={[{ id: "report", label: "Report", icon: Flag, opens: true, onSelect: () => openReport("comment", comment.content) }]} />
+            </div>
           </div>
           {showReplyInput && (
             <div className="mt-3 flex gap-2">
@@ -697,7 +387,7 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleReplySubmit() }}
-                  className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
+                  className="flex-1 bg-transparent border-b border-border pb-1 text-base text-foreground md:text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
                   autoFocus
                 />
                 <button aria-label="Post comment" onClick={handleReplySubmit} disabled={!replyText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30">
@@ -724,47 +414,11 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
   )
 }
 
-// ============ SHARE MODAL ============
-
-const sharePlatforms = [
-  { name: "Facebook", icon: (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><linearGradient id="fb5" x1="9.993%" x2="89.993%" y1="0%" y2="100%"><stop offset="0%" stopColor="#18B5FE"/><stop offset="100%" stopColor="#1277F2"/></linearGradient><path fill="url(#fb5)" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z"/><path fill="#fff" d="M26.707 36.301V25.5h3.613l.543-4.215h-4.156v-2.699c0-1.227.336-2.054 2.082-2.054h2.227V12.66c-.387-.047-1.707-.16-3.25-.16-3.207 0-5.41 1.957-5.41 5.559v3.102H19v4.215h3.656V36.3h4.051z"/></svg>) },
-  { name: "WhatsApp", icon: (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><path fill="#fff" d="M4.9 43.3l2.7-9.8C5.5 30.3 4.5 26.7 4.5 23 4.5 12.3 13.3 3.5 24 3.5S43.5 12.3 43.5 23 34.7 42.5 24 42.5c-3.5 0-6.9-.9-9.9-2.7l-9.2 3.5z"/><path fill="#25D366" d="M24 5c9.9 0 18 8.1 18 18s-8.1 18-18 18c-3.2 0-6.2-.8-8.9-2.4l-1-.6-5.5 2.1 1.5-5.3-.7-1.1C5.7 31.1 5 28.6 5 26 5 16.1 13.1 8 23 8h1v-3z"/><path fill="#fff" d="M35.5 26.8c-.4-.2-2.6-1.3-3-1.4-.4-.2-.7-.3-1 .2-.3.4-1.1 1.4-1.4 1.7-.3.3-.5.3-1 .1-.4-.2-1.9-.7-3.6-2.3-1.3-1.2-2.2-2.7-2.5-3.1-.3-.4 0-.7.2-.9.2-.2.4-.5.7-.8.2-.3.3-.5.5-.8.2-.3.1-.6 0-.8-.1-.2-.9-2.4-1.2-3.3-.3-.9-.7-.8-1-.8-.3 0-.6 0-.9 0-.3 0-.8.1-1.2.6-.4.5-1.6 1.5-1.6 3.7s1.6 4.3 1.8 4.6c.2.3 3.2 4.9 7.7 6.9 1.1.5 1.9.8 2.6 1 1.1.3 2.1.3 2.9.2.9-.1 2.6-1.1 3-2.1.4-1 .4-1.9.3-2.1-.2-.2-.4-.3-.8-.5z"/></svg>) },
-  { name: "X", icon: (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><path fill="#000" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z"/><path fill="#fff" d="M13 14h7.5l5.6 8 8.9-8h3.5l-10.3 9.3L38 34h-7.5l-6.3-9-9.2 9H11l10.8-9.8L13 14zm5 2.5h3l13 15h-3l-13-15z"/></svg>) },
-]
-
-function ShareModal({ isOpen, onClose, videoUrl }: { isOpen: boolean; onClose: () => void; videoUrl: string }) {
-  const [copied, setCopied] = useState(false)
-  const shareContainerRef = useRef<HTMLDivElement>(null)
-  const [showLeftArrow, setShowLeftArrow] = useState(false)
-  const [showRightArrow, setShowRightArrow] = useState(true)
-  const handleCopy = () => { navigator.clipboard.writeText(videoUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }
-  const checkScroll = () => { const el = shareContainerRef.current; if (!el) return; setShowLeftArrow(el.scrollLeft > 10); setShowRightArrow(el.scrollLeft < el.scrollWidth - el.clientWidth - 10) }
-  useEffect(() => { const el = shareContainerRef.current; if (el) { el.addEventListener('scroll', checkScroll); checkScroll(); return () => el.removeEventListener('scroll', checkScroll) } }, [isOpen])
-  const scrollShare = (d: 'left' | 'right') => { const el = shareContainerRef.current; if (!el) return; el.scrollBy({ left: d === 'left' ? -250 : 250, behavior: 'smooth' }) }
-  if (!isOpen) return null
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-card rounded-2xl w-[90vw] max-w-[540px] max-h-[85vh] overflow-hidden shadow-2xl animate-fade-in-left">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><h2 className="text-foreground text-lg font-semibold">Share</h2><button aria-label="Close" onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-muted"><X className="h-5 w-5" /></button></div>
-        <div className="relative px-5 py-5">
-          {showLeftArrow && <button aria-label="Scroll left" onClick={() => scrollShare('left')} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronLeft className="h-5 w-5" /></button>}
-          {showRightArrow && <button aria-label="Scroll right" onClick={() => scrollShare('right')} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-background/80 hover:bg-background flex items-center justify-center text-foreground shadow-lg"><ChevronRight className="h-5 w-5" /></button>}
-          <div ref={shareContainerRef} className="flex gap-4 overflow-x-auto scrollbar-none py-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {sharePlatforms.map((p) => (<button type="button" key={p.name} onClick={() => openShareIntent(p.name, videoUrl)} aria-label={`Share on ${p.name}`} className="flex flex-col items-center gap-2 flex-shrink-0 w-[72px] group"><div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-110 transition-transform duration-200">{p.icon}</div><span className="text-xs text-muted-foreground group-hover:text-foreground text-center leading-tight truncate w-full">{p.name}</span></button>))}
-          </div>
-        </div>
-        <div className="px-5 pb-5"><div className="flex items-center gap-3 bg-muted rounded-xl p-3 border border-border"><input type="text" value={videoUrl} readOnly className="flex-1 bg-transparent text-sm text-foreground outline-none truncate" /><button onClick={handleCopy} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all ${copied ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? 'Copied' : 'Copy'}</button></div></div>
-      </div>
-    </div>
-  )
-}
-
 // ============ MAIN COMPONENT ============
 
 function ShortsPageContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
+  const back = useBack("/")
   const containerRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
   // A link to a short (/shorts?v=ID) starts right on it: only its player loads, with no jump from the first
@@ -774,6 +428,9 @@ function ShortsPageContent() {
   // Media queries (not window.innerWidth) so server and first client render match
   const isDesktopViewport = useMediaQuery("(min-width: 768px)")
   const isWideViewport = useMediaQuery("(min-width: 1440px)")
+  // Comments and description: beside the video (the short makes room), or a sheet over it where there's no room
+  const isSidePanel = useMediaQuery("(min-width: 1024px) and (min-height: 561px)")
+  const isRoomy = useMediaQuery("(min-width: 1280px)")
   const [isMuted, setIsMuted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const { isLiked: isLikedShort, like, unlike } = useLikedVideos()
@@ -781,23 +438,18 @@ function ShortsPageContent() {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
   const [volume, setVolume] = useState(75)
   const [, setIsFullscreen] = useState(false)
-  const [showMoreMenu, setShowMoreMenu] = useState(false)
-  // Swiping or scrolling to another short closes its menu, as on every page
-  useMenuDismiss(showMoreMenu, {
-    isInMenu: (t) => t instanceof Element && !!t.closest("[data-shorts-menu]"),
-    isTrigger: (t) => t instanceof Element && !!t.closest('[aria-label="More options"]'),
-    onDismiss: () => setShowMoreMenu(false),
-  })
+  const dontRecommend = useDontRecommend()
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const [captionsEnabled, setCaptionsEnabled] = useState(false)
   const [activePanel, setActivePanel] = useState<PanelType>(null)
+  // What the sheet still shows while it slides away
+  const [lastPanel, setLastPanel] = useState<PanelType>(null)
   const [commentText, setCommentText] = useState("")
   const [comments, setComments] = useState<VideoComment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [descLoading, setDescLoading] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
-  const [showShareModal, setShowShareModal] = useState(false)
   const [likedIds, setLikedIds] = useState<string[]>(() => loadIds(STORAGE_LIKED))
   const [dislikedIds, setDislikedIds] = useState<string[]>(() => loadIds(STORAGE_DISLIKED))
   const [desktopSidebarWidth, setDesktopSidebarWidth] = useState(240)
@@ -864,9 +516,6 @@ function ShortsPageContent() {
   const neighborTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Feedback dialog state
-  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
-  const [feedbackText, setFeedbackText] = useState("")
-  const [feedbackSent, setFeedbackSent] = useState(false)
 
   useEffect(() => {
     const syncSidebarWidth = () => {
@@ -892,10 +541,7 @@ function ShortsPageContent() {
   useEffect(() => {
     if (!currentShort) return
     const s = currentShort
-    const timer = setTimeout(() => recordWatch({
-      id: s.id, type: "short", videoId: s.videoId, title: s.title, channel: s.channel, channelId: s.channelId,
-      channelAvatar: s.channelAvatar, thumbnail: s.thumbnail, duration: "", views: s.views, timeAgo: s.timeAgo,
-    }), 1500)
+    const timer = setTimeout(() => recordWatch(historyEntryForShort(s)), 1500)
     return () => clearTimeout(timer)
   }, [currentShort])
 
@@ -1424,23 +1070,20 @@ function ShortsPageContent() {
       const typing = !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
       if (activePanel && e.key === "Escape") { setActivePanel(null); return }
       if (typing) return
-      if (showShareModal && e.key === "Escape") { setShowShareModal(false); return }
-      if (activePanel || showShareModal) return
+      if (activePanel || document.querySelector('[role="dialog"], [role="menu"]')) return
       if (e.key === "ArrowDown") { e.preventDefault(); scrollToVideo(currentIndex + 1) }
       if (e.key === "ArrowUp") { e.preventDefault(); scrollToVideo(currentIndex - 1) }
     }
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h)
-  }, [currentIndex, activePanel, showShareModal, scrollToVideo])
+  }, [currentIndex, activePanel, scrollToVideo])
 
   // Likes are stored by YouTube id so they match the Liked videos list
   const toggleLike = (id: string) => {
     const s = shortsData.find((x) => x.id === id)
     if (!s) return
     if (isLikedShort(s.videoId)) { unlike(s.videoId); return }
-    like({
-      id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
-      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "", addedAt: Date.now(),
-    })
+    const item = savedItem(s.videoId, 0) // liked as of now
+    if (item) like(item)
   }
   const toggleFullscreen = () => {
     const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void }
@@ -1477,10 +1120,7 @@ function ShortsPageContent() {
   // Save = Watch Later (it holds both videos and shorts)
   const isShortSaved = (s: (typeof shortsData)[number]) => isInWatchLater(s.videoId)
   const toggleSaveShort = (s: (typeof shortsData)[number]) =>
-    toggleWatchLater({
-      id: s.videoId, videoId: s.videoId, type: "short", title: s.title, channel: s.channel, channelAvatar: s.channelAvatar,
-      thumbnail: s.thumbnail, views: s.views, timeAgo: s.timeAgo, duration: "",
-    })
+    toggleWatchLater(savedItem(s.videoId, 0)!) // saved as of now
   const handleTogglePlay = (e: React.MouseEvent) => {
     e.stopPropagation()
     const onVideo = !(e.currentTarget instanceof HTMLButtonElement)
@@ -1617,36 +1257,97 @@ function ShortsPageContent() {
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment() } }
-  const openPanel = (type: PanelType) => { if (activePanel === type) { setActivePanel(null); return }; setActivePanel(type); setDescExpanded(false); if (type === "comments") { loadCommentsForCurrentShort(); setTimeout(() => commentInputRef.current?.focus(), 400) } else if (type === "description") loadDescriptionForCurrentShort() }
+  const openPanel = (type: PanelType) => { if (activePanel === type) { setActivePanel(null); return }; setActivePanel(type); setLastPanel(type); setDescExpanded(false); if (type === "comments") { loadCommentsForCurrentShort(); if (isSidePanel) setTimeout(() => commentInputRef.current?.focus(), 400) } else if (type === "description") loadDescriptionForCurrentShort() }
   type PanelType = "comments" | "description" | null
-  const panelTitle = activePanel === "comments" ? "Comments" : activePanel === "description" ? "Description" : ""
+  const panel = activePanel ?? lastPanel
+  const panelTitle = panel === "comments" ? "Comments" : panel === "description" ? "Description" : ""
   const panelWidth = isWideViewport ? 480 : 380
-  const panelRight = 96
-  const iframeShiftRight = panelWidth + 20 + panelRight
+  // Room for the up/down buttons beside it, which step aside on smaller screens
+  const panelRight = isRoomy ? 96 : 24
+  const feedRight = activePanel && isSidePanel ? panelWidth + 20 + panelRight : 0
 
   const currentComments2 = commentsByVideo[currentShort?.id] || []
   const totalCommentsCount = currentComments2.length + currentComments2.reduce((acc: number, c: VideoComment) => acc + (c.replies?.length || 0), 0)
 
-  // ---- FEEDBACK HANDLING ----
-  const handleSendFeedback = () => {
-    if (!feedbackText.trim()) return
-    setFeedbackSent(true)
-    setTimeout(() => {
-      setFeedbackSent(false)
-      setFeedbackText("")
-      setShowFeedbackDialog(false)
-    }, 1500)
-  }
+  // Comments or description, in the panel or in the sheet
+  const panelBody = (
+    <>
+      {panel === "comments" && (
+        <>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 yt-scrollbar">
+            {commentsLoading ? (
+              <><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /></>
+            ) : comments.length > 0 ? (
+              comments.map((c) => (
+                <CommentItem
+                  key={c.id}
+                  comment={c}
+                  onLikeComment={handleLikeComment}
+                  onDislikeComment={handleDislikeComment}
+                  onReplyComment={handleReplyComment}
+                  onLikeReply={handleLikeReply}
+                  onDislikeReply={handleDislikeReply}
+                  onReplyNested={handleReplyNested}
+                />
+              ))
+            ) : (
+              <div className="flex min-h-32 items-center justify-center h-full"><p className="text-muted-foreground text-sm">No comments yet</p></div>
+            )}
+          </div>
+          <div className="border-t border-border px-4 py-3 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="bg-muted text-foreground text-xs">Y</AvatarFallback></Avatar>
+              <div className="flex-1 flex items-center gap-2">
+                <input
+                  ref={commentInputRef}
+                  type="text"
+                  placeholder="Add a comment..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  className="flex-1 bg-transparent border-b border-border pb-1 text-base text-foreground md:text-sm placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
+                />
+                <button aria-label="Post comment" onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
+                  <Send className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      {panel === "description" && (
+        <>
+          {descLoading ? (
+            <DescriptionSkeleton />
+          ) : currentShort ? (
+            <div className="flex-1 overflow-y-auto overflow-x-hidden yt-scrollbar">
+              <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentShort.title}</h4></div>
+              <div className="px-4 pb-3 flex items-center gap-4">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Eye className="h-4 w-4" /><span>{currentShort.views} views</span></div>
+                <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Clock className="h-4 w-4" /><span>{currentShort.timeAgo}</span></div>
+              </div>
+              <div className="px-4 pb-4">
+                <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
+                {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
+              </div>
+              <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm [overflow-wrap:anywhere]">{tag}</Link>)}</div>
+            </div>
+          ) : (
+            <div className="flex min-h-32 items-center justify-center h-full"><p className="text-muted-foreground text-sm">No description available</p></div>
+          )}
+        </>
+      )}
+    </>
+  )
+  const closePanel = () => setActivePanel(null)
 
   return (
     <div className="bg-background">
       <h1 className="sr-only">Shorts</h1>
       <style>{`
         @keyframes fadeInLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes playFeedback { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6); } }
         .animate-fade-in-left { animation: fadeInLeft 0.3s ease-out forwards; }
-        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
         .animate-play-feedback { animation: playFeedback 0.55s ease-out forwards; }
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -1669,6 +1370,9 @@ function ShortsPageContent() {
             height: max(calc(100vh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
             height: max(calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
           }
+          @media (orientation: landscape) and (max-height: 560px) {
+            .shorts-video-iframe, .shorts-poster { width: 100%; height: 100%; }
+          }
           @supports (width: 1cqw) {
             .shorts-player-box { container-type: size; }
             .shorts-video-iframe, .shorts-poster {
@@ -1689,219 +1393,42 @@ function ShortsPageContent() {
         }
       `}</style>
 
-      {/* Share Modal */}
-      <ShareModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        videoUrl={typeof window !== "undefined" && currentShort ? `${window.location.origin}/shorts?v=${currentShort.videoId}` : ""}
-      />
-
-      {/* Feedback Dialog */}
-      <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Send className="h-5 w-5 text-primary" /> Send Feedback</DialogTitle>
-            <DialogDescription>Help us improve Deeni.tube. Share your thoughts, suggestions, or report issues.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {feedbackSent ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="h-8 w-8 text-green-500" />
-                </div>
-                <h3 className="text-lg font-semibold mb-1">Thank You!</h3>
-                <p className="text-sm text-muted-foreground">Your feedback has been sent successfully.</p>
-              </div>
-            ) : (
-              <>
-                <Textarea
-                  placeholder="Write your feedback here..."
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  className="min-h-[120px] resize-none"
-                />
-                <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={() => setShowFeedbackDialog(false)}>Cancel</Button>
-                  <Button className="flex-1" onClick={handleSendFeedback} disabled={!feedbackText.trim()}>
-                    <Send className="h-4 w-4 mr-2" /> Send
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Up/down buttons from lg up; on narrower screens they would cover the video (swipe/keys still work) */}
-      <div className="hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-50 flex-col gap-4">
+      <div className={cn("hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-50 flex-col gap-4", activePanel && isSidePanel && !isRoomy && "lg:hidden")}>
         <button aria-label="Previous short" onClick={() => scrollToVideo(currentIndex - 1)} disabled={currentIndex === 0} className="w-14 h-14 rounded-full flex items-center justify-center bg-secondary text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"><ChevronUp className="h-7 w-7" /></button>
         <button aria-label="Next short" onClick={() => scrollToVideo(currentIndex + 1)} disabled={currentIndex === shortsData.length - 1} className="w-14 h-14 rounded-full flex items-center justify-center bg-secondary text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"><ChevronDown className="h-7 w-7" /></button>
       </div>
 
-      {/* Desktop Panel */}
-      {activePanel && (
-        <div className="hidden md:flex fixed top-[56px] bottom-0 z-40 items-center" style={{ right: `${panelRight}px` }}>
+      {/* Beside the video */}
+      {activePanel && isSidePanel && (
+        <div className="fixed top-[56px] bottom-0 z-40 flex items-center" style={{ right: `${panelRight}px` }}>
           <div className="bg-card dark:bg-[#212121] border border-border dark:border-transparent rounded-2xl overflow-hidden flex flex-col shadow-2xl animate-fade-in-left h-[85vh]" style={{ width: `${panelWidth}px` }}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-foreground text-xl font-bold">{panelTitle}</h3>
-                {activePanel === "comments" && <span className="text-muted-foreground text-base">{totalCommentsCount}</span>}
+                <h2 className="text-foreground text-xl font-bold">{panelTitle}</h2>
+                {panel === "comments" && <span className="text-muted-foreground text-base">{totalCommentsCount}</span>}
               </div>
-              <button aria-label="Close" onClick={() => setActivePanel(null)} className="h-10 w-10 flex items-center justify-center rounded-full text-foreground hover:bg-muted">
+              <button aria-label="Close" onClick={closePanel} className="h-10 w-10 flex items-center justify-center rounded-full text-foreground hover:bg-muted">
                 <X className="h-6 w-6" />
               </button>
             </div>
-            {activePanel === "comments" && (
-              <>
-                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 yt-scrollbar">
-                  {commentsLoading ? (
-                    <><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /></>
-                  ) : comments.length > 0 ? (
-                    comments.map((c) => (
-                      <CommentItem
-                        key={c.id}
-                        comment={c}
-                        onLikeComment={handleLikeComment}
-                        onDislikeComment={handleDislikeComment}
-                        onReplyComment={handleReplyComment}
-                        onLikeReply={handleLikeReply}
-                        onDislikeReply={handleDislikeReply}
-                        onReplyNested={handleReplyNested}
-                      />
-                    ))
-                  ) : (
-                    <div className="flex items-center justify-center h-full"><p className="text-muted-foreground text-sm">No comments yet</p></div>
-                  )}
-                </div>
-                <div className="border-t border-border px-4 py-3 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="bg-muted text-foreground text-xs">Y</AvatarFallback></Avatar>
-                    <div className="flex-1 flex items-center gap-2">
-                      <input
-                        ref={commentInputRef}
-                        type="text"
-                        placeholder="Add a comment..."
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
-                      />
-                      <button aria-label="Post comment" onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
-                        <Send className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-            {activePanel === "description" && (
-              <>
-                {descLoading ? (
-                  <DescriptionSkeleton />
-                ) : currentShort ? (
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden yt-scrollbar">
-                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentShort.title}</h4></div>
-                    <div className="px-4 pb-3 flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Eye className="h-4 w-4" /><span>{currentShort.views} views</span></div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Clock className="h-4 w-4" /><span>{currentShort.timeAgo}</span></div>
-                    </div>
-                    <div className="px-4 pb-4">
-                      <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
-                      {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
-                    </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm [overflow-wrap:anywhere]">{tag}</Link>)}</div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full"><p className="text-muted-foreground text-sm">No description available</p></div>
-                )}
-              </>
-            )}
+            {panelBody}
           </div>
         </div>
       )}
 
-      {/* Mobile Panel */}
-      {activePanel && (
-        <div className="md:hidden fixed inset-0 z-[60]">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setActivePanel(null)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-card dark:bg-[#212121] rounded-t-2xl max-h-[70dvh] flex flex-col overflow-hidden animate-slide-up">
-            <div className="w-10 h-1 bg-muted-foreground/40 rounded-full mx-auto mt-3 mb-2 flex-shrink-0" />
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border flex-shrink-0">
-              <div className="flex items-center gap-2"><h3 className="text-foreground text-lg font-bold">{panelTitle}</h3>{activePanel === "comments" && <span className="text-muted-foreground text-base">{totalCommentsCount}</span>}</div>
-              <button aria-label="Close" onClick={() => setActivePanel(null)} className="h-10 w-10 flex items-center justify-center rounded-full text-foreground hover:bg-muted"><X className="h-6 w-6" /></button>
-            </div>
-            {activePanel === "comments" && (
-              <>
-                <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 yt-scrollbar">
-                  {commentsLoading ? (
-                    <><CommentSkeleton /><CommentSkeleton /><CommentSkeleton /></>
-                  ) : comments.length > 0 ? (
-                    comments.map((c) => (
-                      <CommentItem
-                        key={c.id}
-                        comment={c}
-                        onLikeComment={handleLikeComment}
-                        onDislikeComment={handleDislikeComment}
-                        onReplyComment={handleReplyComment}
-                        onLikeReply={handleLikeReply}
-                        onDislikeReply={handleDislikeReply}
-                        onReplyNested={handleReplyNested}
-                      />
-                    ))
-                  ) : (
-                    <div className="flex items-center justify-center h-32"><p className="text-muted-foreground text-sm">No comments yet</p></div>
-                  )}
-                </div>
-                <div className="border-t border-border px-4 py-3 flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback className="bg-muted text-foreground text-xs">Y</AvatarFallback></Avatar>
-                    <div className="flex-1 flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add a comment..."
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        className="flex-1 bg-transparent border-b border-border pb-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
-                      />
-                      <button aria-label="Post comment" onClick={handleAddComment} disabled={!commentText.trim()} className="text-primary hover:text-primary/80 disabled:opacity-30 disabled:cursor-not-allowed p-1">
-                        <Send className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-            {activePanel === "description" && (
-              <>
-                {descLoading ? (
-                  <DescriptionSkeleton />
-                ) : currentShort ? (
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden yt-scrollbar">
-                    <div className="px-4 py-3"><h4 className="text-foreground text-base font-semibold leading-snug [overflow-wrap:anywhere]">{currentShort.title}</h4></div>
-                    <div className="px-4 pb-3 flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Eye className="h-4 w-4" /><span>{currentShort.views} views</span></div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground text-sm"><Clock className="h-4 w-4" /><span>{currentShort.timeAgo}</span></div>
-                    </div>
-                    <div className="px-4 pb-4">
-                      <DescriptionText text={currentShort.description} className={cn("text-sm text-foreground leading-relaxed", !descExpanded && "line-clamp-4")} />
-                      {currentShort.description && currentShort.description.length > 200 && <button onClick={() => setDescExpanded(!descExpanded)} className="text-muted-foreground hover:text-foreground text-xs mt-1 font-medium">{descExpanded ? 'Show less' : '...more'}</button>}
-                    </div>
-                    <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">{currentShort.hashtags.map((tag: string) => <Link key={tag} href={hashtagHref(tag)} className="text-[#065fd4] dark:text-[#3ea6ff] text-sm [overflow-wrap:anywhere]">{tag}</Link>)}</div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-32"><p className="text-muted-foreground text-sm">No description available</p></div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Phones, tablets and low windows: the app's sheet */}
+      <Drawer open={!!activePanel && !isSidePanel} onOpenChange={(open) => { if (!open) closePanel() }}>
+        <DrawerContent accessibleTitle={null} className="max-h-[70dvh] md:mx-auto md:max-w-[640px] low:max-h-[85dvh]">
+          <DrawerTitleBar title={panelTitle} count={panel === "comments" ? totalCommentsCount : undefined} />
+          {panelBody}
+        </DrawerContent>
+      </Drawer>
 
 
       {/* The shared player (iPhone, iPad, Safari) lives under the feed, which is see-through where the short on
           screen plays; black behind it on phones, as the feed is */}
-      {hosted && <div className="fixed inset-0 bg-black md:hidden" aria-hidden="true" />}
+      {hosted && <div className="fixed inset-0 bg-black low:bg-background md:hidden" aria-hidden="true" />}
 
       {/* Main Shorts Content */}
       <div
@@ -1911,9 +1438,11 @@ function ShortsPageContent() {
         className={cn(hosted && "z-[2]", "fixed inset-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:top-[56px] md:bottom-0 overflow-y-scroll overflow-x-hidden touch-pan-y snap-y snap-mandatory overscroll-contain scrollbar-none transition-all duration-300 ease-in-out")}
         style={{
           scrollSnapType: "y mandatory",
-          left: isDesktopViewport ? `${desktopSidebarWidth}px` : "0px",
-          right: isDesktopViewport && activePanel ? `${iframeShiftRight}px` : "0px",
-        }}
+          left: isDesktopViewport ? `calc(${desktopSidebarWidth}px + var(--sal))` : "0px",
+          right: `${feedRight}px`,
+          // The feed's width, which a short with its actions beside it stays within (on windows narrower than they are tall)
+          "--feed-w": `calc(100vw - ${(isDesktopViewport ? desktopSidebarWidth : 0) + feedRight}px)`,
+        } as React.CSSProperties}
       >
         {/* Refs below are only used inside event handlers and ref callbacks, never read while rendering */}
         {/* eslint-disable-next-line react-hooks/refs */}
@@ -1931,11 +1460,11 @@ function ShortsPageContent() {
           return (
             <section key={short.id} className={cn("relative h-full md:h-[calc(100%-32px)] w-full overflow-x-clip snap-start snap-always flex items-center md:items-start justify-center", !seeThrough && "bg-background")}>
               {/* The video plus its action rail: side by side from lg up; on smaller screens the rail sits over the video */}
-              <div className="relative w-full h-full md:w-auto md:h-[calc(100%-12px)] md:mt-2 flex items-end lg:gap-4">
+              <div className="relative w-full h-full low:h-[calc(100%-16px)] low:w-auto md:w-auto md:h-[min(calc(100%-12px),calc((var(--feed-w)-24px)*16/9))] md:mt-2 lg:h-[min(calc(100%-12px),calc((var(--feed-w)-88px)*16/9))] flex items-end lg:gap-4">
                 <div
-                  className={cn("relative w-full h-full md:w-auto md:flex-shrink-0 md:aspect-[9/16] md:rounded-2xl md:overflow-hidden", !seeThrough && "bg-black")}
+                  className={cn("relative w-full h-full low:aspect-[9/16] low:w-auto low:flex-shrink-0 low:rounded-2xl low:!overflow-visible md:w-auto md:flex-shrink-0 md:aspect-[9/16] md:rounded-2xl md:overflow-hidden", !seeThrough && "bg-black")}
                   onMouseEnter={() => setHoveredVideoId(short.id)}
-                  onMouseLeave={() => { setHoveredVideoId(null); setShowVolumeSlider(false); setShowMoreMenu(false) }}
+                  onMouseLeave={() => { setHoveredVideoId(null); setShowVolumeSlider(false) }}
                 >
                   {/* Video Player — overflow-hidden only here so the progress bar scrubber isn't clipped */}
                   {/* Tapping a short that isn't the active one (e.g. the next one peeking in) moves to it */}
@@ -1944,7 +1473,7 @@ function ShortsPageContent() {
                       if (el) boxRefs.current.set(short.id, el)
                       else boxRefs.current.delete(short.id)
                     }}
-                    className={cn("shorts-player-box absolute inset-0 overflow-hidden md:rounded-2xl", !seeThrough && "bg-black")}
+                    className={cn("shorts-player-box absolute inset-0 overflow-hidden low:rounded-2xl md:rounded-2xl", !seeThrough && "bg-black")}
                     onClick={isActive ? handleTogglePlay : () => scrollToVideo(index)}
                   >
                     {hasPlayer && (
@@ -1973,7 +1502,7 @@ function ShortsPageContent() {
                     <div className={cn("absolute inset-0 pointer-events-none transition-opacity duration-200", posterHidden ? "opacity-0" : "opacity-100")}>
                       <div className="shorts-poster">
                         {/* The opening short's cover is the main image until its player starts, so only it loads early */}
-                        <ShortCover videoId={short.videoId} thumbnail={short.thumbnail} title={short.title} priority={index === initialIndex} />
+                        <ShortCover videoId={short.videoId} thumbnail={youtubeThumb(short.videoId)} title={short.title} priority={index === initialIndex} />
                       </div>
                     </div>
                   </div>
@@ -1999,7 +1528,7 @@ function ShortsPageContent() {
                     </div>
                   )}
                   {isActive && playIssue?.id === short.id && (
-                    <div role="alert" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 px-8 text-center text-white md:rounded-2xl">
+                    <div role="alert" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 px-8 low:px-2 low:gap-2 text-center text-white low:rounded-2xl md:rounded-2xl">
                       <p className="text-base font-medium">{playIssue.kind === "unavailable" ? "This short isn't available" : "This short isn't playing"}</p>
                       <p className="max-w-xs text-sm text-white/80">
                         {playIssue.kind === "unavailable" ? "It may have been removed from YouTube." : "Check your connection, then try again."}
@@ -2027,71 +1556,58 @@ function ShortsPageContent() {
                   )}
 
                   {/* Gradient overlays */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
-                  <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none low:rounded-b-2xl" />
+                  <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none low:hidden" />
 
                   {/* Top controls (hover only) */}
                   {/* Only the control row takes clicks; the padded area below it must not cover the action rail on short windows */}
-                  <div className={`absolute top-0 left-0 right-0 z-30 px-4 pt-4 pb-16 transition-opacity duration-200 pointer-events-none ${(isHovered || isActive) && !isScrolling ? "opacity-100 [&>*]:pointer-events-auto" : "opacity-0"}`}>
+                  <div className={`absolute top-0 left-0 right-0 z-30 px-4 pt-4 pb-16 low:p-0 transition-opacity duration-200 pointer-events-none ${(isHovered || isActive) && !isScrolling ? "opacity-100 [&>*]:pointer-events-auto" : "opacity-0"}`}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 low:absolute low:right-full low:top-0 low:mr-3 low:flex-col">
                         {/* Mobile: back button in play/pause slot */}
-                        <button onClick={() => router.back()} className="md:hidden w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} aria-label="Go back">
-                          <ChevronLeft className="h-5 w-5" />
+                        <button type="button" onClick={back} className={cn(topButtonClass, "flex md:hidden")} aria-label="Go back">
+                          <ArrowLeft className="h-6 w-6" />
                         </button>
                         {/* Desktop: play/pause */}
-                        <button type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={handleTogglePlay} className="hidden md:flex w-10 h-10 rounded-full items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                        <button type="button" aria-label={isPlaying ? "Pause" : "Play"} onClick={handleTogglePlay} className={cn(topButtonClass, "hidden md:flex")}>
                           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                         </button>
                         <div className="relative flex items-center" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) { if (isMuted) allowHostSound(); setIsMuted(!isMuted) } }} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) { if (isMuted) allowHostSound(); setIsMuted(!isMuted) } }} className={cn(topButtonClass, "flex")}>
                             {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                           </button>
                           {showVolumeSlider && (
-                            <div className="hidden md:flex items-center rounded-full px-3 py-2 ml-1 shadow-lg" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
+                            <div className="hidden md:flex low:!hidden items-center rounded-full px-3 py-2 ml-1 shadow-lg" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
                               <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); autoMutedRef.current = false; setAutoMuted(false); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button type="button" aria-label={captionsEnabled ? "Turn off captions" : "Turn on captions"} aria-pressed={captionsEnabled} onClick={toggleCaptions} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                      <div className="flex items-center gap-2 low:absolute low:left-full low:top-0 low:ml-3">
+                        <button type="button" aria-label={captionsEnabled ? "Turn off captions" : "Turn on captions"} aria-pressed={captionsEnabled} onClick={toggleCaptions} className={cn(topButtonClass, "flex")}>
                           {captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />}
                         </button>
-                        <button type="button" aria-label="Full screen" onClick={toggleFullscreen} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                        <button type="button" aria-label="Full screen" onClick={toggleFullscreen} className={cn(topButtonClass, "flex")}>
                           <FullscreenIcon className="h-5 w-5" />
                         </button>
-                        <div className="relative">
-                          <button type="button" aria-label="More options" aria-expanded={showMoreMenu} onClick={() => setShowMoreMenu(!showMoreMenu)} className="w-10 h-10 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-                            <MoreVertIcon className="h-5 w-5 md:h-6 md:w-6" />
-                          </button>
-
-                          {/* Dropdown — same on mobile and desktop */}
-                          {showMoreMenu && (
-                            <>
-                              <div data-shorts-menu="" className="absolute top-full right-0 mt-2 z-50 bg-popover text-popover-foreground rounded-xl shadow-2xl border dark:border-transparent py-2 w-[280px]">
-                                <button className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { openPanel("description"); setShowMoreMenu(false) }}>
-                                  <List className="h-5 w-5" /> Description
-                                </button>
-                                <button type="button" className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { toggleSaveShort(short); setShowMoreMenu(false) }}>
-                                  <SaveIcon filled={isShortSaved(short)} className="h-5 w-5" /> {isShortSaved(short) ? "Remove from Watch later" : "Save to Watch later"}
-                                </button>
-                                <button className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { toggleCaptions(); setShowMoreMenu(false) }}>
-                                  <div className="flex items-center gap-4">{captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />} Captions</div>
-                                  <span className="text-muted-foreground text-sm">{captionsEnabled ? "On" : "Off"}</span>
-                                </button>
-                                <ReportDialog videoTitle={short.title} videoId={short.id}>
-                                  <button className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                                    <Flag className="h-5 w-5" /> <span>Report</span>
-                                  </button>
-                                </ReportDialog>
-                                <button className="w-full flex items-center gap-4 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors" onClick={() => { setShowMoreMenu(false); setShowFeedbackDialog(true); }}>
-                                  <MessageSquare className="h-5 w-5" /> Send feedback
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        <ActionMenu
+                          title="Short actions"
+                          actions={[
+                            { id: "description", label: "Description", icon: List, onSelect: () => openPanel("description") },
+                            { id: "captions", label: "Captions", icon: captionsEnabled ? CCIconOn : CCIconOff, value: captionsEnabled ? "On" : "Off", onSelect: toggleCaptions },
+                            { id: "watch-later", label: isShortSaved(short) ? "Remove from Watch later" : "Save to Watch later", icon: Clock, divider: true, onSelect: () => toggleSaveShort(short) },
+                            { id: "playlist", label: "Save to playlist", icon: SaveIcon, opens: true, onSelect: () => openSaveCard(short) },
+                            { id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(`/shorts?v=${short.videoId}`) },
+                            { id: "dont-recommend", label: "Don't recommend channel", icon: UserX, divider: true, onSelect: () => dontRecommend(short.channelId, short.channel) },
+                            { id: "report", label: "Report", icon: Flag, opens: true, onSelect: () => openReport("short", short.title) },
+                            { id: "feedback", label: "Send feedback", icon: MessageSquare, opens: true, onSelect: openFeedback },
+                          ]}
+                          trigger={
+                            <button type="button" aria-label="More options" className={cn(topButtonClass, "flex")}>
+                              <MoreVertIcon className="h-5 w-5 md:h-6 md:w-6" />
+                            </button>
+                          }
+                        />
                       </div>
                     </div>
                   </div>
@@ -2102,7 +1618,7 @@ function ShortsPageContent() {
                       type="button"
                       data-mute-toggle
                       onClick={(e) => { e.stopPropagation(); restoreSound() }}
-                      className="absolute left-1/2 top-16 z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                      className="absolute left-1/2 top-16 z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium low:top-2 low:px-3 low:text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/75"
                     >
                       <VolumeX className="h-5 w-5" />
                       <span className="md:hidden">Tap to unmute</span>
@@ -2110,18 +1626,18 @@ function ShortsPageContent() {
                     </button>
                   )}
 
-                  {/* Bottom info (phones: room under the title, above the progress bar, as in the YouTube app: about 5% of
-                      the screen's height, so 24px on small phones up to 44px on tall ones) */}
-                  <div className={`absolute bottom-[clamp(24px,5svh,44px)] md:bottom-6 left-4 right-20 lg:right-4 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <Avatar className="h-9 w-9 flex-shrink-0">
+                  {/* Bottom info (phones: the title ends 19px above the bottom, 16px above the progress bar, on every size, as on
+                      YouTube's mobile site) */}
+                  <div className={`absolute bottom-[19px] md:bottom-6 low:!bottom-3 left-4 right-20 lg:right-4 low:left-3 low:!right-3 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+                    <div className="flex items-center gap-2.5 mb-2 low:gap-2 low:mb-1">
+                      <Avatar className="h-9 w-9 flex-shrink-0 low:h-7 low:w-7">
                         <AvatarImage src={short.channelAvatar} />
                         <AvatarFallback className="bg-muted text-foreground text-sm">{short.channel.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <span className="text-white font-medium text-[15px] truncate">{short.channel}</span>
+                      <span className="text-white font-medium text-[15px] low:text-[13px] truncate">{short.channel}</span>
                     </div>
-                    <button onClick={() => openPanel("description")} className="text-left w-full">
-                      <p className="text-white text-[15px] leading-snug line-clamp-2 [overflow-wrap:anywhere]">{short.title}</p>
+                    <button type="button" onClick={() => openPanel("description")} className="block w-full text-left">
+                      <p className="text-white text-[15px] low:text-[13px] leading-snug line-clamp-2 [overflow-wrap:anywhere]">{short.title}</p>
                     </button>
                   </div>
 
@@ -2132,7 +1648,7 @@ function ShortsPageContent() {
                     return (
                       /* Outer div: tall transparent hit area on mobile (24px), auto on desktop */
                       <div
-                        className="absolute bottom-0 left-0 right-0 z-40 cursor-pointer flex flex-col justify-end h-6 md:h-auto"
+                        className="absolute bottom-0 left-0 right-0 low:left-3 low:right-3 z-40 cursor-pointer flex flex-col justify-end h-6 md:h-auto"
                         onMouseEnter={() => setIsProgressHovered(true)}
                         onMouseLeave={() => { setIsProgressHovered(false) }}
                         onMouseDown={(e) => {
@@ -2208,20 +1724,22 @@ function ShortsPageContent() {
                 </div>
                 {/* Actions: over the video on phones/tablets, beside it on wider screens (as on YouTube) */}
                 <div className={cn(
-                  // Phones/tablets: the bottom offset and gaps follow the screen's height too (see actionCircleClass)
-                  "absolute right-3 bottom-[clamp(64px,12svh,112px)] z-20 flex flex-col items-center gap-[clamp(6px,2.2svh,20px)] transition-all duration-500",
+                  // Phones/tablets: ends 27px above the bottom, as on YouTube; the gaps follow the screen's height (see actionCircleClass)
+                  "absolute right-3 bottom-[27px] z-20 flex flex-col items-center gap-[clamp(6px,2.2svh,20px)] transition-all duration-500",
                   "lg:static lg:z-auto lg:flex-shrink-0 lg:gap-4 lg:mb-1",
+                  // Phones held sideways: beside the video, in two rows
+                  "low:!absolute low:left-full low:right-auto low:bottom-0 low:!mb-0 low:ml-3 low:grid low:w-max low:grid-cols-[repeat(3,max-content)] low:justify-items-center low:!gap-x-3 low:!gap-y-1.5",
                   isActive && !isScrolling ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"
                 )}>
-                  <button type="button" aria-label={liked ? "Unlike" : "Like"} aria-pressed={liked} onClick={() => toggleLike(short.id)} className="flex flex-col items-center gap-1 group">
+                  <button type="button" aria-label={`${liked ? "Unlike" : "Like"}, ${short.likes}`} aria-pressed={liked} onClick={() => toggleLike(short.id)} className="flex flex-col items-center gap-1 group">
                     <span className={actionCircleClass}><Heart className={cn("h-6 w-6", liked && "text-red-500 fill-red-500")} /></span>
                     <span className={actionLabelClass}>{short.likes}</span>
                   </button>
-                  <button type="button" aria-label="Comments" onClick={() => openPanel("comments")} className="flex flex-col items-center gap-1 group">
+                  <button type="button" aria-label={`Comments, ${short.comments}`} onClick={() => openPanel("comments")} className="flex flex-col items-center gap-1 group">
                     <span className={actionCircleClass}><MessageCircle className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>{short.comments}</span>
                   </button>
-                  <button type="button" onClick={() => setShowShareModal(true)} className="flex flex-col items-center gap-1 group">
+                  <button type="button" onClick={() => openShare(`/shorts?v=${short.videoId}`)} className="flex flex-col items-center gap-1 group">
                     <span className={actionCircleClass}><ShareIcon className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>Share</span>
                   </button>
@@ -2229,12 +1747,10 @@ function ShortsPageContent() {
                     <span className={actionCircleClass}><SaveIcon filled={saved} className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>{saved ? "Saved" : "Save"}</span>
                   </button>
-                  <ReportDialog videoTitle={short.title} videoId={short.id}>
-                    <button type="button" className="flex flex-col items-center gap-1 group">
-                      <span className={actionCircleClass}><Flag className="h-6 w-6" /></span>
-                      <span className={actionLabelClass}>Report</span>
-                    </button>
-                  </ReportDialog>
+                  <button type="button" onClick={() => openReport("short", short.title)} className="flex flex-col items-center gap-1 group">
+                    <span className={actionCircleClass}><Flag className="h-6 w-6" /></span>
+                    <span className={actionLabelClass}>Report</span>
+                  </button>
                 </div>
               </div>
             </section>

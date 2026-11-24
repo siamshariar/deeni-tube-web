@@ -103,7 +103,7 @@ test.describe('YouTube-style UI', () => {
 
   test('shorts description wraps long links inside the screen', async ({ page }) => {
     await page.goto('/shorts');
-    const description = page.getByRole('button', { name: 'Description' }).locator('visible=true').first();
+    const description = page.locator('[data-action="description"]'); // a sheet's row on phones, a menu's on desktop
     // A click before the page is ready (hydrated) does nothing: click until the menu opens
     await expect(async () => {
       await page.getByRole('button', { name: 'More options' }).locator('visible=true').first().click({ timeout: 5000 });

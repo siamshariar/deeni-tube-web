@@ -13,6 +13,7 @@ import {
   // ThumbsUp, // Liked Videos — hidden
 } from "lucide-react";
 import { cn, isActivePath } from "@/lib/utils";
+import { isVideoPath } from "@/lib/video-url";
 import { useHeader } from "@/app/contexts/header-context";
 import { useState, useEffect } from "react";
 import {
@@ -32,7 +33,7 @@ export default function DesktopSidebar() {
   // Overlay mode: video detail pages and playlist detail pages.
   // The sidebar appears as a slide-in overlay — content never shifts.
   const isOverlayPage =
-    !!pathname?.startsWith("/videos/") ||
+    isVideoPath(pathname) ||
     !!pathname?.startsWith("/playlists/");
 
   // Restore persisted collapsed state on mount
@@ -101,8 +102,9 @@ export default function DesktopSidebar() {
 
         {/* Slide-in sidebar panel */}
         <aside
+          aria-label="Main menu"
           className={cn(
-            "hidden md:flex fixed left-0 w-[240px] bg-background border-r z-50 overflow-y-auto overflow-x-hidden flex-col transition-transform duration-300 ease-in-out yt-scrollbar",
+            "hidden md:flex fixed left-0 w-[calc(240px+var(--sal))] pl-[var(--sal)] bg-background border-r z-50 overflow-y-auto overflow-x-hidden flex-col transition-transform duration-300 ease-in-out yt-scrollbar",
             top,
             height,
             overlayOpen ? "translate-x-0" : "-translate-x-full"
@@ -119,8 +121,9 @@ export default function DesktopSidebar() {
   // ── NORMAL MODE (all other pages) ─────────────────────────────────────────
   return (
     <aside
+      aria-label="Main menu"
       className={cn(
-        "desktop-sidebar hidden md:flex flex-col fixed left-0 bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out yt-scrollbar",
+        "desktop-sidebar hidden md:flex flex-col fixed left-[var(--sal)] bg-background overflow-y-auto overflow-x-hidden flex-shrink-0 z-30 transition-all duration-300 ease-in-out yt-scrollbar",
         isCollapsed ? "w-[72px]" : "w-[240px]",
         top,
         height

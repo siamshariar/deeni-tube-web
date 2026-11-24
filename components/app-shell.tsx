@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { bootPlayerHost } from "@/lib/player-host";
+import { isVideoPath } from "@/lib/video-url";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -34,7 +35,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Video and playlist detail pages use overlay sidebar — content must not shift
   const hasDesktopSidebar = !(
-    pathname?.startsWith("/videos/") ||
+    isVideoPath(pathname) ||
     pathname?.startsWith("/playlists/") ||
     pathname === "/signin"
   );

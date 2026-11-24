@@ -7,6 +7,7 @@ import Link from "next/link"
 import { Home, PlaySquare, Users, LayoutGrid, GraduationCap, User } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { useHydrated } from "@/lib/local-store"
 import { isActivePath } from "@/lib/utils"
 
 const navItems = [
@@ -17,6 +18,9 @@ const navItems = [
   { href: "/scholars",  icon: GraduationCap, label: "Scholars" },
   { href: "/you",       icon: User,          label: "You" },
 ]
+
+// Opened from the You page: it stays the current one
+const YOU_PAGES = ["/history", "/watch-later", "/liked-videos", "/playlists", "/settings", "/help", "/more"]
 
 // Fixed at the bottom on phones, as in YouTube's app (it stays while the page scrolls), always above the
 // phone's own navigation (gesture bar or Back/Home/Recents buttons). Chrome's edge-to-edge pattern: the bar
@@ -32,25 +36,12 @@ export default function MobileNav() {
   const pathname = usePathname()
   const isMobile = useMediaQuery("(max-width: 767px)")
 
-  // Hide on detail pages
-  const detailPatterns = [
-    "/videos/",
-    "/shorts",
-    "/channels/",
-    "/scholars/",
-    "/categories/",
-    "/playlists/",
-    "/more/",
-    "/help/",
-  ]
-
-  const listPages = ["/channels", "/scholars", "/categories", "/playlists", "/you", "/shorts"]
-
-  // Hide on detail pages, show on list pages. The sign-in page is a standalone screen
-  const shown =
-    isMobile &&
-    pathname !== "/signin" &&
-    !detailPatterns.some((prefix) => pathname?.startsWith(prefix) && !listPages.includes(pathname))
+  // Not on the pages with the app bar's back arrow (components/page-bar), which are one step further in, nor on the
+  // sign-in page, a screen of its own
+  const inner = ["/videos/", "/search/", "/channels/", "/scholars/", "/categories/", "/playlists/", "/more/", "/help/", "/donate"]
+  const onThisPage = pathname !== "/signin" && !inner.some((prefix) => pathname?.startsWith(prefix))
+  const shown = isMobile && onThisPage
+  const hydrated = useHydrated()
 
   // Toasts sit just above the bar when it's there, and near the bottom edge when it isn't (globals.css)
   useEffect(() => {
@@ -60,17 +51,18 @@ export default function MobileNav() {
   }, [shown])
   useEffect(() => () => { delete document.documentElement.dataset.bottomNav }, [])
 
-  if (!shown) return null
+  // In the server's page too (hidden from md up by CSS), so phones show it at once
+  if (!onThisPage || (hydrated && !isMobile)) return null
 
   return (
     <nav
-      className="fixed left-0 right-0 z-50 flex border-t border-border bg-background"
+      className="safe-x fixed left-0 right-0 z-50 flex border-t border-border bg-background md:hidden"
       style={NAV_STYLE}
       aria-label="Mobile navigation"
     >
       <div className="flex w-full items-stretch justify-around">
         {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = isActivePath(pathname, href)
+          const isActive = isActivePath(pathname, href) || (href === "/you" && YOU_PAGES.some((p) => isActivePath(pathname, p)))
           return (
             <Link
               key={href}
