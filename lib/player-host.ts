@@ -294,10 +294,18 @@ export function detachHost(token: number) {
 /**
  * Load a video into the attached player (no tap: sound only if the player already had it).
  * `keepSound`: the visitor has the sound on; say unMute again if YouTube mutes the new video (as after a tap).
+ * `again`: load it once more although it's the one the player has (it got stuck).
  */
-export function hostLoad(videoId: string, keepSound = false) {
-  if (requested === videoId) return;
+export function hostLoad(videoId: string, keepSound = false, again = false) {
+  if (requested === videoId && !again) return;
   requested = videoId;
+  // The player never answered: load its frame again (onMessage then loads the video if it isn't the one it opened)
+  if (again && !ready && frame) {
+    const { src } = frame;
+    frame.src = src;
+    handshake();
+    return;
+  }
   hostCommand("loadVideoById", [{ videoId }]);
   if (keepSound && soundAllowed) keepSoundUntil = Date.now() + 8000;
 }

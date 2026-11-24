@@ -138,7 +138,7 @@ test.describe('iPhone: tap to play with sound', () => {
 });
 
 const FIRST_SHORT = 'MBxDbbkk0gQ';
-const SECOND_SHORT = 'goHfO28fE-A';
+const SECOND_SHORT = 'Pr5qe5nQfWc';
 const THIRD_SHORT = '8YfQCDjlQsc';
 
 // The shared player covers the short on screen: its box exactly, with the 9:16 video filling it (no side bars)
@@ -243,5 +243,68 @@ test.describe('iPhone: Shorts with sound', () => {
     await page.keyboard.press('ArrowDown');
     await expect.poll(() => fake(frame)).toMatchObject({ playing: true, muted: false, videoId: THIRD_SHORT });
     await expect(unmute).toHaveCount(0);
+  });
+
+  // The shared player has no playlist, so YouTube doesn't loop: shorts used to freeze on their last frame
+  test('a short loops: started again just before its end, and also if its end was missed', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true, clock: true });
+    await page.goto(`/shorts?v=${SECOND_SHORT}`);
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: SECOND_SHORT });
+    const time = () => frame.evaluate(() => (window as unknown as { __player: () => { time: number } }).__player().time);
+    // Near the end (30s)
+    await page.evaluate(() => document.querySelector<HTMLIFrameElement>('[data-player-host] iframe')!.contentWindow!.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [29, true] }), '*'));
+    await expect.poll(time).toBeGreaterThanOrEqual(29);
+    await expect.poll(time, { timeout: 5_000 }).toBeLessThan(5);
+    await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(true);
+    // Ended all the same
+    await frame.evaluate(() => (window as unknown as { __end: () => void }).__end());
+    await expect.poll(() => fake(frame).then((s) => s.playing)).toBe(true);
+    expect(await time()).toBeLessThan(5);
+  });
+
+  test('arrow keys pressed while the feed still slides land on the right short', async ({ page }) => {
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/shorts');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: FIRST_SHORT });
+    for (const wait of [30, 80, 150, 220]) {
+      for (const key of ['ArrowDown', 'ArrowDown', 'ArrowUp']) {
+        await page.keyboard.press(key);
+        await page.waitForTimeout(wait);
+      }
+      await page.waitForTimeout(1200);
+      expect(await fake(frame), `${wait}ms between keys`).toMatchObject({ playing: true, videoId: SECOND_SHORT });
+      await expectHostOver(page, 1);
+      await page.keyboard.press('ArrowUp');
+      await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: FIRST_SHORT });
+      await page.waitForTimeout(800);
+    }
+  });
+
+  test('a short that cannot be played says so and the next one plays; a stalled one is loaded again', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/shorts');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: FIRST_SHORT });
+    const troubles = (t: Record<string, string>) => frame.evaluate((t) => { (window as unknown as { __troubles: Record<string, string> }).__troubles = t; }, t);
+    const message = page.getByRole('alert').filter({ hasText: "This short isn't available" });
+    await troubles({ [SECOND_SHORT]: 'unavailable' });
+    await page.keyboard.press('ArrowDown');
+    await expect(message).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await expect(message).toHaveCount(0);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: THIRD_SHORT });
+    await troubles({ [SECOND_SHORT]: 'stalled' });
+    await page.keyboard.press('ArrowUp');
+    await expect(page.getByRole('status', { name: 'Loading' })).toBeVisible({ timeout: 5_000 });
+    await troubles({});
+    await expect.poll(() => fake(frame), { timeout: 20_000 }).toMatchObject({ playing: true, videoId: SECOND_SHORT });
+    await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
+    await expectHostOver(page, 1);
   });
 });

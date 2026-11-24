@@ -49,7 +49,7 @@ test.describe('Shorts page', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.waitForTimeout(500);
     // Mute button is also in the top controls overlay
-    const muteBtn = page.locator('button[style*="rgba(0,0,0,0.4)"]').nth(1);
+    const muteBtn = page.locator('button[data-mute-toggle]').first();
     await expect(muteBtn).toBeAttached({ timeout: 5000 });
     // Hover over video section to make controls visible
     const videoSection = page.locator('section.snap-start').first();

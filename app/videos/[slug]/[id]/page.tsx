@@ -3,9 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import { WatchedBar } from "@/components/watched-bar";
 import {
   ArrowLeft,
     Clock,
@@ -21,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
-import { MoreButton } from "@/components/more-button";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,9 +37,8 @@ import {
 import { ShareModal } from "@/components/share-modal";
 import { DescriptionText } from "@/components/description-text";
 import { YouTubePlayer } from "@/components/youtube-player";
-import { warmYouTube } from "@/lib/warm-youtube";
-import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
-import { cn } from "@/lib/utils";
+import { WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY } from "@/components/watch-layout";
+import { RelatedVideos } from "@/components/related-videos";
 import { openSaveCard } from "@/lib/save-card";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -504,6 +500,16 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
     />
   );
 
+  const related = {
+    video: mainVideo,
+    videos: relatedVideos,
+    isInWatchLater,
+    onWatchLater: toggleWatchLater,
+    onShare: (v: VideoItem) => { setSelectedRelatedVideo(v); setShowShareModal(true); },
+    onReport: (v: VideoItem) => { setSelectedRelatedVideo(v); setShowReportDialog(true); },
+    onMore: (v: VideoItem) => { setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); },
+  };
+
   return (
     <div className="min-h-screen bg-background pt-14">
       {/* Mobile back button – sits naturally below the fixed header */}
@@ -522,9 +528,9 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
       )}
 
       {/* Main content */}
-      <div className="md:pt-6 pb-6">
+      <div className="pb-6">
         {/* Content: YouTube's watch layout (see components/watch-layout.ts) */}
-        <div className="px-3 md:px-6">
+        <div className={WATCH_PAGE}>
           <div className={WATCH_COLUMNS}>
             <div className={WATCH_PRIMARY}>
               {/* The player, always exactly 16:9 (so YouTube adds no black bars at the sides): edge to edge on
@@ -868,84 +874,14 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
               </div>
             </div>
 
-            {/* Related Videos – Desktop */}
-            {!isMobile && (
-              <aside
-                className={cn(WATCH_SECONDARY, "min-[1016px]:sticky min-[1016px]:top-20 min-[1016px]:flex min-[1016px]:max-h-[calc(100vh-104px)] min-[1016px]:flex-col min-[1016px]:self-start")}
-                aria-labelledby="related-heading"
-              >
-                {/* Beside the player (from 1016px) the list stays in view and scrolls on its own, with the thin
-                    scrollbar, so the page itself only scrolls as far as the description */}
-                <h2 id="related-heading" className="mb-3 flex-shrink-0 text-base font-medium">Related videos</h2>
-                <div
-                  tabIndex={0}
-                  aria-label="Related videos list"
-                  className="yt-scrollbar space-y-2 focus-visible:outline-none min-[1016px]:-mr-2 min-[1016px]:min-h-0 min-[1016px]:flex-1 min-[1016px]:overflow-y-auto min-[1016px]:overflow-x-hidden min-[1016px]:overscroll-contain min-[1016px]:pr-2"
-                >
-                  {relatedVideos.map((v) => (
-                    <div key={v.id} className="group/rel relative flex gap-2" onPointerEnter={warmYouTube}>
-                      {/* Big thumbnails, as on YouTube: 46% of the column, 168–236px wide, 16:9 */}
-                      <Link href={videoPath(v)} className="relative aspect-video w-[46%] min-w-[168px] max-w-[236px] flex-shrink-0 self-start overflow-hidden rounded-lg bg-muted">
-                        <Image src={youtubeThumb(v.videoId)} alt={v.title} fill className="object-cover" />
-                        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
-                        <WatchedBar videoId={v.videoId} />
-                      </Link>
-                      <div className="min-w-0 flex-1 pr-7">
-                        <Link href={videoPath(v)} className="block">
-                          <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
-                        </Link>
-                        <Link href={getChannelHref(v.channelId)} className="mt-1 block truncate text-[13px] leading-[18px] text-muted-foreground hover:text-foreground">{v.channel}</Link>
-                        <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{v.views} • {v.timeAgo}</p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          {/* As on YouTube: compact, and with a mouse only shown while the row is hovered or the menu is open (always shown on touch screens) */}
-                          <MoreButton
-                            size="sm"
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute -right-2 -top-1 can-hover:opacity-0 can-hover:group-hover/rel:opacity-100 kb:group-focus-within/rel:opacity-100 data-[state=open]:opacity-100"
-                          />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 rounded-xl py-2">
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => toggleWatchLater(v)}><Clock className="h-5 w-5" /> {isInWatchLater(v.id) ? "Remove from Watch later" : "Save to Watch later"}</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => openSaveCard(v)}><SaveIcon className="h-5 w-5" /> Save to playlist</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} onSelect={() => { setSelectedRelatedVideo(v); setShowShareModal(true); }}><ShareIcon className="h-5 w-5" /> Share</DropdownMenuItem>
-                          <DropdownMenuItem className={MENU_ITEM} afterClose={() => { setSelectedRelatedVideo(v); setShowReportDialog(true); }}><Flag className="h-5 w-5" /> Report</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  ))}
-                </div>
-              </aside>
-            )}
+            {!isMobile && <RelatedVideos {...related} isMobile={false} />}
           </div>
         </div>
 
-        {/* Related Videos – Mobile */}
+        {/* Phones: the related videos, and the sheet their three dots open */}
         {isMobile && (
-          <section className="mt-6 px-3" aria-labelledby="related-heading-mobile">
-            <h2 id="related-heading-mobile" className="mb-3 text-base font-medium">Related videos</h2>
-            <div className="space-y-3">
-              {relatedVideos.map((v) => (
-                <div key={v.id} className="flex gap-3">
-                  <Link href={videoPath(v)} className="relative w-40 aspect-video flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                    {/* Lazy on purpose: preloading the first one measured worse (it competes with the YouTube player) */}
-                    <Image src={youtubeThumb(v.videoId, "small")} alt={v.title} fill className="object-cover" />
-                    <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-px text-xs font-medium leading-[18px] text-white">{v.duration}</span>
-                        <WatchedBar videoId={v.videoId} />
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <Link href={videoPath(v)} className="block">
-                      <h3 className="line-clamp-2 text-[15px] font-medium leading-5 [overflow-wrap:anywhere]">{v.title}</h3>
-                    </Link>
-                    <p className="mt-1 truncate text-[13px] leading-[18px] text-muted-foreground">{v.channel}</p>
-                    <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{v.views} • {v.timeAgo}</p>
-                  </div>
-                  <MoreButton onClick={(e) => { e.stopPropagation(); setSelectedRelatedVideo(v); setRelatedDrawerOpen(true); }} className="-mr-2 -mt-1.5" />
-                </div>
-              ))}
-            </div>
-            {/* Single Drawer outside map — uses separate state from main video drawer */}
+          <>
+            <RelatedVideos {...related} isMobile />
             <Drawer open={relatedDrawerOpen} onOpenChange={(o) => { if (!o) { setRelatedDrawerOpen(false); setSelectedRelatedVideo(null); } }}>
               <DrawerContent accessibleTitle="Video actions" className="px-0 max-h-[70vh]">
                 <div className="mt-2 pb-6">
@@ -956,7 +892,7 @@ function VideoPlayView({ mainVideo }: { mainVideo: VideoItem }) {
                 </div>
               </DrawerContent>
             </Drawer>
-          </section>
+          </>
         )}
       </div>
 

@@ -30,13 +30,25 @@ test.describe('Watch page', () => {
     const { width, height } = page.viewportSize()!;
     const aside = (await page.locator('[aria-labelledby="related-heading"]').boundingBox())!;
     expect(aside.x).toBeGreaterThan(b.x + b.width); // beside the player
-    expect(aside.width).toBeGreaterThanOrEqual(300);
-    // No empty space at the sides: the player starts at the page margin and the column ends at the other
-    expect(Math.round(b.x)).toBe(24);
-    expect(Math.round(aside.x + aside.width)).toBe(width - 24);
+    // YouTube's layout: 16px at the sides and between the columns, 12px under the header; the column is 27.5% of the
+    // window (here 352px), so there's no empty space at the sides
+    expect([b.x, b.y].map(Math.round)).toEqual([16, 68]);
+    expect(Math.round(aside.x - b.x - b.width)).toBe(16);
+    expect(Math.round(aside.x + aside.width)).toBe(width - 16);
+    expect(Math.round(aside.width)).toBe(Math.round(Math.max(320, width * 0.275)));
     // Title and channel are visible below the player without scrolling
     const title = (await page.locator('main h1').first().boundingBox())!;
     expect(title.y + title.height).toBeLessThanOrEqual(height);
+    const channel = (await page.locator('main h1 ~ * a[href^="/channels/"], main h1 ~ a[href^="/channels/"]').first().boundingBox())!;
+    expect(channel.y + channel.height).toBeLessThanOrEqual(height);
+    // Also in a low window (a laptop's), where the player is smaller and the column wider
+    await page.setViewportSize({ width: 1366, height: 650 });
+    const low = (await box.boundingBox())!;
+    expect(Math.abs(low.width / low.height - 16 / 9)).toBeLessThan(0.01);
+    const lowChannel = (await page.locator('main h1 ~ * a[href^="/channels/"], main h1 ~ a[href^="/channels/"]').first().boundingBox())!;
+    expect(lowChannel.y + lowChannel.height).toBeLessThanOrEqual(650);
+    const lowAside = (await page.locator('[aria-labelledby="related-heading"]').boundingBox())!;
+    expect(Math.round(lowAside.x + lowAside.width)).toBe(1366 - 16);
   });
 
   test("our controls: click to pause, k to play; YouTube's own overlays stay cropped out", async ({ page }) => {
@@ -107,11 +119,11 @@ test.describe('Watch page', () => {
     await expect(aside).toBeVisible();
     const top = () => aside.evaluate((a) => Math.round(a.getBoundingClientRect().top));
     await page.evaluate(() => window.scrollTo(0, 120));
-    await expect.poll(top).toBe(80); // sticky under the header
+    await expect.poll(top).toBe(68); // sticky under the header
     // Menus lock page scrolling; that must not undo the sticky position (it used to jump up)
     await page.getByRole('button', { name: 'More actions', exact: true }).locator('visible=true').first().click();
     await expect(page.getByRole('menu')).toBeVisible();
-    expect(await top()).toBe(80);
+    expect(await top()).toBe(68);
   });
 
   test('playlist with Autoplay on: the next video starts at the end, with no end screen', async ({ page }) => {

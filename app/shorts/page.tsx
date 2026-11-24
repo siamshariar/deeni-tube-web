@@ -46,6 +46,7 @@ import { notify } from "@/lib/notify";
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { openShareIntent } from "@/lib/share"
 import { recordWatch } from "@/hooks/useWatchHistory"
+import { replacedShorts } from "@/lib/shorts-data"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
 import { useMenuDismiss } from "@/hooks/use-menu-dismiss"
 import { useWatchLater } from "@/hooks/useWatchLater"
@@ -86,12 +87,12 @@ const shortsData = [
   },
   {
     id: "s2",
-    videoId: "goHfO28fE-A",
-    title: "যারা বলে আমাদের রব আল্লাহ",
+    videoId: "Pr5qe5nQfWc",
+    title: "কীভাবে দুনিয়ার লোভ থেকে বেঁচে থাকবেন?",
     channel: "Dr. Mohammad Monzur-E-Elahi",
     channelId: "monzur",
     channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_lLp3SxQeehJxSmd_QCmSxpFBj4k-7X-brif7v9Jz0rBg=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/goHfO28fE-A/hqdefault.jpg",
+    thumbnail: "https://img.youtube.com/vi/Pr5qe5nQfWc/hqdefault.jpg",
     likes: "25K",
     comments: "2.1K",
     isSubscribed: true,
@@ -299,22 +300,6 @@ Dr. Khandaker Abdullah Jahangir Rh Official
     hashtags: ["#drzakirnaik", "#BadOmen", "#Shirk"]
   },
   {
-    id: "s13",
-    videoId: "0m1Mc6dX8XY",
-    title: "Seek The Forgiveness of Allah #muftimenk",
-    channel: "Mufti Menk",
-    channelId: "mufti-menk",
-    channelAvatar: "https://yt3.googleusercontent.com/ytc/AIdro_nFND09H6Vvk_P8L4djMdBusHPU8nIT6XuiRjL8M59hJsw=s160-c-k-c0x00ffffff-no-rj",
-    thumbnail: "https://img.youtube.com/vi/0m1Mc6dX8XY/hqdefault.jpg",
-    likes: "7.3K",
-    comments: "3.2K",
-    isSubscribed: false,
-    description: "Seek The Forgiveness of Allah #muftimenk #motivation #dua #clean #faith",
-    views: "94,721",
-    timeAgo: "4 months ago",
-    hashtags: ["#muftimenk", "#forgiveness", "#dua"]
-  },
-  {
     id: "s14",
     videoId: "HKRq0DE-GTo",
     title: "Just Don't Get Angry #muftimenk",
@@ -447,12 +432,19 @@ const YT_ORIGIN = "https://www.youtube.com"
 const HOST_ORIGIN = "https://www.youtube-nocookie.com"
 const noSubscribe = () => () => {}
 // infoDelivery.playerState values
+const YT_ENDED = 0
 const YT_PLAYING = 1
 const YT_PAUSED = 2
 const YT_BUFFERING = 3
 // Shorts this many places above/below the active one keep a loaded, paused player,
 // so switching to them starts playback at once instead of showing a black frame
 const PRELOAD_RANGE = 1
+// A short that doesn't play (its stream stalls, its player never answers): seconds until the spinner, until its
+// player is loaded again (once), and from then until the page says so and offers to try again. Twice as long for a
+// player that hasn't answered yet, or that stopped to load while playing: on a slow network both may still work
+const SPINNER_AFTER = 1
+const RELOAD_AFTER = 10
+const GIVE_UP_AFTER = 15
 
 function ytPost(iframe: HTMLIFrameElement | null | undefined, message: Record<string, unknown>) {
   iframe?.contentWindow?.postMessage(JSON.stringify(message), YT_ORIGIN)
@@ -468,6 +460,12 @@ function ytCommand(iframe: HTMLIFrameElement | null | undefined, func: string, a
 const avatarSrc = (src?: string) => (src && !src.includes("placeholder.svg") ? src : undefined)
 
 // ============ ICON COMPONENTS ============
+
+/** The short with this YouTube id (a replaced short's old links open the one that took its place); -1: none. */
+function shortIndex(videoId: string | null): number {
+  const id = videoId && (replacedShorts[videoId] ?? videoId)
+  return id ? shortsData.findIndex((short) => short.videoId === id) : -1
+}
 
 // ============ COVER ============
 
@@ -771,11 +769,7 @@ function ShortsPageContent() {
   const commentInputRef = useRef<HTMLInputElement>(null)
   // A link to a short (/shorts?v=ID) starts right on it: only its player loads, with no jump from the first
   // short (this content renders on the client, inside Suspense, so the search params are known here)
-  const [initialIndex] = useState(() => {
-    const v = searchParams.get("v")
-    const i = v ? shortsData.findIndex((short) => short.videoId === v) : -1
-    return i >= 0 ? i : 0
-  })
+  const [initialIndex] = useState(() => Math.max(0, shortIndex(searchParams.get("v"))))
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   // Media queries (not window.innerWidth) so server and first client render match
   const isDesktopViewport = useMediaQuery("(min-width: 768px)")
@@ -853,8 +847,21 @@ function ShortsPageContent() {
   const lastScrollAtRef = useRef(0)
   // The active short's thumbnail stays on top until its player is actually playing
   const [startedId, setStartedId] = useState<string | null>(null)
+  // The active short isn't playing (yet): the spinner; and why it can't: YouTube says it's unavailable, or it never
+  // started (the message with "Try again")
+  const [isSlow, setIsSlow] = useState(false)
+  const [playIssue, setPlayIssue] = useState<{ id: string; kind: "unavailable" | "stalled" } | null>(null)
+  // A player that got stuck is loaded again: a new <iframe> (its key), going on from where it stopped
+  const [playerLoads, setPlayerLoads] = useState<Record<string, number>>({})
+  const reloadedRef = useRef<{ id: string; at: number } | null>(null)
+  // The visitor pressed play on a short that hadn't started
+  const pressedPlayRef = useRef(false)
+  // YouTube's error for a player (also one preloaded off screen, which says it only once)
+  const playerErrorsRef = useRef(new WeakMap<HTMLIFrameElement, number>())
+  const currentTimeRef = useRef(0)
   // Neighbouring players load once the first short has started, so they don't slow it down
   const [preloadNeighbors, setPreloadNeighbors] = useState(false)
+  const neighborTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Feedback dialog state
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
@@ -911,7 +918,7 @@ function ShortsPageContent() {
     const v = searchParams.get("v")
     if (!v || v === shownVideoParamRef.current) return
     shownVideoParamRef.current = v
-    const targetIndex = shortsData.findIndex((short) => short.videoId === v)
+    const targetIndex = shortIndex(v)
     const c = containerRef.current
     if (targetIndex === -1 || !c) return
     const sectionH = (c.firstElementChild as HTMLElement)?.offsetHeight || c.clientHeight
@@ -963,18 +970,24 @@ function ShortsPageContent() {
       const newIdx = indexInView()
       if (newIdx !== currentIndex) setCurrentIndex(newIdx)
     }
+    const settleSoon = () => {
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+      scrollTimeout.current = setTimeout(() => { setIsScrolling(false); settle() }, 250)
+    }
     const handleScroll = () => {
       lastScrollAtRef.current = Date.now()
       setIsScrolling(true)
-      if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
       // Fallback for browsers without the 'scrollend' event
-      scrollTimeout.current = setTimeout(() => { setIsScrolling(false); settle() }, 250)
+      settleSoon()
       // A keyboard/arrow scroll already set the index; don't flip it back halfway through the animation
       if (scrollTargetRef.current !== null) return
       const newIdx = indexInView()
       if (newIdx !== currentIndex) setCurrentIndex(newIdx)
     }
     const handleScrollEnd = () => {
+      // An arrow key pressed while the feed still slides: Safari reports the end of the slide it cut short, halfway.
+      // The new one is on its way to its own short (this used to jump back to the one in between)
+      if (scrollTargetRef.current !== null && indexInView() !== scrollTargetRef.current) return settleSoon()
       if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
       setIsScrolling(false)
       settle()
@@ -1015,6 +1028,99 @@ function ShortsPageContent() {
     setAutoMuted(true)
   }, [])
 
+  // The active short really plays: hide its thumbnail (the shared player: once YouTube has drawn it at this size)
+  const markPlaying = useCallback((id: string, iframe: HTMLIFrameElement) => {
+    playerStatesRef.current.set(iframe, YT_PLAYING)
+    activePlayedRef.current = true
+    setIsPlaying(true)
+    setIsSlow(false)
+    setPlayIssue(null)
+    if (iframe === hostFrame()) revealHost(() => { if (shortsData[currentIndexRef.current]?.id === id) setStartedId(id) })
+    else setStartedId(id)
+  }, [])
+
+  // Load the active short's player again: a stream that stalled usually plays in a new player
+  const reloadPlayer = useCallback((id: string) => {
+    const short = shortsData[currentIndexRef.current]
+    if (short?.id !== id) return
+    const iframe = videoRefs.current.get(id)
+    const at = currentTimeRef.current
+    reloadedRef.current = { id, at }
+    // Back under its cover until it plays again
+    activePlayedRef.current = false
+    setStartedId(null)
+    setIsPlaying(true)
+    if (iframe && iframe === hostFrame()) {
+      setHostVisible(false)
+      playerStatesRef.current.delete(iframe)
+      hostLoad(short.videoId, !isMutedRef.current, true)
+      if (at > 1) ytCommand(iframe, "seekTo", [at, true])
+      ytCommand(iframe, "playVideo")
+    } else {
+      // Without the preloaded neighbours meanwhile (a weak phone may not manage several players); they come back
+      // once this one plays
+      if (neighborTimerRef.current) clearTimeout(neighborTimerRef.current)
+      neighborTimerRef.current = null
+      setPreloadNeighbors(false)
+      setPlayerLoads((loads) => ({ ...loads, [id]: (loads[id] ?? 0) + 1 }))
+    }
+  }, [])
+
+  // Watchdog: a play command can get lost while the player is busy (loading, seeking), which left shorts paused, and
+  // a stream can stall, which left them on their thumbnail for good. Until the short plays: ask again (muted as a
+  // last resort; normally the player reports a blocked autoplay right away: see onAutoplayBlocked below), show the
+  // spinner, then load its player again once, then say it isn't playing.
+  const watchPlayback = useCallback((id: string) => {
+    if (playWatchRef.current) clearTimeout(playWatchRef.current)
+    let seconds = 0
+    const check = () => {
+      playWatchRef.current = null
+      const iframe = videoRefs.current.get(id)
+      const state = iframe && playerStatesRef.current.get(iframe)
+      const reloaded = reloadedRef.current?.id === id
+      if (
+        shortsData[currentIndexRef.current]?.id !== id ||
+        userPausedRef.current ||
+        state === YT_PLAYING ||
+        // Paused after it had played (by the phone, another app…): the play button shows, nothing to repair
+        (state === YT_PAUSED && activePlayedRef.current) ||
+        (iframe && playerErrorsRef.current.has(iframe))
+      ) return setIsSlow(false)
+      // The shared player only reports changes: take a "playing" that came before it said which video it shows
+      if (iframe && iframe === hostFrame() && hostInfo().playerState === YT_PLAYING && hostShowing() === shortsData[currentIndexRef.current].videoId) return markPlaying(id, iframe)
+      // In the background players may wait: go on when the page is back
+      if (document.hidden) {
+        playWatchRef.current = setTimeout(check, 1000)
+        return
+      }
+      seconds++
+      if (seconds >= SPINNER_AFTER) setIsSlow(true)
+      const ready = !!iframe && readyPlayersRef.current.has(iframe)
+      if (ready && state !== YT_BUFFERING && seconds <= 5) {
+        // (Not the shared player: muted there, every later short would stay muted until a tap)
+        if (seconds >= 3 && !isMutedRef.current && iframe !== hostFrame()) {
+          muteAutomatically()
+          ytCommand(iframe, "mute")
+        }
+        ytCommand(iframe, "playVideo")
+        // It may be waiting for a tap (a phone saving power): show the play button
+        if (seconds === 5 && !reloaded && !pressedPlayRef.current) setIsPlaying(false)
+      }
+      if (seconds >= (reloaded ? GIVE_UP_AFTER : RELOAD_AFTER) * (ready && !activePlayedRef.current ? 1 : 2)) {
+        if (reloaded) {
+          setIsSlow(false)
+          setIsPlaying(false)
+          setPlayIssue({ id, kind: "stalled" })
+          return
+        }
+        reloadPlayer(id)
+        seconds = 0
+      }
+      playWatchRef.current = setTimeout(check, 1000)
+    }
+    playWatchRef.current = setTimeout(check, 1000)
+  }, [muteAutomatically, markPlaying, reloadPlayer])
+
   // Start the active short's player with the current mute/volume/captions settings
   const startPlayer = useCallback((id: string) => {
     const iframe = videoRefs.current.get(id)
@@ -1025,32 +1131,14 @@ function ShortsPageContent() {
     ytCommand(iframe, isMutedRef.current ? "mute" : "unMute")
     ytCommand(iframe, "setVolume", [volumeRef.current])
     if (captionsRef.current) ytCommand(iframe, "loadModule", ["captions"])
-    ytCommand(iframe, "playVideo")
-    // Watchdog: a play command can get lost while the player is busy (loading, seeking), which left shorts
-    // paused. Check that it really plays and ask again if not. If it still won't start, play muted as a last
-    // resort (normally the player reports a blocked autoplay right away: see onAutoplayBlocked below).
-    if (playWatchRef.current) clearTimeout(playWatchRef.current)
-    let attempts = 0
-    const check = () => {
-      playWatchRef.current = null
-      if (shortsData[currentIndexRef.current]?.id !== id || userPausedRef.current || !iframe.isConnected) return
-      const state = playerStatesRef.current.get(iframe)
-      if (state === YT_PLAYING) return
-      attempts++
-      if (state !== YT_BUFFERING) {
-        // (Not the shared player: muted there, every later short would stay muted until a tap)
-        if (attempts >= 3 && !isMutedRef.current && iframe !== hostFrame()) {
-          muteAutomatically()
-          ytCommand(iframe, "mute")
-        }
-        ytCommand(iframe, "playVideo")
-      }
-      if (attempts < 5) playWatchRef.current = setTimeout(check, 1000)
-      // Give up: show the play button, so a tap starts it
-      else if (state !== YT_BUFFERING) setIsPlaying(false)
+    // A player loaded again goes on from where it got stuck
+    if (reloadedRef.current?.id === id && reloadedRef.current.at > 1) {
+      ytCommand(iframe, "seekTo", [reloadedRef.current.at, true])
+      reloadedRef.current.at = 0
     }
-    playWatchRef.current = setTimeout(check, 1000)
-  }, [muteAutomatically])
+    ytCommand(iframe, "playVideo")
+    watchPlayback(id)
+  }, [muteAutomatically, watchPlayback])
 
   useEffect(() => () => { if (playWatchRef.current) clearTimeout(playWatchRef.current) }, [])
 
@@ -1088,7 +1176,6 @@ function ShortsPageContent() {
 
   // Neighbouring players load a moment after the first short starts, when the browser is idle, so
   // they don't compete with it (each YouTube player is a lot of script). Fallback: after 6s anyway.
-  const neighborTimerRef = useRef<NodeJS.Timeout | null>(null)
   const scheduleNeighbors = useCallback((delay: number) => {
     if (neighborTimerRef.current) return
     neighborTimerRef.current = setTimeout(() => {
@@ -1137,7 +1224,24 @@ function ShortsPageContent() {
           muteAutomatically()
           ytCommand(iframe, "mute")
           ytCommand(iframe, "playVideo")
-        } else setIsPlaying(false) // even muted playback is blocked: show the play button
+        } else {
+          // Even muted playback is blocked: show the play button and wait for a tap
+          if (playWatchRef.current) clearTimeout(playWatchRef.current)
+          setIsSlow(false)
+          setIsPlaying(false)
+        }
+        return
+      }
+
+      // This short can't be played (removed, private, not allowed outside YouTube…). A preloaded one says so only
+      // once, so it's kept for when it's on screen. The shared player: only about the short it was last given
+      if (d?.event === "onError") {
+        if (iframe === hostFrame() && (hostShowing() ?? shortsData[currentIndexRef.current]?.videoId) !== shortsData[currentIndexRef.current]?.videoId) return
+        playerErrorsRef.current.set(iframe, Number(d.info) || 0)
+        if (isActivePlayer) {
+          setIsPlaying(false)
+          setPlayIssue({ id, kind: "unavailable" })
+        }
         return
       }
 
@@ -1161,28 +1265,37 @@ function ShortsPageContent() {
         return
       }
 
-      if (typeof d.info.currentTime === "number") setVideoCurrentTime(d.info.currentTime)
       if (typeof d.info.duration === "number" && d.info.duration > 0) {
         videoDurationRef.current = d.info.duration
         setVideoDuration(d.info.duration)
       }
+      if (typeof d.info.currentTime === "number") {
+        currentTimeRef.current = d.info.currentTime
+        setVideoCurrentTime(d.info.currentTime)
+        // Shorts loop. The shared player has no playlist for YouTube's own loop: start again just before the end, so
+        // YouTube's end screen doesn't show (and at the end below, should the last report come too late)
+        if (iframe === hostFrame() && videoDurationRef.current > 1 && d.info.currentTime > videoDurationRef.current - 0.3 && !isSeekingRef.current)
+          ytCommand(iframe, "seekTo", [0, true])
+      }
       if (typeof state === "number") {
         if (state === YT_PLAYING) {
-          activePlayedRef.current = true
-          setIsPlaying(true)
-          // The shared player: shown (and the thumbnail hidden) once YouTube has drawn it at this size
-          if (iframe === hostFrame()) revealHost(() => { if (shortsData[currentIndexRef.current]?.id === id) setStartedId(id) })
-          else setStartedId(id)
+          markPlaying(id, iframe)
           scheduleNeighbors(1500)
         }
         // Only a real pause after it has played. Unstarted/cued/ended are passing states while switching
         // or looping, and showed a "paused" short that was in fact starting.
         else if (state === YT_PAUSED && activePlayedRef.current) setIsPlaying(false)
+        // It stopped to load: watch that it goes on
+        else if (state === YT_BUFFERING && activePlayedRef.current) watchPlayback(id)
+        else if (state === YT_ENDED && iframe === hostFrame() && !userPausedRef.current) {
+          ytCommand(iframe, "seekTo", [0, true])
+          ytCommand(iframe, "playVideo")
+        }
       }
     }
     window.addEventListener("message", onYTMessage)
     return () => window.removeEventListener("message", onYTMessage)
-  }, [startPlayer, scheduleNeighbors, muteAutomatically])
+  }, [startPlayer, scheduleNeighbors, muteAutomatically, markPlaying, watchPlayback])
 
   // The shared player: created with the opening short if no tap made it yet (before the effect below, which
   // attaches it); let go when leaving Shorts
@@ -1202,8 +1315,13 @@ function ShortsPageContent() {
     videoDurationRef.current = 0
     setIsPlaying(true)
     setStartedId(null)
+    setIsSlow(false)
+    setPlayIssue(null)
     userPausedRef.current = false
     activePlayedRef.current = false
+    pressedPlayRef.current = false
+    reloadedRef.current = null
+    currentTimeRef.current = 0
     if (playWatchRef.current) clearTimeout(playWatchRef.current)
     if (hosted) {
       // The shared player moves to this short and loads it (keeping the sound if it has it)
@@ -1213,6 +1331,7 @@ function ShortsPageContent() {
       if (!activeId || !frame || !box) return
       videoRefs.current.set(activeId, frame)
       playerStatesRef.current.delete(frame)
+      playerErrorsRef.current.delete(frame)
       hostTokenRef.current = attachHost(box, "short")
       setHostVisible(false)
       hostLoad(shortsData[currentIndex].videoId, !isMutedRef.current)
@@ -1229,14 +1348,10 @@ function ShortsPageContent() {
             videoDurationRef.current = info.duration
             setVideoDuration(info.duration)
           }
-          if (info.playerState === YT_PLAYING) {
-            playerStatesRef.current.set(frame, YT_PLAYING)
-            activePlayedRef.current = true
-            revealHost(() => { if (shortsData[currentIndexRef.current]?.id === activeId) setStartedId(activeId) })
-          }
+          if (info.playerState === YT_PLAYING) markPlaying(activeId, frame)
         }
         startPlayer(activeId)
-      }
+      } else watchPlayback(activeId)
       return
     }
     videoRefs.current.forEach((iframe, id) => {
@@ -1250,10 +1365,16 @@ function ShortsPageContent() {
     })
     const iframe = activeId ? videoRefs.current.get(activeId) : undefined
     if (!activeId || !iframe) return
-    if (readyPlayersRef.current.has(iframe)) startPlayer(activeId)
-    // Not ready yet: its onReady message starts it. Ping again in case an earlier handshake gave up.
-    else registerPlayer(activeId)
-  }, [currentIndex, startPlayer, registerPlayer, hosted])
+    if (playerErrorsRef.current.has(iframe)) {
+      setIsPlaying(false)
+      setPlayIssue({ id: activeId, kind: "unavailable" })
+    } else if (readyPlayersRef.current.has(iframe)) startPlayer(activeId)
+    else {
+      // Not ready yet: its onReady message starts it. Ping again in case an earlier handshake gave up.
+      registerPlayer(activeId)
+      watchPlayback(activeId)
+    }
+  }, [currentIndex, startPlayer, registerPlayer, watchPlayback, markPlaying, hosted])
 
   // (The shared player is hidden on each switch above and shown with revealHost once the short plays.)
   // YouTube draws captions at its bottom edge, so no cropping while they're on
@@ -1377,8 +1498,28 @@ function ShortsPageContent() {
     setShowPlayFeedback(true)
     playFeedbackTimerRef.current = setTimeout(() => setShowPlayFeedback(false), 600)
     const activeShort = shortsData[currentIndex]
-    const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
-    ytCommand(iframe, newPlaying ? 'playVideo' : 'pauseVideo')
+    if (!activeShort) return
+    if (!newPlaying) ytCommand(videoRefs.current.get(activeShort.id), 'pauseVideo')
+    else {
+      if (!activePlayedRef.current) pressedPlayRef.current = true
+      startPlayer(activeShort.id)
+    }
+  }
+
+  // "Try again" on a short that didn't play: its player is loaded again (inside this tap, so it may play with sound)
+  const retryPlay = () => {
+    const activeShort = shortsData[currentIndex]
+    if (!activeShort) return
+    if (!isMuted) allowHostSound()
+    const iframe = videoRefs.current.get(activeShort.id)
+    if (iframe) playerErrorsRef.current.delete(iframe)
+    setPlayIssue(null)
+    setIsPlaying(true)
+    setIsSlow(true)
+    userPausedRef.current = false
+    pressedPlayRef.current = true
+    reloadPlayer(activeShort.id)
+    watchPlayback(activeShort.id)
   }
 
   // ---- COMMENT ACTIONS ----
@@ -1808,11 +1949,13 @@ function ShortsPageContent() {
                   >
                     {hasPlayer && (
                       <iframe
+                        key={playerLoads[short.id] ?? 0}
                         ref={(el) => {
                           if (el) videoRefs.current.set(short.id, el)
                         }}
                         // Never change this src after mount (that reloads the player): playback is started and
-                        // stopped with postMessage commands, so neighbours can load ahead of time paused
+                        // stopped with postMessage commands, so neighbours can load ahead of time paused.
+                        // (A player that got stuck is replaced by a new one: its key, see reloadPlayer)
                         src={`https://www.youtube.com/embed/${short.videoId}?autoplay=0&mute=0&controls=0&loop=1&playlist=${short.videoId}&modestbranding=1&rel=0&fs=1&playsinline=1&enablejsapi=1`}
                         title={short.title}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -1841,6 +1984,35 @@ function ShortsPageContent() {
                       className="absolute inset-0 z-10 cursor-pointer"
                       onClick={(e) => handleTogglePlay(e as unknown as React.MouseEvent)}
                     />
+                  )}
+
+                  {/* It's loading, or got stuck: never just a still picture */}
+                  {isActive && isSlow && isPlaying && !playIssue && (
+                    <div role="status" aria-label="Loading" className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                      <span className="h-12 w-12 animate-spin rounded-full border-4 border-white/25 border-t-white" />
+                    </div>
+                  )}
+                  {/* Phones: the play icon while paused, as in YouTube's app (on desktop it's the button at the top) */}
+                  {isActive && !isPlaying && !playIssue && !showPlayFeedback && (
+                    <div aria-hidden="true" data-paused-icon className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center md:hidden">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/40"><Play className="h-8 w-8 fill-white text-white" /></span>
+                    </div>
+                  )}
+                  {isActive && playIssue?.id === short.id && (
+                    <div role="alert" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 px-8 text-center text-white md:rounded-2xl">
+                      <p className="text-base font-medium">{playIssue.kind === "unavailable" ? "This short isn't available" : "This short isn't playing"}</p>
+                      <p className="max-w-xs text-sm text-white/80">
+                        {playIssue.kind === "unavailable" ? "It may have been removed from YouTube." : "Check your connection, then try again."}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {playIssue.kind === "stalled" && (
+                          <button type="button" onClick={retryPlay} className="h-9 rounded-full bg-white px-4 text-sm font-medium text-black hover:bg-white/90 active:bg-white/80">Try again</button>
+                        )}
+                        {index < shortsData.length - 1 && (
+                          <button type="button" onClick={() => scrollToVideo(index + 1)} className="h-9 rounded-full bg-white/20 px-4 text-sm font-medium text-white hover:bg-white/30 active:bg-white/30">Next short</button>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   {/* Play/pause tap feedback animation */}

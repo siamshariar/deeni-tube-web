@@ -18,6 +18,16 @@ export interface ShortVideo {
   videoUrl: string
 }
 
+/** Shorts taken out of the feed, and the one in their place: their old links (/shorts?v=…, History) open it. */
+export const replacedShorts: Record<string, string> = {
+  "goHfO28fE-A": "Pr5qe5nQfWc", // reported stuck (not playing) on Nov 23, 2026
+}
+
+/** Shorts removed for good: gone from the feed, and from what visitors saved earlier (History, Liked, Watch later). */
+export const removedShorts: ReadonlySet<string> = new Set([
+  "0m1Mc6dX8XY", // "Seek The Forgiveness of Allah #muftimenk", Nov 24, 2026
+])
+
 export const shortsVideos: ShortVideo[] = [
   {
     id: "s1",
@@ -50,8 +60,8 @@ export const shortsVideos: ShortVideo[] = [
   },
   {
     id: "s2",
-    youtubeId: "goHfO28fE-A",
-    title: "যারা বলে আমাদের রব আল্লাহ ।। Prof. Dr. Mohammad Monzur-E-Elahi",
+    youtubeId: "Pr5qe5nQfWc",
+    title: "কীভাবে দুনিয়ার লোভ থেকে বেঁচে থাকবেন? ।। Prof. Dr. Mohammad Monzur-E-Elahi",
     channel: "Dr. Mohammad Monzur-E-Elahi",
     channelAvatar: "/placeholder.svg?height=36&width=36",
     views: "98,765",
@@ -75,7 +85,7 @@ export const shortsVideos: ShortVideo[] = [
     likes: "25K",
     comments: "2.1K",
     isSubscribed: true,
-    videoUrl: "https://www.youtube.com/shorts/goHfO28fE-A"
+    videoUrl: "https://www.youtube.com/shorts/Pr5qe5nQfWc"
   },
   {
     id: "s3",

@@ -51,7 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ShareModal } from "@/components/share-modal";
 import { DescriptionText } from "@/components/description-text";
 import { YouTubePlayer } from "@/components/youtube-player";
-import { WATCH_COLUMNS, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
+import { WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
 import { openSaveCard } from "@/lib/save-card";
 import { ReportDialog } from "@/components/report-dialog";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -683,7 +683,7 @@ export default function PlaylistDetailPage() {
       )}
 
       <div className="pb-6">
-        <div className="px-3 md:pt-6 md:px-6">
+        <div className={WATCH_PAGE}>
           {/* YouTube's watch layout (see components/watch-layout.ts) */}
           <div className={WATCH_COLUMNS}>
             <div className={WATCH_PRIMARY}>

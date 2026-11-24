@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
 import { historySeed, HistoryItem } from "@/lib/history-data";
 import { findVideo } from "@/lib/media-lookup";
+import { removedShorts } from "@/lib/shorts-data";
 
 export type { HistoryItem };
 
@@ -33,7 +34,7 @@ function realDuration(item: HistoryItem): string {
 export function useWatchHistory() {
   const stored = useLocalStore(historyStore, EMPTY);
   const history = useMemo(
-    () => stored.map((item) => {
+    () => stored.filter((item) => !removedShorts.has(item.videoId)).map((item) => {
       const duration = realDuration(item);
       return duration === item.duration ? item : { ...item, duration };
     }),

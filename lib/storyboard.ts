@@ -4,7 +4,8 @@
 //   L0  48×27, one sheet of 100 frames for the whole video (25 KB): loaded first, so a frame shows at once
 //   L1  80×45, L2 160×90, L3 320×180: a frame every 1–10 s, 100 / 25 / 9 frames to a sheet
 // Their links are signed, so they come from lib/storyboard-data.ts (made by scripts/storyboards.mjs). That file and
-// a video's first sheet are only loaded when its progress bar is first used.
+// a video's first sheet are only loaded when its progress bar is first used. Related videos' moving thumbnails use
+// them too (components/moving-thumbnail.tsx).
 
 export interface StoryboardLevel {
   width: number;
@@ -55,11 +56,8 @@ export function parseStoryboard(videoId: string, spec: string): Storyboard | nul
   return { videoId, levels, aspect: last.width / last.height };
 }
 
-/** The frame at `time` seconds. `level` is the size wanted; videos without it use their largest. */
-export function frameAt(board: Storyboard, level: number, time: number, duration: number): StoryboardFrameAt {
-  const l = board.levels[Math.min(level, board.levels.length - 1)];
-  const at = l.interval > 0 ? (time * 1000) / l.interval : duration > 0 ? (time / duration) * l.count : 0;
-  const index = Math.min(l.count - 1, Math.max(0, Math.floor(at)));
+/** Frame number `index` (0 is the first) of a level. */
+function frameNumber(l: StoryboardLevel, index: number): StoryboardFrameAt {
   const perSheet = l.cols * l.rows;
   const sheet = Math.floor(index / perSheet);
   const inSheet = index - sheet * perSheet;
@@ -74,6 +72,31 @@ export function frameAt(board: Storyboard, level: number, time: number, duration
     col: inSheet % l.cols,
     row: Math.floor(inSheet / l.cols),
   };
+}
+
+/** The frame at `time` seconds. `level` is the size wanted; videos without it use their largest. */
+export function frameAt(board: Storyboard, level: number, time: number, duration: number): StoryboardFrameAt {
+  const l = board.levels[Math.min(level, board.levels.length - 1)];
+  const at = l.interval > 0 ? (time * 1000) / l.interval : duration > 0 ? (time / duration) * l.count : 0;
+  return frameNumber(l, Math.min(l.count - 1, Math.max(0, Math.floor(at))));
+}
+
+/**
+ * The frames of a moving thumbnail, in order: up to three sheets of the largest size (320×180), from different
+ * parts of the video, at most nine frames each.
+ */
+export function movingFrames(board: Storyboard): StoryboardFrameAt[] {
+  const l = board.levels[board.levels.length - 1];
+  const perSheet = l.cols * l.rows;
+  const sheets = Math.ceil(l.count / perSheet);
+  const frames: StoryboardFrameAt[] = [];
+  for (const sheet of new Set([0.2, 0.5, 0.8].map((part) => Math.floor(sheets * part)))) {
+    const first = sheet * perSheet;
+    const inSheet = Math.min(perSheet, l.count - first);
+    const step = Math.max(1, Math.floor(inSheet / 9));
+    for (let i = 0; i < inSheet; i += step) frames.push(frameNumber(l, first + i));
+  }
+  return frames;
 }
 
 /** Background styles that draw one frame over the whole element, whatever its size. */
@@ -106,24 +129,23 @@ export function loadSheet(url: string): Promise<boolean> {
 }
 
 const boards = new Map<string, Promise<Storyboard | null>>();
-/** The video's storyboard, once its first small sheet has loaded; null when it has none (or it can't load). */
-export function loadStoryboard(videoId: string): Promise<Storyboard | null> {
+/** The video's storyboard without any of its sheets; null when it has none. */
+export function storyboardOf(videoId: string): Promise<Storyboard | null> {
   let p = boards.get(videoId);
   if (!p) {
     p = import("@/lib/storyboard-data")
-      .then(async ({ storyboards }) => {
-        const spec = storyboards[videoId];
-        const board = spec ? parseStoryboard(videoId, spec) : null;
-        if (!board) return null;
-        if (await loadSheet(board.levels[0].url.replace("$M", "0"))) return board;
-        boards.delete(videoId);
-        return null;
-      })
+      .then(({ storyboards }) => (storyboards[videoId] ? parseStoryboard(videoId, storyboards[videoId]) : null))
       .catch(() => {
-        boards.delete(videoId);
+        boards.delete(videoId); // offline: try again next time
         return null;
       });
     boards.set(videoId, p);
   }
   return p;
+}
+
+/** The video's storyboard, once its first small sheet has loaded; null when it has none (or it can't load). */
+export async function loadStoryboard(videoId: string): Promise<Storyboard | null> {
+  const board = await storyboardOf(videoId);
+  return board && (await loadSheet(board.levels[0].url.replace("$M", "0"))) ? board : null;
 }

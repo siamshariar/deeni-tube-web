@@ -134,6 +134,20 @@ export default function Home() {
     };
   }, [setHeaderVisible]);
 
+  // The logo or a Home link pressed while already on Home starts the feed over, as on YouTube: "All", from the top
+  // (Next.js does nothing for a link to the page it's on)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // opens a new tab or window
+      if (!(e.target as Element).closest('a[href="/"]')) return;
+      setActiveChip("All");
+      scrollContainerRef.current?.scrollTo({ left: 0 });
+      window.scrollTo(0, 0);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   const filteredVideos = allVideos.filter(
     (v: VideoItem) =>
       preferredLanguages.includes(v.language) &&

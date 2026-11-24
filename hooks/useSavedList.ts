@@ -5,6 +5,7 @@
 import { useCallback, useMemo } from "react";
 import { createLocalStore, useLocalStore } from "@/lib/local-store";
 import { findShort, findVideo, youtubeIdFromThumbnail } from "@/lib/media-lookup";
+import { removedShorts } from "@/lib/shorts-data";
 
 export interface SavedVideo {
   id: string;
@@ -39,10 +40,10 @@ export function canonicalMediaId(id: string): string {
   return findVideo(id)?.id ?? findShort(id)?.id ?? id;
 }
 
-// Items saved before ids were normalised may use YouTube ids; clean them up on read and write
+// Items saved before ids were normalised may use YouTube ids; clean them up on read and write (also removed shorts)
 function normalizeAll(list: SavedVideo[]) {
   const seen = new Set<string>();
-  return list.map(normalizeSaved).filter((v) => !seen.has(v.id) && !!seen.add(v.id));
+  return list.map(normalizeSaved).filter((v) => !removedShorts.has(v.videoId ?? "") && !seen.has(v.id) && !!seen.add(v.id));
 }
 
 /** A demo item for a main-feed video or short (by internal or YouTube id). */

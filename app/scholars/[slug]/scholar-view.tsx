@@ -54,7 +54,7 @@ import { videoPath } from "@/lib/video-url";
 const mockShortsByChannel: Record<string, ChannelShort[]> = {
   "monzur": [
     { id: "sh1", videoId: "MBxDbbkk0gQ", title: "একমাত্র আল্লাহর রাজত্বই চিরস্থায়ী", views: "15K", timeAgo: "2 weeks ago", duration: "0:58" },
-    { id: "sh2", videoId: "goHfO28fE-A", title: "যারা বলে আমাদের রব আল্লাহ", views: "25K", timeAgo: "3 days ago", duration: "0:45" },
+    { id: "sh2", videoId: "Pr5qe5nQfWc", title: "কীভাবে দুনিয়ার লোভ থেকে বেঁচে থাকবেন?", views: "25K", timeAgo: "3 days ago", duration: "0:27" },
     { id: "sh3", videoId: "8YfQCDjlQsc", title: "ইমামের দূর্ব্যবহারের কারণে কেউ ওই মাসজিদে না গেলে কি অন্যায় হবে?", views: "50K", timeAgo: "1 week ago", duration: "0:51" },
   ],
   "abdullah-jahangir": [
@@ -70,7 +70,6 @@ const mockShortsByChannel: Record<string, ChannelShort[]> = {
     { id: "sh19", videoId: "Qp4vZLEqizc", title: "Belief in Bad Omen is Shirk - Dr Zakir Naik", views: "4.6K", timeAgo: "2 weeks ago", duration: "1:13" },
   ],
   "mufti-menk": [
-    { id: "sh13", videoId: "0m1Mc6dX8XY", title: "Seek The Forgiveness of Allah #muftimenk", views: "95K", timeAgo: "4 months ago", duration: "1:10" },
     { id: "sh14", videoId: "HKRq0DE-GTo", title: "Just Don't Get Angry #muftimenk", views: "127K", timeAgo: "1 month ago", duration: "1:00" },
   ],
   "assim-al-hakeem": [

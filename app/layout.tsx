@@ -58,6 +58,13 @@ export default function RootLayout({
             __html: `(function(d){addEventListener("keydown",function(e){if(e.key==="Tab")d.dataset.keyboard=""},true);addEventListener("pointerdown",function(){delete d.dataset.keyboard},true)})(document.documentElement)`,
           }}
         />
+        {/* A reloaded Home starts at the top, as on YouTube: until it has loaded, the browser's return to the old place
+            (partway down, with the chips out of sight) is undone, unless the visitor scrolls. Back keeps its place. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(location.pathname!=="/"||performance.getEntriesByType("navigation")[0].type!=="reload")return;var on=true,by=["wheel","touchstart","pointerdown","keydown"];function top(){if(on)scrollTo(0,0)}function stop(){on=false;removeEventListener("scroll",top);by.forEach(function(e){removeEventListener(e,stop,true)})}addEventListener("scroll",top);by.forEach(function(e){addEventListener(e,stop,true)});addEventListener("load",function(){setTimeout(top,0);setTimeout(stop,200)})}catch(e){}})()`,
+          }}
+        />
       </head>
       <body className={`${roboto.variable} font-sans antialiased`}>
         <ThemeProvider

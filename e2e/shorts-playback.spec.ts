@@ -6,6 +6,8 @@ import { useFakeYouTube } from './fake-youtube';
 
 async function activePlayer(page: Page): Promise<Frame> {
   const feed = page.locator('section').first().locator('..');
+  // (Laid out first: before that its height is 0 and there is no index)
+  await expect.poll(() => feed.evaluate((c) => (c.firstElementChild as HTMLElement).offsetHeight)).toBeGreaterThan(0);
   const index = await feed.evaluate((c) => Math.round(c.scrollTop / (c.firstElementChild as HTMLElement).offsetHeight));
   const handle = await page.locator('section').nth(index).locator('iframe').elementHandle();
   return (await handle!.contentFrame())!;
