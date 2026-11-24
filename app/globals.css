@@ -93,6 +93,11 @@ html body[data-scroll-locked] {
   }
 }
 
+/* The watch player in full screen (components/youtube-player.tsx): the page behind it stays put, without a scrollbar */
+html[data-player-full] {
+  overflow: hidden !important;
+}
+
 /* Prevent any element from causing horizontal overflow. In the base layer so that max-w-* utilities
    (dialog widths and the like) still win: unlayered, this rule overrode them and made every dialog
    full-width on desktop. */

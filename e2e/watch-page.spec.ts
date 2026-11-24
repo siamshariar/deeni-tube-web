@@ -83,7 +83,7 @@ test.describe('Watch page', () => {
     await end();
     await expect(page.getByText(/^Up next in \d$/)).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
-    const replay = page.getByRole('button', { name: 'Replay' });
+    const replay = page.getByRole('button', { name: 'Replay', exact: true });
     await expect(replay).toBeVisible();
     await replay.click();
     await expect(replay).toHaveCount(0);
@@ -106,7 +106,7 @@ test.describe('Watch page', () => {
     await page.getByRole('switch', { name: 'Autoplay is on' }).click({ force: true });
     await expect(page.getByRole('switch', { name: 'Autoplay is off' })).toBeAttached();
     await frame.evaluate(() => (window as unknown as { __end: () => void }).__end());
-    await expect(page.getByRole('button', { name: 'Replay' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Replay', exact: true })).toBeVisible();
     await expect(page.getByText(/Up next in/)).toHaveCount(0);
   });
 
@@ -136,7 +136,7 @@ test.describe('Watch page', () => {
     const frame = await playerFrame(page);
     await frame.evaluate(() => (window as unknown as { __end: () => void }).__end());
     await expect(title).not.toHaveText(first);
-    await expect(page.getByRole('button', { name: 'Replay' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Replay', exact: true })).toHaveCount(0);
   });
 
   test('a link to a short opens right on it, without loading the first short', async ({ page }) => {

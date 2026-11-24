@@ -317,15 +317,25 @@ export function setHostCropped(on: boolean) {
 }
 /** Fill the window (the page player's full screen). */
 export function setHostFullscreen(on: boolean) {
+  if (fullscreen === on) return;
   fullscreen = on;
+  applyCrop();
   place();
 }
 
 function applyCrop() {
   if (!frame) return;
+  frame.style.transform = "";
   if (attached?.fit === "short") return place(); // sized in place()
   frame.style.left = "0";
   frame.style.width = "100%";
+  // Full screen on a screen wider than 16:9 (phones): no wider than the video, or the crop would cut into it
+  if (fullscreen) {
+    frame.style.left = "50%";
+    frame.style.transform = "translateX(-50%)";
+    frame.style.width = "min(100%, 177.78vh)";
+    frame.style.width = "min(100%, 177.78dvh)"; // where the browser knows dvh
+  }
   frame.style.top = cropped ? `-${CROP}px` : "0";
   frame.style.height = cropped ? `calc(100% + ${CROP * 2}px)` : "100%";
 }

@@ -9,14 +9,16 @@ import { Page } from '@playwright/test';
 // player already playing (the tap on a video, lib/player-host.ts) gives it sound for good.
 // `clock`: time runs while it plays (reported every 250ms), as in a real player; otherwise it only moves on seeks.
 // `trouble`: asked for each player that loads (its video's id) — 'stalled': it answers but its stream never starts
-// (state 3), 'unavailable': YouTube's error 150, 'silent': it never answers. In the frame, window.__troubles[id] does the
+// (state 3), 'unavailable': YouTube's error 150, 'silent': it never answers, 'deaf': it answers but doesn't act on playVideo.
+// `pauses`: a Safari whose placeholder never started: sound isn't allowed, and a video asked to play with it goes to
+// "paused" without saying it was blocked (seen with real YouTube). In the frame, window.__troubles[id] does the
 // same for videos loaded later (loadVideoById).
-// In the frame: window.__player() → { playing, muted, videoId }, window.__end() ends the video,
+// In the frame: window.__player() → { playing, muted, videoId }, window.__end() ends the video, window.__break(t) breaks its stream off,
 // window.__commands lists the commands received (window.__log: with their arguments).
 
-export type Trouble = 'stalled' | 'unavailable' | 'silent';
+export type Trouble = 'stalled' | 'unavailable' | 'silent' | 'deaf';
 
-const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, clock: boolean, trouble?: Trouble) => `<!doctype html><html><body><script>
+const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, clock: boolean, trouble?: Trouble, pauses = false) => `<!doctype html><html><body><script>
   const params = new URLSearchParams(location.search);
   let muted = params.get('mute') === '1', state = -1, listening = false, dropFirstPlay = ${dropFirstPlay}, time = 0, rate = 1, volume = 100;
   let videoId = location.pathname.split('/').pop();
@@ -24,7 +26,7 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
   window.__allowSound = ${allowSound};
   window.__commands = [];
   window.__log = [];
-  const ios = ${ios};
+  const ios = ${ios}, pauses = ${pauses};
   let trouble = '${trouble ?? ''}';
   window.__troubles = {};
   const send = (m) => parent.postMessage(JSON.stringify(m), '*');
@@ -39,7 +41,7 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
         send({ event: 'initialDelivery', info: { playerState: -1, videoData: { video_id: videoId } } });
         send({ event: 'onReady' });
         if (trouble === 'unavailable') send({ event: 'onError', info: 150 });
-        if (params.get('autoplay') === '1' && muted) setState(1);
+        if (params.get('autoplay') === '1' && muted && !pauses) setState(1);
       }
       return;
     }
@@ -61,7 +63,8 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
       if (trouble === 'unavailable') { setState(-1, 0); send({ event: 'onError', info: 150 }); return; }
       if (trouble === 'stalled') { setState(3, 0); return; }
       // Loading plays the new video (muted ones always; with sound only if allowed)
-      if (muted || window.__allowSound) setState(1, 0);
+      if (pauses) setState(3, 0);
+      else if (muted || window.__allowSound) setState(1, 0);
       else { setState(-1, 0); if (subscribed.has('onAutoplayBlocked')) send({ event: 'onAutoplayBlocked' }); }
     }
     else if (d.func === 'seekTo') { time = d.args[0]; send({ event: 'infoDelivery', info: info() }); }
@@ -69,8 +72,10 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
     else if (d.func === 'setVolume') volume = d.args[0];
     else if (d.func === 'pauseVideo') { if (state === 1 || state === 3) setState(2); }
     else if (d.func === 'playVideo') {
-      if (trouble === 'unavailable') return;
+      if (trouble === 'unavailable' || trouble === 'deaf') return;
       if (trouble === 'stalled') { setState(3); return; }
+      if (pauses && videoId === 'p3Mrisem6ek') return;                // the placeholder doesn't start
+      if (pauses && !muted) { setState(3); setState(2); return; }
       if (dropFirstPlay) { dropFirstPlay = false; return; }          // a command the player didn't act on
       if (!muted && !window.__allowSound) {                           // the browser blocks sound
         setState(-1);
@@ -89,12 +94,14 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
   if (params.get('start')) time = Number(params.get('start'));
   window.__player = () => ({ playing: state === 1, muted, videoId, time });
   window.__end = () => setState(0, 30);
+  // The stream breaks off: it loads, then YouTube gives up (after 20s with real YouTube), and playVideo doesn't help
+  window.__break = (t, giveUp = true) => { trouble = 'deaf'; setState(3, t); if (giveUp) setState(-1); };
 </script></body></html>`;
 
-export async function useFakeYouTube(page: Page, options: { allowSound?: () => boolean; dropFirstPlay?: boolean; ios?: boolean; clock?: boolean; trouble?: (videoId: string) => Trouble | undefined } = {}) {
+export async function useFakeYouTube(page: Page, options: { allowSound?: () => boolean; dropFirstPlay?: boolean; ios?: boolean; clock?: boolean; trouble?: (videoId: string) => Trouble | undefined; pauses?: boolean } = {}) {
   const allowSound = options.allowSound ?? (() => !options.ios);
   // Shorts use www.youtube.com, the watch pages the privacy-enhanced www.youtube-nocookie.com
   for (const host of ['https://www.youtube.com', 'https://www.youtube-nocookie.com'])
     await page.route(`${host}/embed/**`, (route) =>
-      route.fulfill({ contentType: 'text/html', body: fakePlayer(allowSound(), !!options.dropFirstPlay, !!options.ios, !!options.clock, options.trouble?.(new URL(route.request().url()).pathname.split('/').pop()!)) }));
+      route.fulfill({ contentType: 'text/html', body: fakePlayer(allowSound(), !!options.dropFirstPlay, !!options.ios, !!options.clock, options.trouble?.(new URL(route.request().url()).pathname.split('/').pop()!), !!options.pauses) }));
 }

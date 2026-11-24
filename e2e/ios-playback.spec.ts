@@ -161,6 +161,20 @@ async function expectHostOver(page: Page, index: number) {
   expect(video.y + video.height).toBeGreaterThanOrEqual(b.y + b.height - 0.5);
 }
 
+test.describe('iPhone and Safari: nothing stays stuck on a video page', () => {
+  test("a video Safari leaves paused (it didn't allow its sound) plays muted, with Tap to unmute; so does the next one", async ({ page }) => {
+    test.setTimeout(60_000);
+    await seed(page);
+    await useFakeYouTube(page, { ios: true, pauses: true });
+    await page.goto('/videos/x/v2');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame), { timeout: 15_000 }).toMatchObject({ playing: true, muted: true, videoId: 'UugARckPloo' });
+    await expect(page.getByRole('button', { name: /to unmute/ })).toBeVisible();
+    await frame.evaluate(() => (window as unknown as { __end: () => void }).__end());
+    await expect.poll(() => fake(frame), { timeout: 20_000 }).toMatchObject({ playing: true, videoId: 'gZ3C_UO_tZM' });
+  });
+});
+
 test.describe('iPhone: Shorts with sound', () => {
   test('a tap on Shorts plays the first short with sound in the shared player; the next short keeps the sound', async ({ page }) => {
     await seed(page);
