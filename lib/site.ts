@@ -2,12 +2,14 @@
 // The site's own address and name, for search engines and shared links. The address: NEXT_PUBLIC_SITE_URL if it is set, else
 // the project's production domain on Vercel (so it changes by itself when deeni.tube is connected there), else, for a build made
 // anywhere else, the site's current public address; in development, this computer's.
+/** The site's current public address */
+export const PUBLIC_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://deeni-tube-web.vercel.app").replace(/\/+$/, "");
 const url =
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.NODE_ENV === "production"
-      ? "https://deeni-tube-web.vercel.app"
+      ? PUBLIC_URL
       : "http://localhost:3000");
 export const SITE_URL = url.replace(/\/+$/, "");
 export const SITE_NAME = "Deeni.tube";

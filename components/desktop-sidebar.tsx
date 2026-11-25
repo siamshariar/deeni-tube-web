@@ -1,9 +1,12 @@
 // components/desktop-sidebar.tsx
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
+  Menu,
   PlaySquare,
   Users,
   GraduationCap,
@@ -15,7 +18,9 @@ import {
 import { cn, isActivePath } from "@/lib/utils";
 import { isVideoPath } from "@/lib/video-url";
 import { useHeader } from "@/app/contexts/header-context";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import Logo from "@/components/logo";
 import {
   SidebarItem,
   SidebarExpandedContent,
@@ -28,7 +33,9 @@ export default function DesktopSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   // The page the overlay was opened on; navigating anywhere else closes it
   const [overlayOpenOn, setOverlayOpenOn] = useState<string | null>(null);
-  const overlayOpen = overlayOpenOn !== null && overlayOpenOn === pathname;
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wide = useMediaQuery("(min-width: 768px)"); // (a phone turned upright has no sidebar)
+  const overlayOpen = overlayOpenOn !== null && overlayOpenOn === pathname && wide;
 
   // Overlay mode: video detail pages and playlist detail pages.
   // The sidebar appears as a slide-in overlay — content never shifts.
@@ -56,6 +63,7 @@ export default function DesktopSidebar() {
 
     window.__sidebarToggle = () => {
       if (isOverlayPage) {
+        openerRef.current = document.activeElement as HTMLElement | null;
         setOverlayOpenOn((prev) => (prev === pathname ? null : pathname));
         return;
       }
@@ -85,41 +93,45 @@ export default function DesktopSidebar() {
   const height = headerVisible ? "h-[calc(100vh-56px)]" : "h-screen";
 
   // ── OVERLAY MODE (video & playlist detail pages) ──────────────────────────
-  if (isOverlayPage) {
-    return (
-      <>
-        {/* Backdrop — click to close */}
-        <div
-          className={cn(
-            "hidden md:block fixed inset-0 z-40 bg-black/50 transition-opacity duration-300",
-            headerVisible ? "top-[56px]" : "top-0",
-            overlayOpen
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none"
-          )}
-          onClick={() => setOverlayOpenOn(null)}
-        />
-
-        {/* Slide-in sidebar panel */}
-        <aside
-          aria-label="Main menu"
-          className={cn(
-            "hidden md:flex fixed left-0 w-[calc(240px+var(--sal))] pl-[var(--sal)] bg-background border-r z-50 overflow-y-auto overflow-x-hidden flex-col transition-transform duration-300 ease-in-out yt-scrollbar",
-            top,
-            height,
-            overlayOpen ? "translate-x-0" : "-translate-x-full"
-          )}
+  // YouTube's, measured: over the whole window, also the header, with the menu button and the logo where the header
+  // has them; 240px, no border or shadow, half black behind it, 0.2s. The page stays where it is and the video goes on.
+  // Closed by a click beside it, Escape, the menu button or a link.
+  const closeOverlay = () => setOverlayOpenOn(null);
+  const overlay = (
+    <Dialog.Root open={overlayOpen} onOpenChange={(open) => setOverlayOpenOn(open ? pathname : null)}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 ![animation-duration:200ms] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          // The focus goes back to the menu button
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            openerRef.current?.focus({ preventScroll: true });
+          }}
+          className="fixed inset-y-0 left-0 z-50 flex w-[calc(240px+var(--sal))] flex-col bg-background pl-[var(--sal)] text-foreground outline-none ![animation-duration:200ms] data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:animate-in data-[state=open]:slide-in-from-left"
         >
-          <div className="w-full py-1.5">
-            <SidebarExpandedContent pathname={pathname} />
+          <Dialog.Title className="sr-only">Main menu</Dialog.Title>
+          <div className="flex h-14 flex-shrink-0 items-center gap-4 pl-4">
+            <Dialog.Close className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted active:bg-accent" aria-label="Close the menu">
+              <Menu className="h-6 w-6" />
+            </Dialog.Close>
+            <Link href="/" onClick={closeOverlay}>
+              <Logo height={28} className="h-7 w-auto" />
+            </Link>
           </div>
-        </aside>
-      </>
-    );
-  }
+          <div className="yt-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain py-3">
+            <SidebarExpandedContent pathname={pathname} onLinkClick={closeOverlay} />
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+  if (isOverlayPage) return overlay;
 
   // ── NORMAL MODE (all other pages) ─────────────────────────────────────────
   return (
+    <>
+    {overlay /* closing, after a link in it */}
     <aside
       aria-label="Main menu"
       className={cn(
@@ -129,7 +141,7 @@ export default function DesktopSidebar() {
         height
       )}
     >
-      <div className="w-full py-3 flex flex-col flex-1">
+      <div className={cn("flex w-full flex-1 flex-col", isCollapsed ? "py-1" : "py-3")}>
         {isCollapsed ? (
           <>
             {/* Mini collapsed items — order: Home, Shorts, Channels, Scholars, You, Playlists, Categories */}
@@ -152,5 +164,6 @@ export default function DesktopSidebar() {
         )}
       </div>
     </aside>
+    </>
   );
 }

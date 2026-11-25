@@ -668,7 +668,7 @@ export function YouTubePlayer({
     if (!started) return;
     // Off says so too: YouTube remembers on its own that captions were on
     if (!captions || !choice) return command(...HIDE_CAPTIONS);
-    noteUntilRef.current = Date.now() + CAPTION_NOTE_MS;
+    noteUntilRef.current = Date.now() + 2500 + CAPTION_NOTE_MS;
     const show = () => {
       const layout = placeCaptionsRef.current();
       [...showCaptionsCommands(choice, layout), ...moveCaptionsCommands(iframeRef.current, layout)].forEach((c) => command(...c));
@@ -677,7 +677,7 @@ export function YouTubePlayer({
     // Again once YouTube's captions part has loaded (unless it has said so already)
     const timers = reported ? [] : [700, 2500].map((ms) => setTimeout(show, ms));
     // After the note: the box as YouTube's
-    timers.push(setTimeout(() => moveCaptionsCommands(iframeRef.current, placeCaptionsRef.current()).forEach((c) => command(...c)), CAPTION_NOTE_MS + 50));
+    timers.push(setTimeout(() => moveCaptionsCommands(iframeRef.current, placeCaptionsRef.current()).forEach((c) => command(...c)), 2500 + CAPTION_NOTE_MS + 50));
     return () => timers.forEach(clearTimeout);
   }, [started, captions, choice, reported, command]);
   useEffect(() => {

@@ -192,3 +192,55 @@ move; no picture of it was got.
 | The note "Click ⚙ for settings" | not shown | not shown |
 
 Captions were on there already; the track was put back (Bangla, not translated), and the tab closed. The computer's site places a top caption at 85px (69px and 2%).
+
+## After the push: Shorts' captions for both of YouTube's kinds, and shared links
+
+Found while moving the phone's captions up: YouTube's embed gets one of two caption files for Shorts. Of 13 sessions, 12 placed them at the bottom of their box (6 rolling up,
+4 in the new style...) and 1 at its top (`apPoint` 0), which is what its own mobile site shows. With the box that reaches far above the short all the time (the version pushed before),
+the second kind was out of sight. Now (real player, one captured file of each kind):
+
+| Kind of file | 360x660 | 450x800 | 712x1082 | held sideways (163x290) |
+|---|---|---|---|---|
+| bottom | 158-190px | 183-223px | 256-320px | 69-125px |
+| top (in sight after YouTube's note, 8-11s) | 61-93px | 61-101px | 63-127px | 6-58px |
+| new style | 158-190px | 183-223px | 256-320px | 69-125px |
+
+The text is YouTube's size (12, 15, 23.7px) in all of them; 67px for the bottom kind isn't possible without hiding the top kind: YouTube's largest text step is 4.
+
+WhatsApp: the live pages give WhatsApp's and Facebook's own user agents (also for a part of the page) the title, description and picture in the first 4 KB of the head; all 86 pictures are
+under 250 KB. Links shared from localhost were localhost's, which no app can open: they are the public address now.
+
+## Also asked: the side menu on the video page, as on YouTube (web)
+
+| What (1440x900) | YouTube | Before | Now |
+|---|---|---|---|
+| Where | over the whole window, also the header | under the header | as YouTube's |
+| Its top | menu button at 16,8 (40px) and the logo | none | the same places as the header's (16,8 and 72,14) |
+| Panel | 240px, no border or shadow | 240px, a border | 240px, none |
+| Behind it | rgba(0, 0, 0, 0.5), the whole window | under the header only | the whole window |
+| Speed | 0.2s ease | 0.3s | 0.2s ease |
+| Page while open | locked, the video goes on | scrolled | locked, the video goes on |
+| Closes with | Escape, a click beside it, the button | a click beside it, the button | Escape too; the focus goes back to the menu button |
+| Rows | 204x40 at 12, icon at 24, text at 72 | 216x40 | the same |
+| Section headings / lines | 16px/22px in 32px; 20% lines | 34px; lighter lines | the same |
+| Mini menu (other pages) | tiles 64x76, the first at 60 | 64x74, the first at 68 | the same |
+
+Tests: `e2e/side-menu.spec.ts` (4 passed). Accessibility of the open menu, light and dark: 0 problems.
+
+## Also asked: long captions left the card
+
+Reproduced with long captions of five kinds in the real player: in the first 5 seconds those in the middle of their box (YouTube's new style, translated ones) went over the left edge, then they were
+inside. Cause: the box of the first seconds was as wide as the text in its usual size needs. The same on the phone's and tablet's video player; not on a computer's, nor on Shorts.
+
+| Where (first 5 seconds, distance from the left edge) | Before | Now |
+|---|---|---|
+| Card, computer (373x210) | -59px | 28px |
+| Card, phone (360x203) | -37px | inside (13px or more) |
+| Card, 320px phone / narrow window / tablet | -32 / -56 / -34px | inside |
+| Video, phone / tablet | -57 / -129px | 13 / 22px |
+
+Later than that: 14px at the left and 63px at the right in a card; YouTube's own card 17 and 65px (computer), 14 and 63px (phone).
+YouTube's phone card has 1.5 times the text in 4 of 5 sessions (1.125 in one): ours 1.5.
+
+
+Full run with all of the above (production build): 623 passed, 195 skipped, 0 failed (818). Accessibility: 92 scans, 0 problems. Type check and lint: 0.

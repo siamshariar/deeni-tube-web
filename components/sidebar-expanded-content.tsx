@@ -34,7 +34,7 @@ interface SidebarItemProps {
 }
 
 export function SidebarItem({ href, icon, label, active, collapsed, onClick }: SidebarItemProps) {
-  // YouTube guide entry: 40px rows, Roboto 14px/20px (500 for the current page), 24px outline icons with a
+  // YouTube guide entry: 204x40px rows (12px from the left, 24px from the right), Roboto 14px/20px (500 for the current page), 24px outline icons with a
   // thin 1.5px line (2px for the current page, where YouTube shows a filled icon); the mini guide uses tiles
   // with 10px labels
   return (
@@ -47,7 +47,7 @@ export function SidebarItem({ href, icon, label, active, collapsed, onClick }: S
         active ? "[&_svg]:[stroke-width:2]" : "[&_svg]:[stroke-width:1.5]",
         collapsed
           ? "mx-1 flex-col justify-center gap-1.5 px-1 pb-3.5 pt-4"
-          : "mx-3 h-10 gap-6 px-3 text-sm",
+          : "ml-3 mr-6 h-10 gap-6 px-3 text-sm",
         active && "bg-muted font-medium hover:bg-accent"
       )}
       title={label}
@@ -56,7 +56,7 @@ export function SidebarItem({ href, icon, label, active, collapsed, onClick }: S
       <span
         className={cn(
           "whitespace-nowrap truncate",
-          collapsed ? "w-full text-center text-[10px] leading-[14px]" : "text-sm leading-5"
+          collapsed ? "w-full text-center text-[10px] leading-4" : "text-sm leading-5"
         )}
       >
         {label}
@@ -85,6 +85,9 @@ export function UserIcon({ className }: { className?: string }) {
   );
 }
 
+// YouTube's sections: 12px above and below a line from edge to edge
+const SECTION = "mt-3 border-t border-foreground/20 pt-3";
+
 // ─── SidebarExpandedContent ───────────────────────────────────────────────────
 
 const FOOTER_LINKS = [
@@ -108,18 +111,18 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
       <SidebarItem href="/shorts" icon={<PlaySquare className="h-5 w-5 flex-shrink-0" />} label="Shorts" active={isActivePath(pathname, "/shorts")} collapsed={false} onClick={onLinkClick} />
 
       {/* Browse */}
-      <div className="border-t mt-3 pt-3">
+      <div className={SECTION}>
         <SidebarItem href="/channels" icon={<Users className="h-5 w-5 flex-shrink-0" />} label="Channels" active={isActivePath(pathname, "/channels")} collapsed={false} onClick={onLinkClick} />
         <SidebarItem href="/scholars" icon={<GraduationCap className="h-5 w-5 flex-shrink-0" />} label="Scholars" active={isActivePath(pathname, "/scholars")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* You */}
-      <div className="border-t mt-3 pt-3">
+      <div className={SECTION}>
         {/* "You ›" opens the You page, as on YouTube */}
         <Link
           href="/you"
           onClick={onLinkClick}
-          className="mx-3 flex h-10 items-center gap-2 rounded-[10px] px-3 transition-colors duration-150 hover:bg-muted active:bg-accent"
+          className="ml-3 mr-6 flex h-10 items-center gap-2 rounded-[10px] px-3 transition-colors duration-150 hover:bg-muted active:bg-accent"
         >
           <h3 className="whitespace-nowrap text-base font-medium leading-[22px]">You</h3>
           <ChevronRight className="h-4 w-4 [stroke-width:1.5]" aria-hidden="true" />
@@ -134,29 +137,29 @@ export function SidebarExpandedContent({ pathname, onLinkClick }: SidebarExpande
       </div>
 
       {/* Explore */}
-      <div className="border-t mt-3 pt-3">
-        <div className="px-6 pb-1.5 pt-1.5">
+      <div className={SECTION}>
+        <div className="px-6 py-[5px]">
           <h3 className="whitespace-nowrap text-base font-medium leading-[22px]">Explore</h3>
         </div>
         <SidebarItem href="/categories" icon={<FolderOpen className="h-5 w-5 flex-shrink-0" />} label="Categories" active={isActivePath(pathname, "/categories")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* More from Deeni.tube */}
-      <div className="border-t mt-3 pt-3">
-        <div className="px-6 pb-1.5 pt-1.5">
+      <div className={SECTION}>
+        <div className="px-6 py-[5px]">
           <h3 className="text-base font-medium leading-[22px]">More from Deeni.tube</h3>
         </div>
         <SidebarItem href="/more" icon={<LayoutGrid className="h-5 w-5 flex-shrink-0" />} label="More" active={isActivePath(pathname, "/more")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Settings */}
-      <div className="border-t mt-3 pt-3">
+      <div className={SECTION}>
         <SidebarItem href="/settings" icon={<Settings className="h-5 w-5 flex-shrink-0" />} label="Settings" active={isActivePath(pathname, "/settings")} collapsed={false} onClick={onLinkClick} />
         <SidebarItem href="/help" icon={<HelpCircle className="h-5 w-5 flex-shrink-0" />} label="Help" active={isActivePath(pathname, "/help")} collapsed={false} onClick={onLinkClick} />
       </div>
 
       {/* Footer, as on YouTube: small grey links, then the copyright (mt-auto keeps it at the bottom) */}
-      <div className="mt-auto border-t px-6 py-4">
+      <div className="mt-auto border-t border-foreground/20 px-6 py-4">
         <nav aria-label="About Deeni.tube" className="flex flex-wrap gap-x-2 text-[13px] font-medium leading-[18px] text-muted-foreground">
           {FOOTER_LINKS.map((l) => (
             <Link key={l.href} href={l.href} onClick={onLinkClick} className="inline-flex min-h-6 items-center hover:text-foreground">

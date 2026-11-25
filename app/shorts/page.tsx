@@ -16,7 +16,7 @@ import { CCIconOff, CCIconOn, FullscreenIcon } from "@/components/icons/player-i
 import { ResponsiveDialog } from "@/components/responsive-dialog"
 import { savedSound, saveSound } from "@/lib/player-prefs"
 import { CaptionsDialog } from "@/components/captions-dialog"
-import { HIDE_CAPTIONS, languageName, moveCaptionsCommands, reportedCaptions, setCaptionsOn, shortCaptionLayout, showCaptionsCommands, useCaptions, type ReportedCaptions } from "@/lib/captions"
+import { CAPTION_NOTE_MS, HIDE_CAPTIONS, languageName, moveCaptionsCommands, reportedCaptions, setCaptionsOn, shortCaptionLayout, showCaptionsCommands, useCaptions, type ReportedCaptions } from "@/lib/captions"
 
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -1119,27 +1119,34 @@ function ShortsPageContent() {
 
   // Captions (lib/captions): drawn by YouTube, in the short's upper part
   const playingId = startedId && startedId === currentShort?.id ? startedId : null
-  const placeCaptions = useCallback((id: string) => {
+  const placeCaptions = useCallback((id: string, far: boolean) => {
     const frame = videoRefs.current.get(id)
     const box = boxRefs.current.get(id)
     if (!frame || !box) return null
-    return shortCaptionLayout(frame, box, { ratio: shortRatio(shortsData.find((s) => s.id === id)?.videoId ?? "") })
+    const b = box.getBoundingClientRect()
+    const buttons = box.closest("section")?.querySelector("[data-mute-toggle]")?.getBoundingClientRect()
+    // (held sideways the buttons are beside the video)
+    const over = buttons && buttons.right > b.left && buttons.left < b.right
+    return shortCaptionLayout(frame, box, { ratio: shortRatio(shortsData.find((s) => s.id === id)?.videoId ?? ""), head: over ? Math.round(buttons.bottom - b.top) + 2 : 4, far })
   }, [])
   useEffect(() => {
     if (!playingId) return
     const send = (commands: [string, unknown[]][]) => commands.forEach(([func, args]) => ytCommand(videoRefs.current.get(playingId), func, args))
     if (!captions || !captionChoice) return send([HIDE_CAPTIONS])
+    let far = true
     const show = () => {
-      const layout = placeCaptions(playingId)
+      const layout = placeCaptions(playingId, far)
       send([...showCaptionsCommands(captionChoice, layout), ...moveCaptionsCommands(videoRefs.current.get(playingId), layout)])
     }
-    const place = () => send(moveCaptionsCommands(videoRefs.current.get(playingId), placeCaptions(playingId)))
+    const place = () => send(moveCaptionsCommands(videoRefs.current.get(playingId), placeCaptions(playingId, far)))
     show()
     // Again a little later, and whenever YouTube's captions part says it has loaded (captionReport: a slow network); in
     // their place once the title and the buttons are in theirs
     const timers = [setTimeout(place, 600), setTimeout(show, 1200)]
     // (not a translation, which YouTube would fetch again)
     if (!captionChoice.to) timers.push(setTimeout(show, 3000))
+    // After YouTube's note
+    timers.push(setTimeout(() => { far = false; place() }, (captionChoice.to ? 1200 : 3000) + CAPTION_NOTE_MS))
     const box = boxRefs.current.get(playingId)
     const observer = new ResizeObserver(() => timers.push(setTimeout(place, 100), setTimeout(place, 600)))
     if (box) observer.observe(box)
@@ -1699,7 +1706,7 @@ function ShortsPageContent() {
                       type="button"
                       data-mute-toggle
                       onClick={(e) => { e.stopPropagation(); restoreSound() }}
-                      className="absolute left-1/2 top-[136px] z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium low:top-2 low:px-3 low:text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                      className="absolute left-1/2 top-[200px] supports-[width:1cqw]:top-[calc(66px+37.5cqw)] z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium low:!top-2 low:px-3 low:text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/75"
                     >
                       <VolumeX className="h-5 w-5" />
                       <span className="md:hidden">Tap to unmute</span>

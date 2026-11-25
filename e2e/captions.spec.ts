@@ -178,8 +178,11 @@ test.describe('Captions on the watch page', () => {
     const first = await told(frame);
     expect(textSize(first)).toBeCloseTo(text, 0);
     expect(first.box!.top).toBeLessThan(60); // (the video begins at 120)
+    // …and no wider than the place captions have: long ones stay in the player
+    expect(first.box!.left).toBeGreaterThanOrEqual(7);
+    expect(first.box!.left + first.box!.width).toBeLessThanOrEqual(box.width - 48);
     expect(await up(page, frame, BANGLA)).toBe(Math.round(24 + 0.02 * box.height));
-    await expect.poll(async () => (await told(frame)).fontSize, { timeout: 9000 }).toBe(2);
+    await expect.poll(async () => Math.round((await told(frame)).box!.left), { timeout: 9000 }).toBe(8);
     const t = await told(frame);
     expect(textSize(t)).toBeCloseTo(text, 1);
     expect([t.box!.left, t.box!.width].map(Math.round)).toEqual([8, Math.round(box.width) - 64]);
@@ -270,7 +273,7 @@ test.describe('Captions on Shorts', () => {
     return { frame, section };
   };
 
-  for (const [id, ratio] of [['MBxDbbkk0gQ', 9 / 16], ['ihdO_G6Yk0E', 1]] as const) test(`YouTube's text at YouTube's place (${ratio === 1 ? 'a square video' : '9:16'}): 2% and 69px from the top; its note and bars out of sight; nothing else changes`, async ({ page }) => {
+  for (const [id, ratio] of [['MBxDbbkk0gQ', 9 / 16], ['ihdO_G6Yk0E', 1]] as const) test(`YouTube's text in the upper part (${ratio === 1 ? 'a square video' : '9:16'}), for both of its kinds of captions; its note and bars out of sight; nothing else changes`, async ({ page }) => {
     const { frame, section } = await short(page, id);
     const around = () => section.evaluate((s) => [...s.querySelectorAll('[data-short-shade], [data-short-info]')].map((e) => [getComputedStyle(e).opacity, getComputedStyle(e).backgroundImage, getComputedStyle(e, '::before').content]));
     await expect.poll(async () => (await around())[1]?.[0]).toBe('1');
@@ -280,21 +283,28 @@ test.describe('Captions on Shorts', () => {
     await expect.poll(async () => (await told(frame, ratio)).lang).toBe('bn');
     const iframe = (await section.locator('iframe').boundingBox())!;
     const box = (await section.locator('.shorts-player-box').boundingBox())!;
-    for (const wait of [0, 7000]) {
-      await page.waitForTimeout(wait);
+    const mute = (await section.locator('[data-mute-toggle]').first().boundingBox())!;
+    const text = box.width / 30; // 16px in a short 480px wide
+    const ends: number[] = [];
+    const look = async () => {
       const t = await told(frame, ratio);
       const scale = iframe.width / t.frame[0];
-      // 16px in a short 480px wide
-      expect(textSize(t, ratio) * scale).toBeCloseTo(box.width / 30, 0);
-      // Its box reaches far above the short (YouTube's note is at its top); its second line ends where YouTube's does
-      expect(iframe.y + t.box!.top * scale).toBeLessThan(box.y - 60);
-      const end = iframe.y + (t.box!.bottom - 0.02 * t.box!.height) * scale - box.y;
-      expect(Math.abs(end - (0.02 * box.height + 69 + 2.66 * (box.width / 30)))).toBeLessThan(3);
-      // In the middle of the short, clear of the buttons at its top
+      expect(textSize(t, ratio) * scale).toBeCloseTo(text, 0);
       expect(Math.abs(iframe.x + (t.box!.left + t.box!.width / 2) * scale - (box.x + box.width / 2))).toBeLessThan(3);
-      const mute = (await section.locator('[data-mute-toggle]').first().boundingBox())!;
-      expect(box.y + 0.02 * box.height + 69).toBeGreaterThan(mute.y + mute.height);
-    }
+      // Captions at the bottom of their box end here
+      ends.push(iframe.y + (t.box!.bottom - 0.02 * t.box!.height) * scale - box.y);
+      return { top: iframe.y + t.box!.top * scale, height: t.box!.height * scale };
+    };
+    // At first the box reaches far above the short (YouTube's note is at its top)
+    expect((await look()).top).toBeLessThan(box.y - 60);
+    await page.waitForTimeout(6000);
+    // Then it's right under the buttons: captions at its top are in sight too, all in the short's upper part
+    const near = await look();
+    expect(near.top).toBeGreaterThanOrEqual(mute.y + mute.height);
+    expect(near.top).toBeLessThan(mute.y + mute.height + 8);
+    expect(Math.abs(near.height - text * 11.25)).toBeLessThan(3);
+    expect(Math.abs(ends[0] - ends[1])).toBeLessThan(3); // those at the bottom stay where they are
+    expect(ends[1] / box.height).toBeLessThan(0.36);
     expect(await around()).toEqual(before);
     // The player reaches 120px past its video at the top and bottom (YouTube's title, logo and buttons)
     const cover = (await section.locator('.shorts-poster').boundingBox())!;
@@ -338,7 +348,7 @@ test.describe('Captions in the cards', () => {
     const button = preview.getByRole('button', { name: /^Subtitles/ });
     await expect(button).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(async () => (await told(frame)).lang).not.toBe(null);
-    expect(textSize(await told(frame))).toBeCloseTo((box.height / 360) * 16 * (isMobile ? 1.125 : 1.5), 0);
+    expect(textSize(await told(frame))).toBeCloseTo((box.height / 360) * 16 * 1.5, 0);
     // Under the volume, of its size
     const [v, c] = [(await preview.getByRole('button', { name: 'Unmute' }).boundingBox())!, (await button.boundingBox())!];
     expect([c.width, c.height, Math.round(c.x - v.x), Math.round(c.y - v.y)]).toEqual([48, 48, 0, 48]);
@@ -350,6 +360,20 @@ test.describe('Captions in the cards', () => {
     expect(await page.evaluate(() => [localStorage.getItem('deeni-preview-captions'), localStorage.getItem('deeni-captions')])).toEqual(['{"on":false}', null]); // the watch page's own switch is another
     if (isMobile) await button.tap(); else await button.click();
     await expect.poll(async () => (await told(frame)).lang).not.toBe(null);
+  });
+
+  test('long captions stay in the card, also in the first seconds', async ({ page, isMobile }) => {
+    const { preview, frame } = await card(page, isMobile);
+    await expect.poll(async () => (await told(frame)).lang).not.toBe(null);
+    const iframe = (await preview.locator('iframe').boundingBox())!;
+    const box = (await preview.locator('iframe').locator('..').boundingBox())!;
+    for (const wait of [0, 6500]) {
+      await page.waitForTimeout(wait);
+      const t = (await told(frame)).box!;
+      // (captions in the middle of their box may be 96% as wide as it)
+      expect(iframe.x + t.left + 0.02 * t.width).toBeGreaterThanOrEqual(box.x + 8);
+      expect(iframe.x + t.left + 0.98 * t.width).toBeLessThanOrEqual(box.x + box.width - 48);
+    }
   });
 
   test('off stays off', async ({ page, isMobile }) => {

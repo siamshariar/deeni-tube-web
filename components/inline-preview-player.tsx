@@ -244,7 +244,7 @@ export default function PreviewLayer({
     if (!captions || !choice) return send(...HIDE_CAPTIONS);
     // (YouTube's note isn't in its own cards: out of sight while it may be there)
     let far = true;
-    const layout = () => captionLayout(frame, box, { ratio: findVideo(videoId)?.ratio, style: CARD_CAPTIONS[mode], far, rollup: choice.track.auto });
+    const layout = () => captionLayout(frame, box, { ratio: findVideo(videoId)?.ratio, style: CARD_CAPTIONS, far, rollup: choice.track.auto });
     const show = () => {
       const at = layout();
       [...showCaptionsCommands(choice, at), ...moveCaptionsCommands(frame, at)].forEach((c) => send(...c));
@@ -252,9 +252,9 @@ export default function PreviewLayer({
     show();
     // Again once YouTube's captions part has loaded (a translation only once more: YouTube fetches it each time)
     const timers = (choice.to ? [1200] : [700, 2500]).map((ms) => setTimeout(show, ms));
-    timers.push(setTimeout(() => { far = false; moveCaptionsCommands(frame, layout()).forEach((c) => send(...c)); }, CAPTION_NOTE_MS));
+    timers.push(setTimeout(() => { far = false; moveCaptionsCommands(frame, layout()).forEach((c) => send(...c)); }, 2500 + CAPTION_NOTE_MS));
     return () => timers.forEach(clearTimeout);
-  }, [playing, captions, choice, mode, videoId]);
+  }, [playing, captions, choice, videoId]);
   const toggleCaptions = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();

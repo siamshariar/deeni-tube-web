@@ -112,24 +112,25 @@ type CaptionLayout = { position: { top: number; left: number; bottom: number; ri
 
 /**
  * How YouTube shows captions (all measured on its own pages): `times` its text size of 16px in a player 360px high, by the
- * embed's `steps` of a quarter (`least`: but not under this) (YouTube moves its own captions to the left for those: `left`); the px
- * it keeps free under them (beside the 2%) and at their right; `edge`: around them, a clear border we can't draw; where its
- * own captions begin (`left`, by the width they have). They don't move for the controls where `stays`.
+ * embed's `steps` of a quarter (YouTube moves its own captions to the left for those); the px
+ * it keeps free under them (beside the 2%) and at their right; `edge`: around them, a clear border we can't draw. They don't
+ * move for the controls where `stays`.
  */
-export type CaptionStyle = { times: number; least?: number; steps: number; up: number; right: number; edge: number; left: (width: number) => number; stays?: boolean };
-const mobile = { steps: 2, up: 16, right: 48, edge: 8, left: (width: number) => 9 + 0.0408 * width };
+export type CaptionStyle = { times: number; steps: number; up: number; right: number; edge: number; stays?: boolean };
+const mobile = { steps: 2, up: 16, right: 48, edge: 8 };
 /** youtube.com, also on an iPad */
-export const DESKTOP_CAPTIONS: CaptionStyle = { times: 1, steps: 0, up: 0, right: 0, edge: 0, left: (width) => 0.212 * width };
+export const DESKTOP_CAPTIONS: CaptionStyle = { times: 1, steps: 0, up: 0, right: 0, edge: 0 };
 /** m.youtube.com: phones and Android tablets */
 export const MOBILE_CAPTIONS: CaptionStyle = { ...mobile, times: 1.5, stays: true };
-/** The previews in cards */
-export const CARD_CAPTIONS: Record<"mouse" | "touch", CaptionStyle> = { mouse: { ...mobile, times: 1.5 }, touch: { ...mobile, times: 1.125, least: 9 } };
+/** The previews in cards (a few visitors' phones have 1.125 times) */
+export const CARD_CAPTIONS: CaptionStyle = { ...mobile, times: 1.5 };
 
 /** Which site this device gets from YouTube (an iPad says it's a Mac) */
 export const captionStyle = (canHover: boolean) => (canHover || /Macintosh/.test(navigator.userAgent) ? DESKTOP_CAPTIONS : MOBILE_CAPTIONS);
 
-/** For a moment after captions start YouTube writes a note at the top of their box ("Click ⚙ for settings") */
-export const CAPTION_NOTE_MS = 5000;
+/** For 2 seconds after it has loaded a caption file YouTube writes a note at the top of their box ("Click ⚙ for settings"): gone
+ *  this long after the last time they were asked for */
+export const CAPTION_NOTE_MS = 2500;
 
 /** The frame and the visible box around it, as they are on the screen now, and the box's place as YouTube takes it */
 function measure(frame: HTMLElement, box: HTMLElement, ratio: number) {
@@ -172,7 +173,7 @@ export function captionLayout(
   if (!m) return null;
   const { b, w, scale } = m;
   const seen = Math.min(b.height / scale, m.videoH);
-  const text = Math.max((seen / 360) * 16 * style.times, (style.least ?? 0) / scale);
+  const text = (seen / 360) * 16 * style.times;
   const left = Math.max(0, m.x(b.left));
   const right = Math.min(w, m.x(b.right - style.right));
   const edge = style.edge / scale;
@@ -183,41 +184,47 @@ export function captionLayout(
     const end = bottom + BOTTOM * (height - seen);
     return { position: m.position(left + edge, right - edge, end - height, end), fontSize: style.steps };
   }
-  const width = m.widthFor(text);
+  // Never wider than the place they have, or captions in the middle (YouTube's new style, others' captions) leave the box:
+  // its text in larger steps needs a narrower box
+  const room = right - left - 2 * edge;
+  const steps = [style.steps, 4].find((n) => m.widthFor(text / (1 + 0.25 * n)) <= room) ?? 4;
+  const width = m.widthFor(text / (1 + 0.25 * steps));
   const height = Math.max(m.heightOver(width), (bottom - m.y(b.top) + 130 / scale) / (1 - BOTTOM));
-  const x0 = left + (rollup ? style.left((right - left) * scale) / scale - ROLLUP_LEFT * width : (right - left - width) / 2);
+  const x0 = left + edge + (room - width) * (rollup && !steps ? ROLLUP_LEFT : 0.5);
   const end = bottom + BOTTOM * (height - seen);
-  return { position: m.position(x0, x0 + width, end - height, end), fontSize: 0 };
+  return { position: m.position(x0, x0 + width, end - height, end), fontSize: steps };
 }
 
 // ─── Shorts ───────────────────────────────────────────────────────────────────
 
-/** A short's captions begin here from its top, as YouTube's Shorts draw captions at the top (its rule: 69px, and 2% of the height) */
-const SHORT_TOP = 69;
-/** Two lines of them, in parts of the text size */
-const SHORT_LINES = 2 * 1.33;
 /** Text under this size only in a short this narrow (a phone held sideways) is made larger */
 const NARROW_SHORT = 280;
 const NARROW_TEXT = 11;
 
 /**
- * A short's captions: YouTube's text (16px in a short 480px wide, a square one too) at YouTube's place. Its embed draws them
- * at the bottom of their box, so ours ends under their second line. The box is as wide as the short and reaches far above it,
- * which keeps YouTube's note ("Click ⚙ for settings", not on its own Shorts) out of sight.
+ * A short's captions: YouTube's text (16px in a short 480px wide, a square one too), right under our buttons (`head`: px from
+ * its top). YouTube's own Shorts show them at the top, and its embed gets one of two files, which nothing tells the page: most
+ * visitors' place them at the bottom of their box, some visitors' at its top (as its own pages). So the box is as low as that
+ * text allows (its largest step): both stand in the short's upper part, and neither is out of sight. `far`: while YouTube's note
+ * ("Click ⚙ for settings", not on its own Shorts) may be there, a box that ends its captions in the same place and reaches far
+ * above the short: the note is out of sight (and those at the top until it's gone).
  */
-export function shortCaptionLayout(frame: HTMLElement, box: HTMLElement, { ratio = 9 / 16 } = {}): CaptionLayout | null {
+export function shortCaptionLayout(frame: HTMLElement, box: HTMLElement, { ratio = 9 / 16, head = 0, far = false } = {}): CaptionLayout | null {
   const m = measure(frame, box, ratio);
   if (!m) return null;
   const { b, scale } = m;
-  const text = b.width / 30;
-  const fontSize = b.width < NARROW_SHORT ? Math.max(0, Math.min(4, Math.ceil((NARROW_TEXT / text - 1) / 0.25))) : 0;
+  const text = Math.max(b.width / 30, b.width < NARROW_SHORT ? NARROW_TEXT : 0);
+  const steps = 4;
+  const low = ((text / (1 + 0.25 * steps)) * 360) / 16;
+  const top = b.top + head;
+  // (four fifths of the width: their lines break where YouTube's do)
+  if (!far) return { position: m.position(m.x(b.left + 0.1 * b.width), m.x(b.right - 0.1 * b.width), m.y(top), m.y(top + low)), fontSize: steps };
+  const end = m.y(top + low * (1 - BOTTOM));
   const width = m.widthFor(text / scale);
-  const end = m.y(b.top + BOTTOM * b.height + SHORT_TOP + SHORT_LINES * text * (1 + 0.25 * fontSize));
-  // Out of sight: above the short, and above the frame around it
   const height = Math.max(m.heightOver(width), (end - m.y(b.top) + 130 / scale) / (1 - BOTTOM));
-  const bottom = end + BOTTOM * height;
   const middle = m.x(b.left + b.width / 2);
-  return { position: m.position(middle - width / 2, middle + width / 2, bottom - height, bottom), fontSize };
+  const bottom = end + BOTTOM * height;
+  return { position: m.position(middle - width / 2, middle + width / 2, bottom - height, bottom), fontSize: 0 };
 }
 
 type Command = [func: string, args: unknown[]];

@@ -207,6 +207,7 @@ test.describe('Share', () => {
       expect(url.host + url.pathname, name).toBe(host);
       const said = decodeURIComponent(url.search);
       expect(said, name).toContain(`/${V1}`);
+      expect(said, name).toContain('https://deeni-tube-web.vercel.app/videos/'); // not localhost, which nobody else can open
       if (!['Facebook', 'LinkedIn'].includes(name)) expect(said.replaceAll('+', ' '), name).toContain(title.slice(0, 20));
     });
     expect(new URL(opened[Object.keys(HOSTS).indexOf('Pinterest')]).searchParams.get('media')).toContain(V1);
@@ -241,7 +242,7 @@ test.describe('Share', () => {
     const dialog = page.getByRole('dialog', { name: 'Share' });
     await dialog.getByRole('button', { name: 'Copy' }).click();
     await expect(dialog.getByRole('button', { name: 'Copied' })).toBeVisible();
-    expect(await page.evaluate(() => (window as unknown as { __copied: string }).__copied)).toContain('/channels/monzur');
+    expect(await page.evaluate(() => (window as unknown as { __copied: string }).__copied)).toBe('https://deeni-tube-web.vercel.app/channels/monzur');
   });
 
   test('an app that isn\'t there says so', async ({ page }) => {
