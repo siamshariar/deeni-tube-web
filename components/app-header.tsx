@@ -1,17 +1,26 @@
 // components/app-header.tsx
 "use client";
 
+import { loadRecentSearches, saveRecentSearches } from "@/lib/recent-searches";
 import { useState, useEffect, useRef } from "react";
 import Logo from "@/components/logo";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Search, Mic, X, UserCircle, History, Menu } from "lucide-react";
+import { Search, X, UserCircle, History, Menu } from "lucide-react";
+import { MicIcon } from "@/components/icons/action-icons";
 import { Button } from "@/components/ui/button";
 import AccountDropdown from "@/components/account-dropdown";
 import NotificationDropdown from "@/components/notification-dropdown";
-import { VoiceSearchDialog } from "@/components/voice-search";
+import { openVoice } from "@/lib/voice";
 import { cn, isActivePath } from "@/lib/utils";
 import { useHeader } from "@/app/contexts/header-context";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { THEATER_SCREENS, useTheater } from "@/lib/theater";
+import { isShortsPath } from "@/lib/share-path";
+import { isVideoPath } from "@/lib/video-url";
+
+// A 24px icon in a 48px circle
+const ICON_BUTTON = "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-colors active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
 export default function AppHeader() {
   const router = useRouter();
@@ -25,7 +34,11 @@ export default function AppHeader() {
   const [showDesktopRecent, setShowDesktopRecent] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const desktopSearchRef = useRef<HTMLDivElement>(null);
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  // Theater mode: the header over the player is dark in the light theme too, as on YouTube
+  const barRef = useRef<HTMLElement>(null);
+  const theater = useTheater();
+  const inTheater = useMediaQuery(THEATER_SCREENS) && theater && (isVideoPath(pathname) || !!pathname?.startsWith("/playlists/"));
+  useEffect(() => { barRef.current?.classList.toggle("dark", inTheater); }, [inTheater]);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -54,15 +67,6 @@ export default function AppHeader() {
     if (q) setDesktopSearchQuery(q);
   }, [pathname]);
 
-  const loadRecentSearches = () => {
-    try {
-      const stored = localStorage.getItem("recentSearches");
-      setRecentSearches(stored ? JSON.parse(stored) : []);
-    } catch {
-      setRecentSearches([]);
-    }
-  };
-
   useEffect(() => {
     if (!showDesktopRecent) return;
     const handler = (e: MouseEvent) => {
@@ -78,37 +82,38 @@ export default function AppHeader() {
     e.preventDefault();
     const q = desktopSearchQuery.trim();
     if (!q) return;
-    try {
-      const stored = localStorage.getItem("recentSearches");
-      let searches: string[] = stored ? JSON.parse(stored) : [];
-      searches = [q, ...searches.filter(s => s !== q)].slice(0, 8);
-      localStorage.setItem("recentSearches", JSON.stringify(searches));
-    } catch {}
+    saveRecentSearches([q, ...loadRecentSearches().filter(s => s !== q)].slice(0, 8));
     router.push(`/search?q=${encodeURIComponent(q)}`);
     setShowDesktopRecent(false);
+    searchRef.current?.blur();
   };
 
+  const searchRef = useRef<HTMLInputElement>(null);
+  const openRecent = () => {
+    setRecentSearches(loadRecentSearches());
+    setShowDesktopRecent(true);
+  };
+  // What was typed narrows the list, as on YouTube
+  const typed = desktopSearchQuery.trim().toLowerCase();
+  const shownRecent = recentSearches.filter((s) => s.toLowerCase().includes(typed));
+
   const handleRecentClick = (search: string) => {
+    searchRef.current?.blur();
     setDesktopSearchQuery(search);
     setShowDesktopRecent(false);
-    try {
-      const stored = localStorage.getItem("recentSearches");
-      let searches: string[] = stored ? JSON.parse(stored) : [];
-      searches = [search, ...searches.filter(s => s !== search)].slice(0, 8);
-      localStorage.setItem("recentSearches", JSON.stringify(searches));
-    } catch {}
+    saveRecentSearches([search, ...loadRecentSearches().filter(s => s !== search)].slice(0, 8));
     router.push(`/search?q=${encodeURIComponent(search)}`);
   };
 
   const removeRecent = (search: string) => {
     const updated = recentSearches.filter(s => s !== search);
     setRecentSearches(updated);
-    try { localStorage.setItem("recentSearches", JSON.stringify(updated)); } catch {}
+    saveRecentSearches(updated);
   };
 
   const clearRecent = () => {
     setRecentSearches([]);
-    try { localStorage.removeItem("recentSearches"); } catch {}
+    saveRecentSearches([]);
   };
 
   const toggleSidebar = () => {
@@ -121,17 +126,15 @@ export default function AppHeader() {
   if (pathname === "/signin") return null;
 
   const userArea = (
-    <div className="flex items-center gap-1 flex-shrink-0 min-w-[36px] justify-center">
+    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center">
       {!authLoaded ? (
-        <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+        <div className="h-6 w-6 rounded-full bg-muted animate-pulse" />
       ) : isLoggedIn ? (
         <AccountDropdown />
       ) : (
-        <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-          <Link href="/signin" aria-label="Sign in">
-            <UserCircle className="h-6 w-6" />
-          </Link>
-        </Button>
+        <Link href="/signin" aria-label="Sign in" className={ICON_BUTTON}>
+          <UserCircle className="h-6 w-6" />
+        </Link>
       )}
     </div>
   );
@@ -142,25 +145,24 @@ export default function AppHeader() {
       <header
         className={cn(
           "safe-x md:hidden fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] transition-transform duration-300 ease-in-out",
-          (!headerVisible || pathname === "/shorts") && "-translate-y-full"
+          (!headerVisible || isShortsPath(pathname)) && "-translate-y-full"
         )}
       >
-        <div className="flex items-center justify-between px-2 py-2 w-full h-14">
-          <Link href="/" className="min-w-0 pl-1">
+        {/* (m.youtube.com's: 24px icons and avatar in 48px, the last one 12px from the edge) */}
+        <div className="flex items-center justify-between pl-3 w-full h-14">
+          <Link href="/" className="min-w-0">
             <Logo height={24} className="h-6 w-auto max-w-full object-contain object-left" />
           </Link>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Search icon → opens global mobile search modal directly (no page nav) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 rounded-full"
-              aria-label="Search"
-              onClick={() => window.dispatchEvent(new CustomEvent("open-search-modal"))}
-            >
+          <div className="flex items-center flex-shrink-0">
+            {/* Search icon → opens the phone search screen directly (no page nav) */}
+            <button type="button" aria-label="Search" onClick={() => window.dispatchEvent(new CustomEvent("open-search-modal"))} className={ICON_BUTTON}>
               <Search className="h-6 w-6" />
-            </Button>
+            </button>
+            {/* (narrower phones have it on the search screen, as on YouTube's mobile site) */}
+            <button type="button" aria-label="Search with your voice" onClick={() => openVoice(handleRecentClick)} className={cn(ICON_BUTTON, "hidden min-[480px]:flex")}>
+              <MicIcon className="h-6 w-6" />
+            </button>
             <NotificationDropdown />
             {userArea}
           </div>
@@ -169,12 +171,15 @@ export default function AppHeader() {
 
       {/* ── Desktop Header ────────────────────────────────────────────── */}
       <header
+        ref={barRef}
+        suppressHydrationWarning // a script in app/layout.tsx makes it dark before first paint in theater mode
         className={cn(
-          "safe-x hidden md:flex fixed top-0 left-0 right-0 bg-background z-40 w-full max-w-[100vw] flex-col transition-transform duration-300 ease-in-out",
-          !headerVisible && "-translate-y-full"
+          "app-bar safe-x hidden md:flex fixed top-0 left-0 right-0 bg-background text-foreground z-40 w-full max-w-[100vw] flex-col transition-transform duration-300 ease-in-out",
+          !headerVisible && "-translate-y-full",
+          inTheater && "dark"
         )}
       >
-        <div className="flex h-14 items-center justify-between px-4">
+        <div className="flex h-14 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-4 flex-shrink-0">
             <button
               onClick={toggleSidebar}
@@ -189,93 +194,91 @@ export default function AppHeader() {
             </Link>
           </div>
 
-          {/* Desktop search bar */}
-          <div className="flex-1 max-w-[720px] mx-4 min-w-0" ref={desktopSearchRef}>
-            <form onSubmit={handleDesktopSearchSubmit} className="flex items-center">
-              <div className="relative flex-1 min-w-0">
+          {/* Search, as on YouTube (measured): the box is at most 536px; focused it grows 32px to the left, with an icon in
+              it, and the text stays where it is. The list under it is as wide as that box. */}
+          <div className="flex min-w-0 flex-[0_1_732px] items-center" ref={desktopSearchRef}>
+            <form role="search" onSubmit={handleDesktopSearchSubmit} className="relative ml-10 flex min-w-0 flex-1 items-center px-1">
+              <div className="group/box relative ml-8 flex h-10 min-w-0 flex-1 cursor-text items-center rounded-l-full border border-r-0 border-[#c6c6c6] bg-white pl-4 pr-1 shadow-[inset_0_1px_2px_#eee] focus-within:ml-0 focus-within:border-r focus-within:border-[#1c62b9] focus-within:pl-12 focus-within:shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)] dark:border-[#303030] dark:bg-[#121212] dark:!shadow-none dark:focus-within:border-[#1c62b9]">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-4 hidden h-5 w-5 group-focus-within/box:block" />
                 <input
+                  ref={searchRef}
                   type="text"
                   placeholder="Search"
+                  aria-label="Search"
+                  autoComplete="off"
+                  enterKeyHint="search"
                   value={desktopSearchQuery}
                   onChange={e => setDesktopSearchQuery(e.target.value)}
-                  onFocus={() => { loadRecentSearches(); setShowDesktopRecent(true); }}
-                  onClick={() => { loadRecentSearches(); setShowDesktopRecent(true); }}
-                  className="w-full h-10 py-2 pl-4 pr-10 rounded-l-full border border-input border-r-0 text-base placeholder:text-muted-foreground focus:outline-none focus:border-[#1c62b9] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] dark:focus:border-[#3ea6ff] bg-background text-foreground"
+                  onFocus={openRecent}
+                  onClick={openRecent}
+                  onKeyDown={e => { if (e.key === "Escape") { setShowDesktopRecent(false); e.currentTarget.blur(); } }}
+                  className="h-full min-w-0 flex-1 bg-transparent text-base leading-[22px] text-foreground outline-none placeholder:text-[#757575] dark:placeholder:text-[#8c8c8c]"
                 />
                 {desktopSearchQuery && (
-                  <button
-                    onClick={() => setDesktopSearchQuery("")}
-                    className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    type="button"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                )}
-
-                {showDesktopRecent && recentSearches.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-xl shadow-lg z-50 overflow-hidden">
-                    <div className="flex h-14 items-center justify-between px-4">
-                      <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
-                      <button type="button" onClick={clearRecent} className="text-xs text-primary">Clear all</button>
-                    </div>
-                    <div className="yt-scrollbar max-h-64 overflow-y-auto">
-                      {recentSearches.map(search => (
-                        <div
-                          key={search}
-                          className="w-full flex items-center justify-between px-4 hover:bg-muted transition-colors"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleRecentClick(search)}
-                            className="flex flex-1 min-w-0 items-center gap-3 py-2.5"
-                          >
-                            <History className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                            <span className="text-sm text-left truncate">{search}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeRecent(search)}
-                            aria-label={`Remove "${search}" from recent searches`}
-                            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <span className="relative h-6 w-6 flex-shrink-0">
+                    <button
+                      onClick={() => { setDesktopSearchQuery(""); searchRef.current?.focus(); }}
+                      className="absolute -inset-2 flex items-center justify-center rounded-full"
+                      type="button"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </span>
                 )}
               </div>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-r-full h-10 w-16 border border-input bg-[#f8f8f8] hover:bg-[#f0f0f0] dark:bg-[#222] dark:hover:bg-[#2a2a2a] flex-shrink-0"
+              <button
                 type="submit"
                 aria-label="Search"
+                title="Search"
+                className="flex h-10 w-16 flex-shrink-0 items-center justify-center rounded-r-full border border-[#d3d3d3] bg-[#f8f8f8] transition-colors hover:bg-[#f0f0f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:border-[#303030] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
               >
-                <Search className="w-6 h-6" />
-              </Button>
-              <Button type="button" aria-label="Search with your voice" title="Search with your voice" onClick={() => { setShowDesktopRecent(false); setVoiceOpen(true); }} variant="ghost" size="icon" className="h-10 w-10 rounded-full ml-3 bg-muted hover:bg-accent flex-shrink-0">
-                <Mic className="w-6 h-6" />
-              </Button>
+                <Search className="h-6 w-6" />
+              </button>
+
+              {showDesktopRecent && shownRecent.length > 0 && (
+                // (a press in it keeps the box focused, so it doesn't shrink under the list)
+                <div onMouseDown={e => e.preventDefault()} className="absolute left-1 right-[66px] top-[calc(100%+4px)] z-50 overflow-hidden rounded-xl border bg-popover py-2 text-popover-foreground shadow-[0_2px_4px_rgba(0,0,0,0.2)] dark:border-transparent dark:bg-[#212121]">
+                  <div className="yt-scrollbar max-h-[min(656px,calc(100vh-120px))] overflow-y-auto px-2">
+                    {shownRecent.map(search => (
+                      <div key={search} className="group/row flex h-11 items-center rounded-lg transition-colors hover:bg-muted dark:hover:bg-white/10">
+                        <button type="button" onClick={() => handleRecentClick(search)} className="flex h-full min-w-0 flex-1 items-center gap-3.5 pl-4 text-left text-base">
+                          <History aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
+                          <span className="truncate">{search}</span>
+                        </button>
+                        <button type="button" onClick={() => removeRecent(search)} aria-label={`Remove "${search}" from recent searches`} className="mr-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end px-4 pt-1">
+                    <button type="button" onClick={clearRecent} className="h-8 text-sm font-medium text-muted-foreground hover:text-foreground">Clear all</button>
+                  </div>
+                </div>
+              )}
             </form>
-            <VoiceSearchDialog
-              open={voiceOpen}
-              onOpenChange={setVoiceOpen}
-              onResult={(text) => { setVoiceOpen(false); handleRecentClick(text); }}
-            />
+            <button
+              type="button"
+              aria-label="Search with your voice"
+              title="Search with your voice"
+              onClick={() => { setShowDesktopRecent(false); openVoice(handleRecentClick); }}
+              className="ml-3 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-black/5 transition-colors hover:bg-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-white/10 dark:hover:bg-white/20"
+            >
+              <MicIcon className="h-6 w-6" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* (as wide as it takes for the search to stand where YouTube's does) */}
+          <div className="flex items-center justify-end gap-2 flex-shrink-0 min-[1280px]:min-w-[267px]">
             <NotificationDropdown />
             <div className="flex items-center justify-end">
               {!authLoaded ? (
-                <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+                <div className="mx-1.5 h-8 w-8 rounded-full bg-muted animate-pulse" />
               ) : isLoggedIn ? (
                 <AccountDropdown />
               ) : (
-                <Button asChild variant="outline" className="rounded-full flex items-center gap-1.5 h-9 text-sm font-medium pl-2 pr-3 text-[#065fd4] dark:text-[#3ea6ff] border-border bg-transparent hover:bg-[#def1ff] dark:hover:bg-[#263850] hover:text-[#065fd4] dark:hover:text-[#3ea6ff] hover:border-transparent">
+                <Button asChild variant="outline" className="rounded-full flex items-center gap-1.5 h-10 text-sm font-medium pl-[11px] pr-[15px] [&_svg]:size-6 text-[#065fd4] dark:text-[#3ea6ff] border-border bg-transparent hover:bg-[#def1ff] dark:hover:bg-[#263850] hover:text-[#065fd4] dark:hover:text-[#3ea6ff] hover:border-transparent">
                   <Link href="/signin">
                     <UserCircle className="h-6 w-6" />
                     <span>Sign in</span>

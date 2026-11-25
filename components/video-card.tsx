@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { DurationBadge } from "@/components/duration-badge";
 import { Dots } from "@/components/media-details";
+import { HoverTint } from "@/components/hover-tint";
 import { HiddenMedia, MediaMenu, useNotInterested } from "@/components/media-menu";
 import { WatchedBar } from "@/components/watched-bar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -99,7 +100,8 @@ export default function VideoCard({
 
   // Grid card (YouTube home layout): rounded thumbnail, avatar + text below, no card chrome
   return (
-    <div className="group/card flex min-w-0 flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
+    <div className="group/card group/tint relative isolate flex min-w-0 flex-col" onPointerEnter={warmYouTube} onTouchStart={warmYouTube}>
+      <HoverTint videoId={videoId} className="-inset-3 rounded-2xl" />
       {/* The video plays in the thumbnail: on hover with a mouse, on screen on touch devices (Settings → Playback in feeds) */}
       <InlinePreview videoId={videoId} title={title} className="rounded-xl">
         <Link href={videoLink} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

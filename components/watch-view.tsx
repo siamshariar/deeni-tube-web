@@ -15,16 +15,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { PageBar } from "@/components/page-bar";
 import { YouTubePlayer } from "@/components/youtube-player";
+import { AmbientLight } from "@/components/ambient-light";
 import { PLAYER_BOX, PLAYER_FRAME, WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY } from "@/components/watch-layout";
 import { RelatedVideos } from "@/components/related-videos";
 import { WatchInfo } from "@/components/watch-info";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useHydrated } from "@/lib/local-store";
 import { recordWatch } from "@/hooks/useWatchHistory";
+import { usePreviousVideo } from "@/hooks/use-video-trail";
 import { historyEntryForVideo } from "@/lib/history-entry";
 import { videoData, VideoItem } from "@/lib/video-data"; // ✅ shared data
 import type { CommentReply } from "@/lib/types";
-import { videoPath } from "@/lib/video-url";
+import { videoPath, videoPathForId } from "@/lib/video-url";
 
 // ─── Mock comments (unchanged) ─────────────────────────────────────
 const mockCommentsWithReplies = [
@@ -450,17 +452,21 @@ function VideoPlayView({ mainVideo, inSearch }: { mainVideo: VideoItem; inSearch
 
   // After this video: the first related one ("Up next" on our end screen, with an Autoplay countdown)
   const nextVideo = relatedVideos[0];
+  const previous = usePreviousVideo(mainVideo.videoId);
   const player = (
     <YouTubePlayer
       videoId={mainVideo.videoId}
       title={mainVideo.title}
+      ratio={mainVideo.ratio}
+      previous={previous}
+      onPrevious={previous ? () => router.push(videoPathForId(previous)) : undefined}
       upNext={nextVideo ? { title: nextVideo.title, channel: nextVideo.channel, videoId: nextVideo.videoId, href: videoPath(nextVideo) } : null}
       onNext={nextVideo ? () => router.push(videoPath(nextVideo)) : undefined}
     />
   );
 
   return (
-    <div className="min-h-screen bg-background pt-14">
+    <div className="watch-page min-h-screen bg-background pt-14">
       <PageBar title={mainVideo.title} parent={parent} />
 
       {/* Main content */}
@@ -473,6 +479,7 @@ function VideoPlayView({ mainVideo, inSearch }: { mainVideo: VideoItem; inSearch
                   phones, rounded on bigger screens. One element placed with CSS rather than a phone/desktop
                   switch in JS, so the server-rendered page already shows it (and its thumbnail) in place. */}
               <div className={PLAYER_FRAME}>
+                <AmbientLight videoId={mainVideo.videoId} />
                 <div className={PLAYER_BOX}>{player}</div>
               </div>
 

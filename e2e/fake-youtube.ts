@@ -14,7 +14,8 @@ import { Page } from '@playwright/test';
 // "paused" without saying it was blocked (seen with real YouTube). In the frame, window.__troubles[id] does the
 // same for videos loaded later (loadVideoById).
 // In the frame: window.__player() → { playing, muted, videoId }, window.__end() ends the video, window.__break(t) breaks its stream off,
-// window.__commands lists the commands received (window.__log: with their arguments).
+// window.__commands lists the commands received (window.__log: with their arguments). window.__captions() → the captions it
+// was told to show, their translation, text size and where YouTube would put their box (frame px; `ratio` of the video).
 
 export type Trouble = 'stalled' | 'unavailable' | 'silent' | 'deaf';
 
@@ -26,6 +27,14 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
   window.__allowSound = ${allowSound};
   window.__commands = [];
   window.__log = [];
+  const captions = { lang: null, to: null, position: null, fontSize: 0 };
+  // As YouTube's captions part does: the place goes by the player's size, the size by the video's
+  window.__captions = (ratio = 16 / 9) => {
+    const w = innerWidth, h = innerHeight, p = captions.position;
+    const vw = Math.min(w, h * ratio), vh = Math.min(h, w / ratio);
+    const box = p && { left: p.left * w, top: p.top * h, width: vw * (1 - p.left - p.right), height: vh * (1 - p.top - p.bottom) };
+    return { ...captions, box: box && { ...box, bottom: box.top + box.height }, frame: [w, h] };
+  };
   const ios = ${ios}, pauses = ${pauses};
   let trouble = '${trouble ?? ''}';
   window.__troubles = {};
@@ -70,6 +79,15 @@ const fakePlayer = (allowSound: boolean, dropFirstPlay: boolean, ios: boolean, c
     else if (d.func === 'seekTo') { time = d.args[0]; send({ event: 'infoDelivery', info: info() }); }
     else if (d.func === 'setPlaybackRate') { rate = d.args[0]; send({ event: 'infoDelivery', info: info() }); }
     else if (d.func === 'setVolume') volume = d.args[0];
+    else if (d.func === 'setOption' && d.args[0] === 'captions') {
+      const [, option, value] = d.args;
+      if (option === 'fontSize') captions.fontSize = value;
+      else if (option === 'track') {
+        if (!Object.keys(value).length) captions.lang = captions.to = null;
+        if (value.languageCode) { captions.lang = value.languageCode; captions.to = value.translationLanguage ? value.translationLanguage.languageCode : null; }
+        if (value.position) captions.position = value.position;
+      }
+    }
     else if (d.func === 'pauseVideo') { if (state === 1 || state === 3) setState(2); }
     else if (d.func === 'playVideo') {
       if (trouble === 'unavailable' || trouble === 'deaf') return;

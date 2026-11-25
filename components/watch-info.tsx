@@ -20,7 +20,8 @@ import { savedItem } from "@/hooks/useSavedList";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { getChannelHref, subscribersText } from "@/lib/channel-data";
 import { openReport, openShare } from "@/lib/dialogs";
-import { mediaPath, youtubeThumb } from "@/lib/media-lookup";
+import { youtubeThumb } from "@/lib/media-lookup";
+import { sharePath } from "@/lib/share-path";
 import { notify } from "@/lib/notify";
 import { openSaveCard } from "@/lib/save-card";
 import type { VideoItem } from "@/lib/video-data";
@@ -47,7 +48,7 @@ export function WatchInfo({ video, parent }: { video: VideoItem; parent: string 
   const long = description.length > SHORT_TEXT;
 
   return (
-    <div className="mt-3">
+    <div className="watch-info mt-3">
       <h1 className="line-clamp-2 text-lg font-semibold leading-6 [overflow-wrap:anywhere] md:line-clamp-none md:text-xl md:font-bold md:leading-7">{video.title}</h1>
 
       <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -64,7 +65,7 @@ export function WatchInfo({ video, parent }: { video: VideoItem; parent: string 
 
         {/* Actions — a scrollable row of pills on phones */}
         <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 scrollbar-none max-[399px]:gap-1.5 md:mx-0 md:overflow-visible md:px-0">
-          <button type="button" className={PILL} onClick={() => openShare(mediaPath(video))}>
+          <button type="button" className={PILL} onClick={() => openShare(sharePath(video), video.title, youtubeThumb(video.videoId))}>
             <ShareIcon /> <span className="max-[339px]:sr-only">Share</span>
           </button>
           <button

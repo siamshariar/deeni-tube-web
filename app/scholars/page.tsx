@@ -13,6 +13,7 @@ import { SortDropdown } from "@/components/sort-dropdown";
 import { countText } from "@/lib/format";
 import { scholarData } from "@/lib/scholar-data";
 import { videoData } from "@/lib/video-data";
+import { filterIn } from "@/lib/search-match";
 
 const SORT_OPTIONS = [
   { label: "Default", value: "default" },
@@ -31,10 +32,7 @@ export default function ScholarsPage() {
   const languages = useLanguageFilter(LANGUAGES);
 
 
-  const query = searchQuery.trim().toLowerCase();
-  const scholars = scholarData
-    .filter((s) => languages.selected.includes(s.language))
-    .filter((s) => !query || s.name.toLowerCase().includes(query) || s.designation.toLowerCase().includes(query))
+  const scholars = filterIn(scholarData.filter((s) => languages.selected.includes(s.language)), searchQuery, (s) => [s.name, s.designation])
     .sort((a, b) => (sort === "name-asc" ? a.name.localeCompare(b.name) : sort === "name-desc" ? b.name.localeCompare(a.name) : sort === "videos" ? videosOf(b.channelId) - videosOf(a.channelId) : 0));
 
   return (

@@ -3,6 +3,7 @@
 // "stack" edge, up to four covers and the number of videos. The whole card is a link; its menu is beside it, not in it.
 "use client";
 
+import { HoverTint } from "@/components/hover-tint";
 import Image from "next/image";
 import Link from "next/link";
 import { Globe, ListVideo, Lock } from "lucide-react";
@@ -31,7 +32,8 @@ export function PlaylistCard({ playlist, ofChannel = false, imagePriority }: Pla
   const count = playlist.videoIds.length;
   const play = () => playPlaylistFromTap(playlist.videoIds);
   return (
-    <div className="group relative flex gap-3 sm:flex-col sm:gap-0">
+    <div className="group group/tint relative isolate flex gap-3 sm:flex-col sm:gap-0">
+      {covers[0] && <HoverTint videoId={covers[0]} className="-inset-2 rounded-lg sm:-inset-3 sm:rounded-2xl" />}
       <div className={cn(ROW_THUMB, "relative pt-1.5 sm:w-full sm:pt-2")}>
         <div
           aria-hidden="true"

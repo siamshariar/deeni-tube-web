@@ -51,9 +51,11 @@ let pending: { videoId: string; at: number } | null = null;
 export type HostFit = "video" | "short";
 let attached: { el: HTMLElement; token: number; fit: HostFit } | null = null;
 let nextToken = 1;
-let cropped = true;
 let fullscreen = false;
+let wideBox = false;
+// The video in a watch player's box: a short, or narrower than 16:9
 let tall = false;
+let ratio = 16 / 9;
 let resetTimer: ReturnType<typeof setTimeout> | undefined;
 // After a tap: YouTube can switch back to muted once the new video has loaded (seen in Quran Tube on iPhones);
 // until then, say unMute again (allowed now: the tap gave this player sound)
@@ -311,15 +313,11 @@ export function hostLoad(videoId: string, keepSound = false, again = false) {
   if (keepSound && soundAllowed) keepSoundUntil = Date.now() + 8000;
 }
 
-/** YouTube draws captions at its frame's bottom edge: uncrop while they're on (as the watch player does). */
-export function setHostCropped(on: boolean) {
-  cropped = on;
-  applyCrop();
-}
-/** A short in a watch player's 16:9 box: shown whole (see tallFrame in components/youtube-player). */
-export function setHostTall(on: boolean) {
-  if (tall === on) return;
-  tall = on;
+/** The shape of the video in a watch player's 16:9 box: a short, shown whole (see tallFrame in components/youtube-player), or its ratio. */
+export function setHostShape(next: { tall?: boolean; ratio?: number }) {
+  if (tall === !!next.tall && ratio === (next.ratio ?? 16 / 9)) return;
+  tall = !!next.tall;
+  ratio = next.ratio ?? 16 / 9;
   applyCrop();
 }
 /** Fill the window (the page player's full screen). */
@@ -340,26 +338,27 @@ function applyCrop() {
     frame.style.left = "50%";
     frame.style.width = fullscreen ? "min(112.5vh, 200%)" : `${(2 * 9 * 9 * 100) / 256}%`;
     if (fullscreen) frame.style.width = "min(112.5dvh, 200%)"; // where the browser knows dvh
-    frame.style.top = cropped ? `-${CROP / 2}px` : "0";
-    frame.style.height = cropped ? `calc(200% + ${CROP * 2}px)` : "200%";
+    frame.style.top = `-${CROP / 2}px`;
+    frame.style.height = `calc(200% + ${CROP * 2}px)`;
     frame.style.transformOrigin = "top center";
     frame.style.transform = "translateX(-50%) scale(0.5)";
     return;
   }
-  // Full screen on a screen wider than 16:9 (phones): no wider than the video, or the crop would cut into it
-  if (fullscreen) {
+  // No wider than the video, or the crop would cut into it: full screen on a screen wider than 16:9 (phones), a video
+  // narrower than 16:9
+  const narrow = ratio < 16 / 9 - 0.02;
+  if (fullscreen || narrow) {
     frame.style.left = "50%";
     frame.style.transform = "translateX(-50%)";
-    frame.style.width = "min(100%, 177.78vh)";
-    frame.style.width = "min(100%, 177.78dvh)"; // where the browser knows dvh
+    frame.style.width = fullscreen ? `min(100%, ${ratio * 100}vh)` : `${ratio * 56.25}%`;
+    if (fullscreen) frame.style.width = `min(100%, ${ratio * 100}dvh)`; // where the browser knows dvh
   }
-  frame.style.top = cropped ? `-${CROP}px` : "0";
-  frame.style.height = cropped ? `calc(100% + ${CROP * 2}px)` : "100%";
+  frame.style.top = `-${CROP}px`;
+  frame.style.height = `calc(100% + ${CROP * 2}px)`;
 }
 
 // A short: the Shorts feed is fixed to the screen, so screen coordinates. The 9:16 video covers the box; YouTube's
-// bars live in the CROP bands above and below the video, outside the box (no bands while captions show, which
-// YouTube draws at its bottom edge)
+// bars live in the CROP bands above and below the video, outside the box
 function layOutShort(rect: { left: number; top: number; width: number; height: number }, radius = "0") {
   if (!wrapper) return;
   const s = wrapper.style;
@@ -373,12 +372,11 @@ function layOutShort(rect: { left: number; top: number; width: number; height: n
   if (!frame) return;
   const w = Math.max(rect.width, (rect.height * 9) / 16);
   const h = (w * 16) / 9;
-  const band = cropped ? CROP : 0;
-  sized(`${Math.round(w)}x${Math.round(h + band * 2)}`);
+  sized(`${Math.round(w)}x${Math.round(h + CROP * 2)}`);
   frame.style.width = `${w}px`;
-  frame.style.height = `${h + band * 2}px`;
+  frame.style.height = `${h + CROP * 2}px`;
   frame.style.left = `${(rect.width - w) / 2}px`;
-  frame.style.top = `${(rect.height - h) / 2 - band}px`;
+  frame.style.top = `${(rect.height - h) / 2 - CROP}px`;
 }
 
 /**
@@ -424,7 +422,17 @@ function place() {
   s.height = `${rect.height}px`;
   s.borderRadius = getComputedStyle(box.parentElement ?? box).borderRadius;
   s.zIndex = "1";
-  sized(`${Math.round(rect.width)}x${Math.round(rect.height)}${cropped ? "c" : ""}`);
+  // Theater mode's box is wider than 16:9: no wider than the video there either
+  if (frame && rect.height && rect.width / rect.height > 16 / 9 + 0.01) {
+    const w = tall ? rect.height * 1.125 : Math.min(rect.width, rect.height * ratio);
+    frame.style.left = "50%";
+    frame.style.width = `${w}px`;
+    frame.style.transform = `translateX(-50%)${tall ? " scale(0.5)" : ""}`;
+  } else if (wideBox) applyCrop();
+  wideBox = !!rect.height && rect.width / rect.height > 16 / 9 + 0.01;
+  // (Ambient mode's glow is behind it there, at the video's sides)
+  s.background = wideBox ? "transparent" : "#000";
+  sized(`${Math.round(rect.width)}x${Math.round(rect.height)}${tall ? "t" : ratio}`);
 }
 
 // ─── Taps on video links ──────────────────────────────────────────────────────
@@ -449,9 +457,10 @@ function linkTarget(el: Element | null): { videoId: string; short: boolean } | n
     return null;
   }
   if (url.origin !== location.origin) return null;
-  if (/^\/shorts\/?$/.test(url.pathname)) {
-    if (/^\/shorts\/?$/.test(location.pathname)) return null;
-    const v = url.searchParams.get("v");
+  const shorts = url.pathname.match(/^\/shorts(?:\/([\w-]{11}))?\/?$/);
+  if (shorts) {
+    if (/^\/shorts(\/|$)/.test(location.pathname)) return null;
+    const v = url.searchParams.get("v") ?? shorts[1];
     return { videoId: v && /^[\w-]{11}$/.test(v) ? v : FIRST_SHORT_ID, short: true };
   }
   const m = url.pathname.match(/^\/(?:videos|search)\/[^/]+\/([\w-]{11})\/?$/);

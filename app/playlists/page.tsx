@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { playlistAgeMs, usePlaylists } from "@/hooks/usePlaylists";
 import { useHydrated } from "@/lib/local-store";
 import { cn } from "@/lib/utils";
+import { filterIn } from "@/lib/search-match";
 
 const SORT_OPTIONS = [
   { label: "Recently updated", value: "recent" },
@@ -31,9 +32,7 @@ export default function PlaylistsPage() {
   const { playlists } = usePlaylists();
 
   const shown = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return playlists
-      .filter((pl) => pl.name.toLowerCase().includes(query))
+    return filterIn(playlists, searchQuery, (pl) => [pl.name])
       .sort((a, b) =>
         sort === "recent" ? playlistAgeMs(a) - playlistAgeMs(b) : sort === "name-asc" ? a.name.localeCompare(b.name) : sort === "name-desc" ? b.name.localeCompare(a.name) : b.videoIds.length - a.videoIds.length
       );

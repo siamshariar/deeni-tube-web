@@ -5,6 +5,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { HoverRow } from "@/components/hover-tint";
+import { MovingThumbnail } from "@/components/moving-thumbnail";
 import Image from "next/image";
 import Link from "next/link";
 import { GripVertical, Play, Shuffle, type LucideIcon } from "lucide-react";
@@ -142,15 +144,17 @@ export function LibraryRow({ video, index, extra, inWatchLater, draggable = fals
   const media = asMedia(video);
   const href = mediaPath(media);
   return (
-    <div
+    <HoverRow
+      videoId={media.videoId}
       className={cn(
         "group flex items-start gap-2 rounded-xl py-1.5 transition-colors sm:items-center sm:gap-3 sm:pr-1",
-        dragOver ? "bg-primary/10 ring-1 ring-primary/30" : "can-hover:hover:bg-muted",
+        dragOver && "bg-primary/10 ring-1 ring-primary/30",
         draggable && "cursor-grab active:cursor-grabbing"
       )}
       draggable={draggable}
       {...(draggable ? drag : {})}
     >
+      {(hovered) => (<>
       <div className="hidden w-7 flex-shrink-0 select-none items-center justify-center sm:flex">
         <span className={cn("text-sm tabular-nums text-muted-foreground", draggable && "can-hover:group-hover:hidden")}>{index + 1}</span>
         {draggable && <GripVertical className="hidden h-5 w-5 text-muted-foreground can-hover:group-hover:block" aria-hidden="true" />}
@@ -160,6 +164,7 @@ export function LibraryRow({ video, index, extra, inWatchLater, draggable = fals
         <Image src={youtubeThumb(media.videoId, index === 0 ? "medium" : "small")} alt="" fill {...imagePriorityProps(priorityForIndex(index), { preload: false })} className="object-cover" />
         <DurationBadge>{video.duration}</DurationBadge>
         <WatchedBar videoId={media.videoId} />
+        <MovingThumbnail videoId={media.videoId} active={hovered} />
       </Link>
       <div className="min-w-0 flex-1">
         <Link href={href}>
@@ -171,7 +176,8 @@ export function LibraryRow({ video, index, extra, inWatchLater, draggable = fals
       <div className="-mr-2 -mt-2 flex-shrink-0 sm:mr-0 sm:mt-0">
         <MediaMenu scope="own" media={media} extra={extra} inWatchLater={inWatchLater} />
       </div>
-    </div>
+      </>)}
+    </HoverRow>
   );
 }
 

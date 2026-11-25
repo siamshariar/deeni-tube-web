@@ -48,3 +48,14 @@ export function FullscreenIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** Theater mode (arrows outwards) and back (inwards): a screen with its base, as YouTube's. */
+export function TheaterIcon({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="1.5" />
+      <path d="M2 17.5h20" strokeWidth="5" />
+      <path d={on ? "M6 7l3 3-3 3M18 7l-3 3 3 3" : "M8.5 7l-3 3 3 3M15.5 7l3 3-3 3"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

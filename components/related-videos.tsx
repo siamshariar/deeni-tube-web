@@ -23,7 +23,7 @@ import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { getChannelHref } from "@/lib/channel-data";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { storyboardOf } from "@/lib/storyboard";
-import { thumbTints } from "@/lib/thumb-tints";
+import { HoverTint } from "@/components/hover-tint";
 import { daysAgo, shortAgo } from "@/lib/time-ago";
 import type { VideoItem } from "@/lib/video-data";
 import { warmYouTube } from "@/lib/warm-youtube";
@@ -154,7 +154,7 @@ function RelatedCard({ video: v }: { video: VideoItem }) {
   if (notInterested.hidden) return <HiddenMedia onUndo={notInterested.undo} className="aspect-video flex-shrink-0 rounded-lg min-[1016px]:aspect-auto min-[1016px]:h-[110px]" />;
   return (
     <div
-      className="group/rel relative isolate flex flex-shrink-0 flex-col min-[1016px]:flex-row"
+      className="group/rel group/tint relative isolate flex flex-shrink-0 flex-col min-[1016px]:flex-row"
       onPointerEnter={(e) => {
         warmYouTube();
         if (e.pointerType !== "mouse") return;
@@ -164,12 +164,7 @@ function RelatedCard({ video: v }: { video: VideoItem }) {
       onPointerLeave={() => setHovered(false)}
     >
       {/* The thumbnail's colour behind the row, 6px out on each side */}
-      <div
-        aria-hidden="true"
-        data-tint
-        style={{ "--tint": `${thumbTints[v.videoId] ?? "0 0%"} 53%` } as React.CSSProperties}
-        className="pointer-events-none absolute -inset-1.5 -z-10 rounded-lg bg-[hsl(var(--tint)/0.13)] opacity-0 transition-opacity duration-300 can-hover:group-hover/rel:opacity-100 dark:bg-[hsl(var(--tint)/0.17)]"
-      />
+      <HoverTint videoId={v.videoId} className="-inset-1.5 rounded-lg" />
       <Link
         href={videoPath(v)}
         tabIndex={-1} // the title is the same link

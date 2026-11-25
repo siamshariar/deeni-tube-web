@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    serviceWorkers: 'block', // (allowed where it is tested, e2e/offline.spec.ts)
   },
   projects: [
     {

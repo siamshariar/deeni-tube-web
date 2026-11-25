@@ -14,6 +14,8 @@ export interface VideoItem {
   category: string;
   /** A short in a list of videos (playlists); see findPlayable in lib/media-lookup */
   isShort?: boolean;
+  /** The picture's width over its height, if it isn't 16:9 */
+  ratio?: number;
 }
 
 const MONZUR_AVATAR =
@@ -146,6 +148,7 @@ export const videoData: VideoItem[] = [
   {
     id: "v9",
     videoId: "kVbpcXFFeWQ",
+    ratio: 1.5,
     title: "এত সুন্দর করে আর কে বুঝাবে || খন্দকার আবদুল্লাহ জাহাঙ্গীর",
     channel: "Dr. Khandaker Abdullah Jahangir",
     channelId: "abdullah-jahangir",

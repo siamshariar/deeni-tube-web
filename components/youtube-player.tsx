@@ -7,9 +7,9 @@
 // - YouTube's controls are off (controls=0), and a transparent layer over the frame takes all clicks and
 //   hovers, so YouTube's hover UI never appears;
 // - the frame is made taller than the box (CROP at the top and bottom), so YouTube's overlays along its edges
-//   (shown when paused and for a few seconds after playback starts) are cut off while the video itself still
-//   fills the box exactly. Only while captions are on and the video plays is it the box's size, because
-//   YouTube draws captions near the bottom edge of the frame;
+//   (shown for a few seconds after playback starts or jumps, and in some versions when paused) are cut off while the
+//   video itself still fills the box exactly. Captions, which YouTube draws at the frame's bottom, are told to stay in
+//   the box, above our controls while those show (lib/captions);
 // - it's the privacy-enhanced embed (youtube-nocookie.com), which leaves out creators' end-screen cards;
 // - at the end, our own end screen covers YouTube's: "Up next" with an Autoplay countdown (YouTube's 8 seconds, 3 in
 //   full screen), or Replay. The control bar stays, so Autoplay can be switched on there. Full screen is the page's
@@ -20,9 +20,10 @@
 // muted with a "Click to unmute" button. Keyboard: space/k play, j/l ±10s, ←/→ ±5s, f full screen, m mute,
 // c captions. On touch screens the controls hide 3s after the video starts or after a tap, as in YouTube's app.
 // The controls are YouTube's updated ones (measured on youtube.com and m.youtube.com): each group on its own rounded
-// dark backing, no gradient. With a mouse: play and next, volume (opens a slider), the time (a click shows the time
-// left), and one group with Autoplay, captions, settings and full screen, each with its name and key on hover. On touch
-// screens: play and next in the middle, the switches at the top right, the time and full screen above the bar.
+// dark backing, no gradient. With a mouse: play (alone in its circle; in a playlist also previous and next, together),
+// volume (opens a slider), the time (a click shows the time left), and one group with Autoplay, captions, settings and
+// full screen, each with its name and key on hover. On touch screens: previous, play and next in the middle, the
+// switches at the top right, the time and full screen above the bar. Shift+N and Shift+P: next and previous.
 // The progress bar is YouTube's (measured): a 4px line, 6px under the pointer, 56px above the bottom on desktop. Over
 // it, a box with the video's frame there (YouTube's storyboard, components/storyboard.tsx) and the time; dragging
 // also covers the video with that frame, dimmed. With a finger: the frame over the whole video and the time in the
@@ -37,14 +38,23 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Gauge, ListVideo, Minimize2, Pause, Play, RotateCcw, Settings, SkipForward } from "lucide-react";
-import { CCIconOff, CCIconOn, FullscreenIcon, VolumeIcon } from "@/components/icons/player-icons";
+import { Check, ChevronLeft, ChevronRight, Gauge, ListVideo, Minimize2, Pause, Play, RotateCcw, Settings, SkipBack, SkipForward, SunMedium, Timer } from "lucide-react";
+import { CCIconOff, CCIconOn, FullscreenIcon, TheaterIcon, VolumeIcon } from "@/components/icons/player-icons";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { imagePriorityProps } from "@/lib/image-priority";
 import { cn } from "@/lib/utils";
 import { takePreviewResume } from "@/components/inline-preview";
 import { progressSaver, resumeTime } from "@/lib/watch-progress";
+import { CAPTION_NOTE_MS, captionLayout, captionStyle, choiceName, chooseCaptions, HIDE_CAPTIONS, moveCaptionsCommands, reportedCaptions, setCaptionsOn, showCaptionsCommands, trackName, translateCaptions, translationLanguages, useCaptions, type ReportedCaptions } from "@/lib/captions";
+import { THEATER_SCREENS, toggleTheater, useTheater } from "@/lib/theater";
+import { setAmbient, setAmbientTime, useAmbient } from "@/lib/ambient";
+import { setSleep, SLEEP_MINUTES, useSleep, getSleep, onSleep } from "@/lib/sleep-timer";
+import { savedSound, savedSpeed, saveSound, saveSpeed } from "@/lib/player-prefs";
+import { notify } from "@/lib/notify";
+import { onBackOnline } from "@/lib/connection";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { STORYBOARD_LARGE, STORYBOARD_MEDIUM, StoryboardFrame, useStoryboard } from "@/components/storyboard";
 import {
   armHost,
@@ -61,8 +71,7 @@ import {
   hostWanted,
   playFromTap,
   revealHost,
-  setHostCropped,
-  setHostTall,
+  setHostShape,
   setHostFullscreen,
 } from "@/lib/player-host";
 
@@ -79,7 +88,15 @@ const PLAYING = 1;
 const PAUSED = 2;
 const BUFFERING = 3;
 const CUED = 5;
-const CROP = 120; // px of the frame hidden above and below the box while not playing
+const CROP = 120; // px of the frame hidden above and below the box
+const WIDE = 16 / 9;
+// Captions: with a mouse this far above the progress bar while the controls show (YouTube's), else at YouTube's own place.
+// On touch screens this far above the bottom (m.youtube.com's), and while the controls show between them: above the time
+// if two lines fit there under the play button, else over the play button (a phone's small player)
+const CAPTIONS_ABOVE_BAR = 14;
+const CAPTION_LINES = 48;
+const PLAY_HALF = 28;
+const SMALL_PLAYER = 200;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 // "Up next in N": YouTube's, at the end and in full screen (measured)
 const COUNTDOWN_SECONDS = { window: 8, full: 3 };
@@ -130,11 +147,11 @@ function formatTime(seconds: number) {
  * the bands above and below it as usual (a frame of the box's width cut its top and bottom off). It is drawn at twice that
  * size and halved, because YouTube's player must be at least 200px wide. (lib/player-host does the same.)
  */
-const tallFrame = (cropped: boolean, full: boolean): React.CSSProperties => ({
+const tallFrame = (full: boolean): React.CSSProperties => ({
   left: "50%",
   width: full ? "min(112.5dvh, 200%)" : `${(2 * 9 * 9 * 100) / 256}%`, // 9:16 of the box's height, itself 9:16 of its width
-  top: cropped ? -CROP / 2 : 0,
-  height: cropped ? `calc(200% + ${CROP * 2}px)` : "200%",
+  top: -CROP / 2,
+  height: `calc(200% + ${CROP * 2}px)`,
   transform: "translateX(-50%) scale(0.5)",
   transformOrigin: "top center",
 });
@@ -144,18 +161,29 @@ export function YouTubePlayer({
   title,
   upNext,
   onNext,
+  previous,
+  onPrevious,
+  playlist = false,
   autoplay: controlledAutoplay,
   onAutoplayChange,
   tall = false,
+  ratio: ownRatio,
 }: {
   videoId: string;
   title: string;
   /** A short (9:16), in a playlist: shown whole, with black at its sides */
   tall?: boolean;
+  /** The video's width over its height, if it isn't 16:9 (a short: 9:16) */
+  ratio?: number;
   /** The video that plays after this one */
   upNext?: UpNextVideo | null;
   /** Go to the next video (end of the countdown, the Next button, the "Up next" card) */
   onNext?: () => void;
+  /** The video before this one (its YouTube id), and going there */
+  previous?: string | null;
+  onPrevious?: () => void;
+  /** In a playlist: Previous and Next beside Play, with a mouse too (as on YouTube, which has none on a single video) */
+  playlist?: boolean;
   /** Autoplay set by the page (playlist: moves on at once at the end). Otherwise the player's own switch,
    *  saved per device, with a countdown at the end. */
   autoplay?: boolean;
@@ -187,7 +215,10 @@ export function YouTubePlayer({
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   const [rate, setRate] = useState(1);
-  const [captions, setCaptions] = useState(false);
+  // What YouTube's player says about its captions, once that part of it has loaded
+  const [reported, setReported] = useState<ReportedCaptions>();
+  const { tracks, choice, on: captions, available: hasCaptions } = useCaptions(videoId, reported);
+  const ratio = ownRatio ?? (tall ? 1 / WIDE : WIDE);
   const [mutedByBrowser, setMutedByBrowser] = useState(false);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
   const [hover, setHover] = useState<{ time: number; x: number; width: number } | null>(null);
@@ -199,7 +230,7 @@ export function YouTubePlayer({
   const [wantBoard, setWantBoard] = useState(false);
   const board = useStoryboard(videoId, wantBoard);
   const [controlsShown, setControlsShown] = useState(true);
-  const [menu, setMenu] = useState<null | "main" | "speed">(null);
+  const [menu, setMenu] = useState<null | "main" | "speed" | "captions" | "translate" | "sleep">(null);
   // The time left instead of the time played (a click on the time)
   const [showTimeLeft, setShowTimeLeft] = useState(false);
   // The menu scrolls when the player is too short for it (phones)
@@ -219,12 +250,13 @@ export function YouTubePlayer({
   const reloadAtRef = useRef<number | null>(null);
   const blockedRef = useRef(false);
   const [slow, setSlow] = useState(false);
-  const [issue, setIssue] = useState<null | "stalled" | "unavailable">(null);
+  const [issue, setIssue] = useState<null | "stalled" | "offline" | "unavailable">(null);
   const [frameLoads, setFrameLoads] = useState(0);
 
   const autoplayOn = controlledAutoplay ?? savedAutoplay;
   const isPlaying = playerState === PLAYING || playerState === BUFFERING;
-  const cropped = !captions || !isPlaying;
+  // Narrower than 16:9 (4:3, 3:2): the frame is as wide as the video, so the whole video shows, with black at its sides
+  const narrow = !tall && ratio < WIDE - 0.02;
   const controlsVisible = started && !issue && (!isPlaying || controlsShown || menu !== null || scrubTime !== null);
   const shownTime = scrubTime ?? time;
   const secondsLeft = countdown === null ? null : Math.min(countdown.seconds, Math.max(1, Math.ceil((countdown.endsAt - now) / 1000)));
@@ -249,6 +281,24 @@ export function YouTubePlayer({
   const command = useCallback((func: string, args: unknown[] = []) => {
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), YT_ORIGIN);
   }, []);
+
+  // The volume, mute and speed the visitor set on the video before, as on YouTube
+  const rateRef = useRef(1);
+  const applySpeed = useCallback(() => {
+    if (rateRef.current !== savedSpeed()) command("setPlaybackRate", [savedSpeed()]);
+  }, [command]);
+  const applySettings = useCallback(() => {
+    const sound = savedSound();
+    command("setVolume", [sound.volume]);
+    setVolume(sound.volume);
+    if (sound.muted) {
+      // (through the shared player's own code, so it stops putting the sound back)
+      if (hosted) hostCommand("mute");
+      else command("mute");
+      setMuted(true);
+    }
+    applySpeed();
+  }, [command, hosted, applySpeed]);
 
   const startCountdown = useCallback(() => {
     const seconds = latest.current.full ? COUNTDOWN_SECONDS.full : COUNTDOWN_SECONDS.window;
@@ -345,6 +395,11 @@ export function YouTubePlayer({
     // Watched to the end: a full bar, and next time it starts from the beginning
     saverRef.current?.update(timeRef.current.duration, timeRef.current.duration, true);
     const { upNext: next, onNext: goNext, autoplayOn: auto, controlled } = latest.current;
+    if (getSleep() === "end") {
+      setSleep(null);
+      notify("Sleep timer ended");
+      return;
+    }
     if (!next || !goNext || !auto) return;
     if (controlled) moveOn(true); // playlist: straight on to the next video
     else startCountdown();
@@ -364,6 +419,12 @@ export function YouTubePlayer({
       // Playing, at its end, or paused after it had played (by the visitor, the phone, another app…): nothing to repair
       if (userPausedRef.current || state === PLAYING || state === ENDED || (state === PAUSED && playedRef.current)) return setSlow(false);
       if (playedRef.current && length > 0 && length - at <= NEAR_END && ++stuck >= STUCK_NEAR_END) return finish();
+      // No connection: say so and wait for it (loading the player now would leave the browser's error page in it)
+      if (!navigator.onLine) {
+        setSlow(false);
+        setIssue("offline");
+        return;
+      }
       if (readyRef.current && state !== BUFFERING && tries < PLAY_TRIES) {
         tries++;
         // Paused, and nobody paused it
@@ -438,7 +499,10 @@ export function YouTubePlayer({
         reloadAtRef.current = null;
         saverRef.current = progressSaver(videoId, resumeAt);
         if (resumeAt) command("seekTo", [resumeAt, true]);
-        command("playVideo");
+        rateRef.current = 1;
+        applySettings();
+        // (stopped by the sleep timer before it could start)
+        if (!userPausedRef.current) command("playVideo");
         return;
       }
       if (d?.event === "onAutoplayBlocked") {
@@ -450,6 +514,12 @@ export function YouTubePlayer({
       }
       const info = d?.info;
       if (!info) return;
+      // Its captions part has loaded
+      if (info.captions) {
+        const next = reportedCaptions(info.captions);
+        next.key = `${frameLoads} ${next.key}`;
+        setReported((r) => (r?.key === next.key ? r : next));
+      }
       if (typeof info.currentTime === "number") {
         timeRef.current.time = info.currentTime;
         setTime(info.currentTime);
@@ -458,14 +528,22 @@ export function YouTubePlayer({
         timeRef.current.duration = info.duration;
         setDuration(info.duration);
       }
-      if (playedRef.current && typeof info.currentTime === "number") saverRef.current?.update(info.currentTime, timeRef.current.duration);
+      if (playedRef.current && typeof info.currentTime === "number") {
+        saverRef.current?.update(info.currentTime, timeRef.current.duration);
+        setAmbientTime({ videoId, time: info.currentTime, duration: timeRef.current.duration });
+      }
       if (typeof info.videoLoadedFraction === "number") setLoaded(info.videoLoadedFraction);
       if (typeof info.muted === "boolean") {
         setMuted(info.muted);
         if (!info.muted) setMutedByBrowser(false);
       }
       if (typeof info.volume === "number") setVolume(info.volume);
-      if (typeof info.playbackRate === "number") setRate(info.playbackRate);
+      if (typeof info.playbackRate === "number") {
+        rateRef.current = info.playbackRate;
+        setRate(info.playbackRate);
+        // (a newly loaded video goes back to normal speed)
+        if (playedRef.current) applySpeed();
+      }
       const state = info.playerState;
       // Act on changes only: YouTube can report the same state more than once
       if (typeof state !== "number" || state === lastStateRef.current) return;
@@ -483,6 +561,7 @@ export function YouTubePlayer({
         userPausedRef.current = false;
         setSlow(false);
         setIssue(null);
+        applySpeed();
         // Shared player: the thumbnail goes once YouTube has drawn the video at this size (no small video zooming)
         if (hosted) revealHost(() => setStarted(true));
         else setStarted(true);
@@ -503,7 +582,7 @@ export function YouTubePlayer({
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [command, videoId, hosted, scheduleHide, mutePlayer, startCountdown, finish, watchPlayback, stopWatching, byAutoplay]);
+  }, [command, videoId, hosted, frameLoads, scheduleHide, mutePlayer, startCountdown, finish, watchPlayback, stopWatching, byAutoplay, applySettings, applySpeed]);
 
   // ── The shared player (iPhone, iPad, Safari) ──
   useEffect(() => {
@@ -523,12 +602,14 @@ export function YouTubePlayer({
       if (hostRequested() !== videoId) {
         // Not started by a tap on its link (e.g. Up next): load it here; it has sound if the player had it
         hostLoad(videoId);
-        if (hostMuted()) {
+        if (hostMuted() && !savedSound().muted) {
           // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the shared player, an outside system
           setMuted(true);
           setMutedByBrowser(true);
         }
       }
+      rateRef.current = 1;
+      applySettings();
       command("playVideo");
       // A tap started it already and YouTube won't say "playing" again (it only reports changes): take it as
       // playing now (resume, controls, thumbnail)
@@ -548,18 +629,87 @@ export function YouTubePlayer({
       iframeRef.current = null;
       readyRef.current = false;
     };
-  }, [hosted, videoId, command, scheduleHide]);
+  }, [hosted, videoId, command, scheduleHide, applySettings]);
   useEffect(() => {
-    if (hosted) setHostCropped(cropped);
-  }, [hosted, cropped]);
-  useEffect(() => {
-    if (!hosted || !tall) return;
-    setHostTall(true);
-    return () => setHostTall(false);
-  }, [hosted, tall]);
+    if (!hosted) return;
+    setHostShape({ tall, ratio: tall ? undefined : ratio });
+    return () => setHostShape({});
+  }, [hosted, tall, ratio]);
   useEffect(() => {
     if (hosted) setHostFullscreen(full);
   }, [hosted, full]);
+
+  // ── Captions ── YouTube draws them: told which to show, and to keep them in the box, above our controls while those show
+  const canHover = useMediaQuery("(hover: hover) and (pointer: fine)");
+  const barRef = useRef<HTMLDivElement>(null);
+  const timeRowRef = useRef<HTMLDivElement>(null);
+  const rollup = choice?.track.auto ?? true;
+  const noteUntilRef = useRef(0);
+  const placeCaptions = useCallback(() => {
+    const frame = iframeRef.current;
+    const box = rootRef.current;
+    if (!frame || !box) return null;
+    const { bottom, height } = box.getBoundingClientRect();
+    let lift = 0;
+    if (controlsVisible && barRef.current && canHover) lift = bottom - barRef.current.getBoundingClientRect().bottom + CAPTIONS_ABOVE_BAR;
+    else if (controlsVisible && timeRowRef.current) {
+      const row = bottom - timeRowRef.current.getBoundingClientRect().top;
+      // (in the smallest, a 320px phone's, there's no room at all: out of sight until the controls go)
+      lift = height / 2 - PLAY_HALF - row >= CAPTION_LINES ? row : height >= SMALL_PLAYER ? height / 2 + PLAY_HALF - 8 : -height;
+    }
+    const style = captionStyle(canHover);
+    const up = style.stays ? 0 : lift;
+    // (with a mouse the note shows where YouTube's does, unless the captions are moved up, which would cut it in half)
+    return captionLayout(frame, box, { ratio, style, lift: up, far: Date.now() < noteUntilRef.current && (style.stays || up > 0), rollup });
+  }, [controlsVisible, canHover, ratio, rollup]);
+  const placeCaptionsRef = useRef(placeCaptions);
+  useEffect(() => { placeCaptionsRef.current = placeCaptions; }, [placeCaptions]);
+  useEffect(() => {
+    if (!started) return;
+    // Off says so too: YouTube remembers on its own that captions were on
+    if (!captions || !choice) return command(...HIDE_CAPTIONS);
+    noteUntilRef.current = Date.now() + CAPTION_NOTE_MS;
+    const show = () => {
+      const layout = placeCaptionsRef.current();
+      [...showCaptionsCommands(choice, layout), ...moveCaptionsCommands(iframeRef.current, layout)].forEach((c) => command(...c));
+    };
+    show();
+    // Again once YouTube's captions part has loaded (unless it has said so already)
+    const timers = reported ? [] : [700, 2500].map((ms) => setTimeout(show, ms));
+    // After the note: the box as YouTube's
+    timers.push(setTimeout(() => moveCaptionsCommands(iframeRef.current, placeCaptionsRef.current()).forEach((c) => command(...c)), CAPTION_NOTE_MS + 50));
+    return () => timers.forEach(clearTimeout);
+  }, [started, captions, choice, reported, command]);
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!started || !captions || !frame) return;
+    const place = () => moveCaptionsCommands(frame, placeCaptions()).forEach((c) => command(...c));
+    place();
+    // At another size: once now, and once YouTube has laid its video out again
+    let timers: ReturnType<typeof setTimeout>[] = [];
+    const observer = new ResizeObserver(() => {
+      timers.forEach(clearTimeout);
+      timers = [100, 600].map((ms) => setTimeout(place, ms));
+    });
+    observer.observe(frame);
+    return () => {
+      observer.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [started, captions, placeCaptions, command, frameLoads]);
+
+  // ── Sleep timer ── pauses the video when its time comes, and stops the countdown to the next one (at the end: see finish)
+  const sleep = useSleep();
+  const [sleepLeft, setSleepLeft] = useState(0);
+  useEffect(() => onSleep(() => {
+    userPausedRef.current = true;
+    stopWatching();
+    setSlow(false);
+    setCountdown(null);
+    setStarted(true);
+    command("pauseVideo");
+    notify("Sleep timer ended. Video paused");
+  }), [command, stopWatching]);
 
   // Save how far it got when leaving the video, the page or the tab
   useEffect(() => {
@@ -653,14 +803,17 @@ export function YouTubePlayer({
       }
       setMuted(false);
       setMutedByBrowser(false);
+      saveSound({ muted: false, volume: volume || 50 });
     } else {
       command("mute");
       setMuted(true);
+      saveSound({ muted: true });
     }
   };
   const changeVolume = (v: number) => {
     setVolume(v);
     command("setVolume", [v]);
+    saveSound({ volume: v, muted: v === 0 });
     if (v > 0 && muted) {
       command("unMute");
       setMuted(false);
@@ -672,11 +825,11 @@ export function YouTubePlayer({
     }
   };
   const toggleCaptions = () => {
-    command(captions ? "unloadModule" : "loadModule", ["captions"]);
-    setCaptions(!captions);
+    if (hasCaptions) setCaptionsOn(!captions);
   };
   const changeRate = (r: number) => {
     setRate(r);
+    saveSpeed(r);
     command("setPlaybackRate", [r]);
     setMenu(null);
   };
@@ -743,10 +896,26 @@ export function YouTubePlayer({
     return () => { delete document.documentElement.dataset.playerFull; };
   }, [full]);
 
+  const canGoNext = !!(upNext && onNext);
+  const canGoPrevious = !!(previous && onPrevious);
+  // The next video, started inside the tap (shared player: with sound)
+  const goNext = () => {
+    if (!canGoNext) return;
+    if (upNext && hosted) playFromTap(upNext.videoId);
+    moveOn();
+  };
+  const goPrevious = () => {
+    if (!canGoPrevious || movingRef.current) return;
+    if (previous && hosted) playFromTap(previous);
+    movingRef.current = true;
+    keepFull = full;
+    onPrevious?.();
+  };
+
   // Keyboard shortcuts, as on YouTube (not while typing or with a dialog or menu open)
-  const actions = useRef({ togglePlay, seekBy, toggleFullscreen, toggleMute, toggleCaptions, showControls });
+  const actions = useRef({ togglePlay, seekBy, toggleFullscreen, toggleMute, toggleCaptions, showControls, goNext, goPrevious });
   useEffect(() => {
-    actions.current = { togglePlay, seekBy, toggleFullscreen, toggleMute, toggleCaptions, showControls };
+    actions.current = { togglePlay, seekBy, toggleFullscreen, toggleMute, toggleCaptions, showControls, goNext, goPrevious };
   });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -767,6 +936,9 @@ export function YouTubePlayer({
         case "f": case "F": a.toggleFullscreen(); break;
         case "m": case "M": a.toggleMute(); break;
         case "c": case "C": a.toggleCaptions(); break;
+        case "t": case "T": if (!latest.current.full && window.matchMedia(THEATER_SCREENS).matches) toggleTheater(); break;
+        case "N": if (!e.shiftKey) return; a.goNext(); break;
+        case "P": if (!e.shiftKey) return; a.goPrevious(); break;
         default: return;
       }
       e.preventDefault();
@@ -775,6 +947,32 @@ export function YouTubePlayer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // The settings close on a press anywhere else and with Escape, as on YouTube. On the video it only closes them (the
+  // click comes to onSurfaceClick); a button or link elsewhere also does what it does.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const menuOpen = menu !== null;
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target || target === surfaceRef.current || menuRef.current?.contains(target) || target.closest("[data-settings-button]")) return;
+      setMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setMenu(null);
+      rootRef.current?.querySelectorAll<HTMLElement>("[data-settings-button]").forEach((b) => b.offsetParent && b.focus({ preventScroll: true }));
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [menuOpen]);
 
   // ── Clicks on the video ──
   // Mouse: click plays/pauses, double click is full screen. Touch: a tap shows/hides the controls, a double tap
@@ -838,11 +1036,6 @@ export function YouTubePlayer({
     endScrub();
   };
 
-  // The next video, started inside the tap (shared player: with sound)
-  const goNext = () => {
-    if (upNext && hosted) playFromTap(upNext.videoId);
-    moveOn();
-  };
   const moveOnByLink = (e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // opens a new tab or window
     movingRef.current = true;
@@ -850,12 +1043,21 @@ export function YouTubePlayer({
   };
   // "This video isn't playing": load its player once more
   const retry = () => {
+    if (!navigator.onLine) return;
     setIssue(null);
     userPausedRef.current = false;
     blockedRef.current = false;
     reloadPlayer();
     watchPlayback();
   };
+  // The connection is back: go on from where it stopped
+  const goOnRef = useRef(() => {});
+  useEffect(() => {
+    goOnRef.current = () => {
+      if (issue === "offline") retry();
+    };
+  });
+  useEffect(() => onBackOnline(() => goOnRef.current()), []);
 
   const played = duration ? Math.min(100, (shownTime / duration) * 100) : 0;
   // Progress bar: lifted while the pointer is on it. Over the pointer: the frame there and its time
@@ -864,8 +1066,11 @@ export function YouTubePlayer({
   const boardWidth = hover ? Math.round(Math.min(BOARD_WIDTH.max, Math.max(BOARD_WIDTH.min, hover.width * BOARD_WIDTH.share))) : 0;
   const pickedTime = scrubTime ?? hover?.time ?? 0;
   const volumeLevel = muted || volume === 0 ? "off" : volume < 50 ? "low" : "on";
-  const canGoNext = !!(upNext && onNext);
   const isFull = full;
+  const theater = useTheater();
+  const ambient = useAmbient();
+  const dark = useTheme().resolvedTheme === "dark";
+  const canGlow = useMediaQuery(THEATER_SCREENS) && (dark || theater) && !full;
   const timeText = (
     <>
       {showTimeLeft ? `-${formatTime(duration - shownTime)}` : formatTime(shownTime)}
@@ -877,6 +1082,7 @@ export function YouTubePlayer({
   const openMenu = () => {
     // Above the bar with a mouse; over the controls on touch screens, where there's less room
     setMenuMax((rootRef.current?.clientHeight ?? 400) - (pointerTypeRef.current === "mouse" ? 78 : 24));
+    if (typeof sleep === "number") setSleepLeft(Math.max(1, Math.ceil((sleep - Date.now()) / 60_000)));
     setMenu(menu ? null : "main");
   };
 
@@ -888,7 +1094,7 @@ export function YouTubePlayer({
       className={cn(
         // Its own layer (z-index), above the shared player's frame on iPhone/iPad/Safari, which is then the video
         "select-none overflow-hidden text-white [-webkit-tap-highlight-color:transparent]",
-        hosted ? "bg-transparent" : "bg-black",
+        hosted ? "bg-transparent" : cn("bg-black", !full && "watch-root"),
         full ? "fixed inset-0 z-[100]" : "absolute inset-0 z-[2]"
       )}
       onMouseMove={() => { if (pointerTypeRef.current === "mouse") showControls(); }}
@@ -906,16 +1112,25 @@ export function YouTubePlayer({
         // which Lighthouse otherwise counts as layout shift of the page (as on Shorts)
         className={cn(
           "pointer-events-none absolute transition-opacity duration-200",
-          // Full screen on a screen wider than 16:9 (phones): no wider than the video, or the crop would cut into it
-          tall ? "" : full ? "left-1/2 w-full max-w-[177.78vh] -translate-x-1/2 supports-[height:1dvh]:max-w-[177.78dvh]" : "left-0 w-full",
+          // Never wider than the video, or the crop would cut into it: full screen on a screen wider than 16:9 (phones),
+          // and a video narrower than 16:9
+          full ? "" : tall ? "watch-video-tall" : "watch-video",
+          tall
+            ? ""
+            : full
+              ? "left-1/2 w-full max-w-[calc(var(--ratio)*100vh)] -translate-x-1/2 supports-[height:1dvh]:max-w-[calc(var(--ratio)*100dvh)]"
+              : narrow
+                ? "left-1/2 w-[calc(var(--ratio)*56.25%)] -translate-x-1/2"
+                : "left-0 w-full",
           started ? "opacity-100" : "opacity-0"
         )}
-        style={tall ? tallFrame(cropped, full) : cropped ? { top: -CROP, height: `calc(100% + ${CROP * 2}px)` } : { top: 0, height: "100%" }}
+        style={tall ? tallFrame(full) : ({ top: -CROP, height: `calc(100% + ${CROP * 2}px)`, "--ratio": Math.min(ratio, WIDE) } as React.CSSProperties)}
         onLoad={startHandshake}
       />}
 
       {/* Takes every click and hover over the video, so YouTube's own hover/pause UI never shows */}
       <div
+        ref={surfaceRef}
         className="absolute inset-0 z-10 cursor-pointer"
         onClick={onSurfaceClick}
         onDoubleClick={() => { if (pointerTypeRef.current === "mouse") toggleFullscreen(); }}
@@ -957,7 +1172,13 @@ export function YouTubePlayer({
       {controlsVisible && !touchScrub && (
         <div style={safe} className={cn("pointer-events-none absolute inset-0 animate-in fade-in duration-200 can-hover:hidden", ended ? "z-[35]" : "z-20")}>
           <div className={cn("absolute inset-0 flex items-center justify-center gap-[34px]", ended && "hidden")}>
-            {canGoNext && <span className="w-12" />}
+            {(canGoNext || canGoPrevious) && (
+              <button type="button" aria-label="Previous" disabled={!canGoPrevious} onClick={goPrevious} className={SKIP_BUTTON}>
+                <span className={SKIP_ROUND}>
+                  <SkipBack className="fill-current" />
+                </span>
+              </button>
+            )}
             <button
               type="button"
               aria-label={isPlaying ? "Pause" : "Play"}
@@ -966,9 +1187,9 @@ export function YouTubePlayer({
             >
               {isPlaying ? <Pause className="fill-current stroke-0" /> : <Play className="fill-current stroke-0" />}
             </button>
-            {canGoNext && (
-              <button type="button" aria-label="Next" onClick={goNext} className="group pointer-events-auto flex h-12 w-12 items-center justify-center">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/30 group-active:bg-black/50 [&_svg]:h-5 [&_svg]:w-5">
+            {(canGoNext || canGoPrevious) && (
+              <button type="button" aria-label="Next" disabled={!canGoNext} onClick={goNext} className={SKIP_BUTTON}>
+                <span className={SKIP_ROUND}>
                   <SkipForward className="fill-current" />
                 </span>
               </button>
@@ -980,10 +1201,17 @@ export function YouTubePlayer({
                 <AutoplayTrack on={autoplayOn} />
               </button>
             )}
-            <button type="button" aria-label="Subtitles/closed captions" aria-pressed={captions} onClick={() => { toggleCaptions(); showControls(); }} className="flex h-10 w-11 items-center justify-center">
+            <button
+              type="button"
+              aria-label={hasCaptions ? "Subtitles/closed captions" : NO_CAPTIONS}
+              aria-pressed={hasCaptions ? captions : undefined}
+              disabled={!hasCaptions}
+              onClick={() => { toggleCaptions(); showControls(); }}
+              className="flex h-10 w-11 items-center justify-center disabled:opacity-40"
+            >
               {captions ? <CCIconOn /> : <CCIconOff className="fill-current" />}
             </button>
-            <button type="button" aria-label="Settings" aria-expanded={menu !== null} onClick={openMenu} className="flex h-10 w-11 items-center justify-center">
+            <button type="button" data-settings-button="" aria-label="Settings" aria-expanded={menu !== null} onClick={openMenu} className="flex h-10 w-11 items-center justify-center">
               <Settings />
             </button>
           </div>
@@ -1023,7 +1251,7 @@ export function YouTubePlayer({
       >
         <div className="flex flex-col px-7 can-hover:px-3">
           {/* Touch: the time and full screen, above the bar */}
-          <div className={cn("flex h-11 items-center justify-between can-hover:hidden", touchScrub && "invisible")}>
+          <div ref={timeRowRef} className={cn("flex h-11 items-center justify-between can-hover:hidden", touchScrub && "invisible")}>
             <span className="rounded-full bg-black/30 px-2 py-1 text-sm font-medium leading-4 tabular-nums">{timeText}</span>
             <button type="button" aria-label={isFull ? "Exit full screen" : "Full screen"} onClick={toggleFullscreen} className="group -mr-1.5 flex h-12 w-12 items-center justify-center">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/30 group-active:bg-black/50 [&_svg]:h-5 [&_svg]:w-5">
@@ -1035,6 +1263,7 @@ export function YouTubePlayer({
           {/* Progress bar: hover to see the frame and time there, click or drag to go there. The pointer can be up to
               10px above the line (a finger more) */}
           <div
+            ref={barRef}
             role="slider"
             aria-label="Seek"
             aria-valuemin={0}
@@ -1094,12 +1323,17 @@ export function YouTubePlayer({
               <BarButton name={ended ? "Replay" : isPlaying ? "Pause" : "Play"} keyName="k" tip="left" onClick={togglePlay}>
                 {ended ? <RotateCcw /> : isPlaying ? <Pause className="fill-current stroke-0" /> : <Play className="fill-current stroke-0" />}
               </BarButton>
-              {canGoNext && (
-                <BarButton name="Next" onClick={goNext}>
+            </div>
+            {playlist && (canGoNext || canGoPrevious) && (
+              <div className="ml-2 flex h-10 rounded-full bg-black/30">
+                <BarButton name="Previous" keyName="Shift+p" disabled={!canGoPrevious} onClick={goPrevious} className="w-[52px]">
+                  <SkipBack className="fill-current" />
+                </BarButton>
+                <BarButton name="Next" keyName="Shift+n" disabled={!canGoNext} onClick={goNext} className="w-[52px]">
                   <SkipForward className="fill-current" />
                 </BarButton>
-              )}
-            </div>
+              </div>
+            )}
             <div className="group/vol ml-3 flex h-10 items-center rounded-full bg-black/30">
               <BarButton name={volumeLevel === "off" ? "Unmute" : "Mute"} keyName="m" onClick={toggleMute}>
                 <VolumeIcon level={volumeLevel} />
@@ -1130,13 +1364,24 @@ export function YouTubePlayer({
                   <AutoplayTrack on={autoplayOn} />
                 </BarButton>
               )}
-              <BarButton name="Subtitles/closed captions" keyName="c" aria-pressed={captions} wide onClick={toggleCaptions}>
-                {captions ? <CCIconOn /> : <CCIconOff className="fill-current" />}
-                {captions && <span className="absolute -bottom-1.5 left-0 h-[3px] w-6 rounded-full bg-[#e1002d]" />}
+              <BarButton
+                name={hasCaptions ? "Subtitles/closed captions" : NO_CAPTIONS}
+                keyName={hasCaptions ? "c" : undefined}
+                aria-pressed={hasCaptions ? captions : undefined}
+                aria-disabled={!hasCaptions || undefined}
+                wide
+                onClick={toggleCaptions}
+              >
+                {captions ? <CCIconOn /> : <CCIconOff className={cn("fill-current", !hasCaptions && "opacity-40")} />}
               </BarButton>
-              <BarButton name="Settings" aria-expanded={menu !== null} wide onClick={openMenu} tip={menu ? "none" : "center"}>
+              <BarButton name="Settings" data-settings-button="" aria-expanded={menu !== null} wide onClick={openMenu} tip={menu ? "none" : "center"}>
                 <Settings className={cn("transition-transform duration-200", menu && "rotate-45")} />
               </BarButton>
+              {!full && (
+                <BarButton name={theater ? "Default view" : "Theater mode"} keyName="t" wide onClick={toggleTheater} className="hidden md:flex">
+                  <TheaterIcon on={theater} />
+                </BarButton>
+              )}
               <BarButton name={isFull ? "Exit full screen" : "Full screen"} keyName="f" wide tip="right" onClick={toggleFullscreen}>
                 {isFull ? <Minimize2 className="rotate-90" /> : <FullscreenIcon className="fill-current" />}
               </BarButton>
@@ -1148,6 +1393,9 @@ export function YouTubePlayer({
       {/* ── Settings ── above the bar with a mouse, over the controls on touch screens */}
       {menu && controlsVisible && (
         <div
+          // Each of its pages starts at the top
+          key={menu}
+          ref={menuRef}
           role="menu"
           aria-label="Settings"
           style={{ maxHeight: menuMax, ...(safe && { marginRight: safe.right, marginBottom: safe.bottom }) }}
@@ -1162,24 +1410,69 @@ export function YouTubePlayer({
                   <MenuSwitch on={autoplayOn} />
                 </MenuRow>
               )}
-              <MenuRow role="menuitemcheckbox" aria-checked={captions} icon={<CCIconOff className="fill-current" />} label="Subtitles/CC" onClick={toggleCaptions}>
-                <MenuSwitch on={captions} />
+              {canGlow && (
+                <MenuRow role="menuitemcheckbox" aria-checked={ambient} icon={<SunMedium />} label="Ambient mode" onClick={() => setAmbient(!ambient)}>
+                  <MenuSwitch on={ambient} />
+                </MenuRow>
+              )}
+              {hasCaptions && (
+                <MenuRow role="menuitem" icon={<CCIconOff className="fill-current" />} label="Subtitles/CC" onClick={() => setMenu("captions")}>
+                  <span className="truncate">{captions && choice ? choiceName(choice) : "Off"}</span>
+                  <ChevronRight className="h-5 w-5 flex-shrink-0" />
+                </MenuRow>
+              )}
+              <MenuRow role="menuitem" icon={<Timer />} label="Sleep timer" onClick={() => setMenu("sleep")}>
+                {sleep === null ? "Off" : sleep === "end" ? "End of video" : `${sleepLeft} min left`}
+                <ChevronRight className="h-5 w-5 flex-shrink-0" />
               </MenuRow>
               <MenuRow role="menuitem" icon={<Gauge />} label="Playback speed" onClick={() => setMenu("speed")}>
                 {rate === 1 ? "Normal" : rate}
                 <ChevronRight className="h-5 w-5" />
               </MenuRow>
             </>
+          ) : menu === "captions" ? (
+            <>
+              <MenuBack label="Subtitles/CC" onClick={() => setMenu("main")} />
+              <MenuChoice on={!captions} onClick={() => { setCaptionsOn(false); setMenu(null); }}>
+                Off
+              </MenuChoice>
+              {tracks.map((t) => (
+                <MenuChoice key={t.code} on={captions && !choice?.to && choice?.track.code === t.code} onClick={() => { chooseCaptions(t.code); setMenu(null); }}>
+                  {trackName(t)}
+                </MenuChoice>
+              ))}
+              {/* As on YouTube, only once captions are on */}
+              {captions && (
+                <MenuChoice on={!!choice?.to} onClick={() => setMenu("translate")}>
+                  Auto-translate
+                </MenuChoice>
+              )}
+            </>
+          ) : menu === "sleep" ? (
+            <>
+              <MenuBack label="Sleep timer" onClick={() => setMenu("main")} />
+              <MenuChoice on={sleep === null} onClick={() => { setSleep(null); setMenu(null); }}>Off</MenuChoice>
+              {SLEEP_MINUTES.map((m) => (
+                <MenuChoice key={m} on={false} onClick={() => { setSleep(Date.now() + m * 60_000); setMenu(null); }}>{m} minutes</MenuChoice>
+              ))}
+              <MenuChoice on={sleep === "end"} onClick={() => { setSleep("end"); setMenu(null); }}>End of video</MenuChoice>
+            </>
+          ) : menu === "translate" ? (
+            <>
+              <MenuBack label="Auto-translate" onClick={() => setMenu("captions")} />
+              {translationLanguages(reported?.languages, choice).map((l) => (
+                <MenuChoice key={l.code} on={choice?.to?.code === l.code} onClick={() => { translateCaptions(l.code, choice?.track.code); setMenu(null); }}>
+                  {l.name}
+                </MenuChoice>
+              ))}
+            </>
           ) : (
             <>
-              <button type="button" role="menuitem" onClick={() => setMenu("main")} className="mb-2 flex h-12 w-full items-center gap-2 border-b border-white/20 px-1 pb-1 font-medium">
-                <ChevronLeft className="h-6 w-6" /> Playback speed
-              </button>
+              <MenuBack label="Playback speed" onClick={() => setMenu("main")} />
               {SPEEDS.map((s) => (
-                <button key={s} type="button" role="menuitemradio" aria-checked={rate === s} onClick={() => changeRate(s)} className="flex h-10 w-full items-center gap-4 rounded-lg px-2 hover:bg-white/10 active:bg-white/10">
-                  <Check className={cn("h-5 w-5", rate !== s && "invisible")} />
+                <MenuChoice key={s} on={rate === s} onClick={() => changeRate(s)}>
                   {s === 1 ? "Normal" : s}
-                </button>
+                </MenuChoice>
               ))}
             </>
           )}
@@ -1192,8 +1485,8 @@ export function YouTubePlayer({
           <Image src={youtubeThumb(videoId)} alt="" fill sizes="50vw" className="object-cover opacity-25 blur-sm" />
           {issue && (
             <div role="alert" className="relative px-6 text-center">
-              <p className="text-base font-medium">{issue === "unavailable" ? "This video isn't available" : "This video isn't playing"}</p>
-              <p className="mt-1 text-sm text-white/80">{issue === "unavailable" ? "It may have been removed from YouTube." : "Check your connection, then try again."}</p>
+              <p className="text-base font-medium">{issue === "unavailable" ? "This video isn't available" : issue === "offline" ? "You're offline" : "This video isn't playing"}</p>
+              <p className="mt-1 text-sm text-white/80">{issue === "unavailable" ? "It may have been removed from YouTube." : issue === "offline" ? "Check your connection." : "Check your connection, then try again."}</p>
             </div>
           )}
           {secondsLeft !== null && upNext ? (
@@ -1215,12 +1508,12 @@ export function YouTubePlayer({
             </div>
           ) : issue ? (
             <div className="relative flex flex-wrap items-center justify-center gap-2">
-              {issue === "stalled" && (
+              {issue !== "unavailable" && (
                 <button type="button" onClick={retry} className="h-9 rounded-full bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-white/85">
                   Try again
                 </button>
               )}
-              {canGoNext && (
+              {canGoNext && issue !== "offline" && (
                 <button type="button" onClick={goNext} className="h-9 rounded-full bg-white/15 px-4 text-sm font-medium transition-colors hover:bg-white/25">
                   Next video
                 </button>
@@ -1249,6 +1542,11 @@ export function YouTubePlayer({
   );
 }
 
+const NO_CAPTIONS = "Subtitles/closed captions unavailable";
+// Previous and Next over the video (touch): 36px round in a 48px target, dimmed when there is none
+const SKIP_BUTTON = "group pointer-events-auto flex h-12 w-12 items-center justify-center disabled:pointer-events-none [&:disabled_svg]:opacity-40";
+const SKIP_ROUND = "flex h-9 w-9 items-center justify-center rounded-full bg-black/30 group-active:bg-black/50 [&_svg]:h-5 [&_svg]:w-5";
+
 /** A button of the control bar (mouse): the highlight inside its group, and its name and key above the progress bar. */
 function BarButton({
   name,
@@ -1264,13 +1562,13 @@ function BarButton({
       type="button"
       aria-label={keyName ? `${name} (${keyName})` : name}
       className={cn(
-        "group/btn relative flex h-10 flex-shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [&_svg]:h-6 [&_svg]:w-6",
+        "group/btn relative flex h-10 flex-shrink-0 items-center justify-center rounded-full [&:disabled_svg]:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [&_svg]:h-6 [&_svg]:w-6",
         wide ? "w-12" : "w-10",
         className
       )}
       {...props}
     >
-      <span aria-hidden="true" className={cn("absolute rounded-full transition-colors group-hover/btn:bg-white/10", wide ? "inset-x-0 inset-y-1" : "inset-1")} />
+      <span aria-hidden="true" className={cn("absolute rounded-full transition-colors group-enabled/btn:group-hover/btn:bg-white/10", wide ? "inset-x-0 inset-y-1" : "inset-1")} />
       <span className="relative flex drop-shadow-[0_0_2px_rgba(0,0,0,0.4)]">{children}</span>
       {tip !== "none" && (
         <span
@@ -1299,13 +1597,30 @@ function AutoplayTrack({ on }: { on: boolean }) {
   );
 }
 
+/** The top of a page of the player's settings: back to the one before. */
+function MenuBack({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" role="menuitem" onClick={onClick} className="mb-2 flex h-12 w-full items-center gap-2 border-b border-white/20 px-1 pb-1 font-medium">
+      <ChevronLeft className="h-6 w-6" /> {label}
+    </button>
+  );
+}
+function MenuChoice({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" role="menuitemradio" aria-checked={on} onClick={onClick} className="flex min-h-10 w-full items-center gap-4 rounded-lg px-2 py-2 text-left hover:bg-white/10 active:bg-white/10">
+      <Check className={cn("h-5 w-5 flex-shrink-0", !on && "invisible")} />
+      {children}
+    </button>
+  );
+}
+
 /** A row of the player's settings: icon, name, and its value or switch on the right. */
 function MenuRow({ icon, label, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactNode; label: string }) {
   return (
     <button type="button" className="flex h-12 w-full items-center rounded-lg px-2 text-left hover:bg-white/10 active:bg-white/10" {...props}>
       <span className="mr-5 flex [&_svg]:h-6 [&_svg]:w-6">{icon}</span>
-      <span className="flex-1">{label}</span>
-      <span className="flex items-center gap-1 text-white/70">{children}</span>
+      <span className="mr-3 flex-1 whitespace-nowrap">{label}</span>
+      <span className="flex min-w-0 items-center gap-1 text-white/70">{children}</span>
     </button>
   );
 }

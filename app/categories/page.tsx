@@ -12,6 +12,7 @@ import { SearchField } from "@/components/search-field";
 import { SortDropdown } from "@/components/sort-dropdown";
 import { countText } from "@/lib/format";
 import { categoryData } from "@/lib/video-data";
+import { filterIn } from "@/lib/search-match";
 
 const SORT_OPTIONS = [
   { label: "Default", value: "default" },
@@ -29,11 +30,8 @@ export default function CategoriesPage() {
   const languages = useLanguageFilter(LANGUAGES);
 
 
-  const query = searchQuery.trim().toLowerCase();
   // Categories with videos in the chosen languages
-  const categories = categoryData
-    .filter((c) => c.languages.some((l) => languages.selected.includes(l)))
-    .filter((c) => !query || c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query))
+  const categories = filterIn(categoryData.filter((c) => c.languages.some((l) => languages.selected.includes(l))), searchQuery, (c) => [c.name, c.description])
     .sort((a, b) => (sort === "name-asc" ? a.name.localeCompare(b.name) : sort === "name-desc" ? b.name.localeCompare(a.name) : sort === "videos" ? b.videoCount - a.videoCount : 0));
 
   return (

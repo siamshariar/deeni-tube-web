@@ -2,15 +2,16 @@
 // The app's Share, Report and Send feedback dialogs (opened with lib/dialogs.ts). Share and Report are sheets on phones.
 "use client";
 
-import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, ChevronLeft, ChevronRight, Copy, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ResponsiveDialog } from "@/components/responsive-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { closeDialog, type DialogRequest, type ReportKind } from "@/lib/dialogs";
 import { notify } from "@/lib/notify";
-import { openShareIntent } from "@/lib/share";
+import { canShareMore, copyText, shareMore, shareOn, shareSites } from "@/lib/share";
+import { useScrollRow } from "@/hooks/use-scroll-row";
 import { cn } from "@/lib/utils";
 
 const onOpenChange = (open: boolean) => {
@@ -18,75 +19,59 @@ const onOpenChange = (open: boolean) => {
 };
 
 export default function Dialogs({ open, request }: { open: boolean; request: DialogRequest }) {
-  if (request.type === "share") return <ShareDialog open={open} url={request.url} />;
+  if (request.type === "share") return <ShareDialog open={open} url={request.url} title={request.title} image={request.image} />;
   if (request.type === "report") return <ReportDialog open={open} kind={request.kind} title={request.title} />;
   return <FeedbackDialog open={open} />;
 }
 
 // ── Share ────────────────────────────────────────────────────────────────────
 
-const sharePlatforms = [
-  {
-    name: "Facebook",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-12 w-12">
-        <linearGradient id="fb5" x1="9.993%" x2="89.993%" y1="0%" y2="100%">
-          <stop offset="0%" stopColor="#18B5FE" />
-          <stop offset="100%" stopColor="#1277F2" />
-        </linearGradient>
-        <path fill="url(#fb5)" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" />
-        <path fill="#fff" d="M26.707 36.301V25.5h3.613l.543-4.215h-4.156v-2.699c0-1.227.336-2.054 2.082-2.054h2.227V12.66c-.387-.047-1.707-.16-3.25-.16-3.207 0-5.41 1.957-5.41 5.559v3.102H19v4.215h3.656V36.3h4.051z" />
-      </svg>
-    ),
-  },
-  {
-    name: "WhatsApp",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-12 w-12">
-        <path fill="#fff" d="M4.9 43.3l2.7-9.8C5.5 30.3 4.5 26.7 4.5 23 4.5 12.3 13.3 3.5 24 3.5S43.5 12.3 43.5 23 34.7 42.5 24 42.5c-3.5 0-6.9-.9-9.9-2.7l-9.2 3.5z" />
-        <path fill="#25D366" d="M24 5c9.9 0 18 8.1 18 18s-8.1 18-18 18c-3.2 0-6.2-.8-8.9-2.4l-1-.6-5.5 2.1 1.5-5.3-.7-1.1C5.7 31.1 5 28.6 5 26 5 16.1 13.1 8 23 8h1v-3z" />
-        <path fill="#fff" d="M35.5 26.8c-.4-.2-2.6-1.3-3-1.4-.4-.2-.7-.3-1 .2-.3.4-1.1 1.4-1.4 1.7-.3.3-.5.3-1 .1-.4-.2-1.9-.7-3.6-2.3-1.3-1.2-2.2-2.7-2.5-3.1-.3-.4 0-.7.2-.9.2-.2.4-.5.7-.8.2-.3.3-.5.5-.8.2-.3.1-.6 0-.8-.1-.2-.9-2.4-1.2-3.3-.3-.9-.7-.8-1-.8-.3 0-.6 0-.9 0-.3 0-.8.1-1.2.6-.4.5-1.6 1.5-1.6 3.7s1.6 4.3 1.8 4.6c.2.3 3.2 4.9 7.7 6.9 1.1.5 1.9.8 2.6 1 1.1.3 2.1.3 2.9.2.9-.1 2.6-1.1 3-2.1.4-1 .4-1.9.3-2.1-.2-.2-.4-.3-.8-.5z" />
-      </svg>
-    ),
-  },
-  {
-    name: "X",
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-12 w-12">
-        <path fill="#000" d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" />
-        <path fill="#fff" d="M13 14h7.5l5.6 8 8.9-8h3.5l-10.3 9.3L38 34h-7.5l-6.3-9-9.2 9H11l10.8-9.8L13 14zm5 2.5h3l13 15h-3l-13-15z" />
-      </svg>
-    ),
-  },
-]
-
-function ShareDialog({ open, url }: { open: boolean; url: string }) {
+function ShareDialog({ open, url, title, image }: { open: boolean; url: string; title: string; image?: string }) {
   const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(url).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      () => notify("Couldn't copy the link")
-    );
+  const [sites] = useState(shareSites);
+  const { rowRef, more, measure, scroll } = useScrollRow(sites, (width) => width - SHARE_ITEM);
+  const copy = async () => {
+    if (!(await copyText(url))) return notify("Couldn't copy the link");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <ResponsiveDialog open={open} onOpenChange={onOpenChange} title="Share" className="max-w-[480px]">
-      <div className="space-y-5">
-        <div className="flex gap-4">
-          {sharePlatforms.map((p) => (
-            <button
-              type="button"
-              key={p.name}
-              onClick={() => openShareIntent(p.name, url)}
-              aria-label={`Share on ${p.name}`}
-              className="flex w-[72px] flex-col items-center gap-2 rounded-xl py-2 transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {p.icon}
-              <span className="text-xs leading-4">{p.name}</span>
-            </button>
-          ))}
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange} title="Share" className="max-w-[520px]">
+      <div className="min-w-0 space-y-5">
+        {/* One row, as on YouTube: swiped with a finger, arrows at its ends with a mouse */}
+        <div className="relative -mx-4 md:mx-0">
+          <div ref={rowRef} role="group" aria-label="Share on" onScroll={measure} className="scrollbar-none flex overflow-x-auto overscroll-x-contain px-2 md:px-0">
+            {sites.map((site) => (
+              <ShareItem key={site.name} name={site.name} label={site.app ? `Share with ${site.name}` : `Share on ${site.name}`} onClick={() => shareOn(site, url, title, image)}>
+                <svg viewBox="0 0 64 64" aria-hidden="true" className="h-[60px] w-[60px] rounded-full">
+                  <rect width="64" height="64" fill={site.color} />
+                  <path d={site.icon} fill="#fff" />
+                </svg>
+              </ShareItem>
+            ))}
+            {canShareMore() && (
+              <ShareItem name="More" label="More ways to share" onClick={() => shareMore(url, title)}>
+                <span className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-accent">
+                  <MoreHorizontal className="h-7 w-7" />
+                </span>
+              </ShareItem>
+            )}
+          </div>
+          {(["left", "right"] as const).map(
+            (side) =>
+              more[side] && (
+                <button
+                  key={side}
+                  type="button"
+                  tabIndex={-1} // the sites themselves are reached with Tab
+                  aria-label={side === "left" ? "Previous" : "More sites"}
+                  onClick={() => scroll(side === "left" ? -1 : 1)}
+                  className={cn("absolute top-[18px] hidden h-10 w-10 items-center justify-center rounded-full border bg-popover shadow-md hover:bg-accent active:bg-accent can-hover:flex", side === "left" ? "-left-2" : "-right-2")}
+                >
+                  {side === "left" ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
+                </button>
+              )
+          )}
         </div>
         <div className="flex items-center gap-2 rounded-xl border bg-muted py-2 dark:bg-white/5 pl-4 pr-2">
           <input type="text" aria-label="Link" value={url} readOnly onFocus={(e) => e.target.select()} className="min-w-0 flex-1 truncate bg-transparent text-base outline-none md:text-sm" />
@@ -96,6 +81,21 @@ function ShareDialog({ open, url }: { open: boolean; url: string }) {
         </div>
       </div>
     </ResponsiveDialog>
+  );
+}
+
+const SHARE_ITEM = 84;
+function ShareItem({ name, label, onClick, children }: { name: string; label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="flex w-[84px] flex-shrink-0 flex-col items-center gap-2 rounded-xl py-2 transition-colors hover:bg-accent active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+    >
+      {children}
+      <span className="text-xs leading-4">{name}</span>
+    </button>
   );
 }
 

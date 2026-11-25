@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>You're offline - Deeni.tube</title>
+<style>
+  :root { --bg: #fff; --fg: #0f0f0f; --soft: #606060; --line: rgba(0, 0, 0, .1); --link: #065fd4; --hover: #def1ff; color-scheme: light; }
+  :root.dark { --bg: #0f0f0f; --fg: #f1f1f1; --soft: #aaa; --line: rgba(255, 255, 255, .2); --link: #3ea6ff; --hover: #263850; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 14px/20px Roboto, Arial, sans-serif; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { height: 56px; display: flex; align-items: center; padding: 0 16px; }
+  header img { height: 28px; width: auto; }
+  .d { display: none; }
+  .dark .d { display: block; }
+  .dark .l { display: none; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 16px 80px; }
+  svg { width: 120px; height: 120px; color: var(--soft); margin-bottom: 24px; }
+  h1 { margin: 0 0 12px; font-size: 24px; line-height: 32px; font-weight: 700; }
+  p { margin: 0 0 24px; color: var(--soft); }
+  button { height: 36px; padding: 0 16px; border: 1px solid var(--line); border-radius: 18px; background: none; color: var(--link); font: 500 14px/34px Roboto, Arial, sans-serif; cursor: pointer; }
+  button:hover { background: var(--hover); border-color: transparent; }
+  button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  @media (max-height: 400px) { svg { width: 64px; height: 64px; margin-bottom: 12px; } main { padding-bottom: 24px; } }
+</style>
+<script>
+  try { var t = localStorage.getItem("theme"); if (t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark"); } catch (e) {}
+</script>
+</head>
+<body>
+<header><a href="/" aria-label="Deeni.tube home"><img class="l" src="/logo-header.webp" alt="Deeni.tube"><img class="d" src="/logo-header-dark.webp" alt="Deeni.tube"></a></header>
+<main>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2-1.5"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8a15 15 0 0 0-11.3-3.8"/><path d="m2 2 20 20"/></svg>
+  <h1>Connect to the internet</h1>
+  <p role="status">You're offline. Check your connection.</p>
+  <button type="button" onclick="location.reload()">Retry</button>
+</main>
+<script>
+  // The page it stands for, as soon as the connection is back
+  addEventListener("online", function () { location.reload(); });
+</script>
+</body>
+</html>

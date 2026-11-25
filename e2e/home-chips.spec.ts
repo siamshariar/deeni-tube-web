@@ -3,8 +3,8 @@ import { useFakeYouTube as fakeYouTube } from './fake-youtube';
 
 // Home's category chips: the logo, a Home link or a reload brings the feed back to "All", from the top.
 
-const chips = (page: Page) => page.locator('main button[aria-pressed]');
-const selected = (page: Page) => page.locator('main button[aria-pressed="true"]');
+const chips = (page: Page) => page.locator('main button[aria-pressed]:not([data-preview] *)');
+const selected = (page: Page) => page.locator('main button[aria-pressed="true"]:not([data-preview] *)');
 const scrollY = (page: Page) => page.evaluate(() => Math.round(window.scrollY));
 const rowLeft = (page: Page) => chips(page).first().evaluate((b) => Math.round(b.parentElement!.parentElement!.scrollLeft));
 const logo = (page: Page) => page.locator('header a[href="/"]:visible');

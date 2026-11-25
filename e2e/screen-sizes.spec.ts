@@ -145,7 +145,14 @@ test.describe('phones held sideways', () => {
   });
 });
 
-test.describe('Shorts comments', () => {
+// (the Comment button is switched off, see app/shorts/page.tsx)
+test('Shorts have no Comment button', async ({ page }) => {
+  await open(page, '/shorts', 390, 844);
+  await expect(page.locator('button[aria-label^="Like"], button[aria-label^="Unlike"]').first()).toBeVisible();
+  await expect(page.locator('button[aria-label^="Comments"]')).toHaveCount(0);
+});
+
+test.describe.skip('Shorts comments', () => {
   for (const [width, height, sheet] of [[390, 844, true], [768, 1024, true], [844, 390, true], [1024, 768, false], [1280, 720, false], [1280, 1024, false]] as const) {
     test(`${sheet ? 'a sheet over' : 'a panel beside'} the video, which stays whole (${width}x${height})`, async ({ page }) => {
       await open(page, '/shorts', width, height);
@@ -487,7 +494,7 @@ test.describe('a search result opens in the search page', () => {
     expect((await page.request.get('/search/only-a-title')).status()).toBe(404);
   });
 
-  test('it plays, is in History and goes on to the next one, in the video page', async ({ page }) => {
+  test('it plays, is in History and goes on to the next one, in the video page', async ({ page, isMobile }) => {
     await open(page, '/search?q=allah', 1440, 900);
     const result = page.locator('main a:has(h3)').locator('visible=true').first();
     const title = (await result.textContent())!;
@@ -495,8 +502,8 @@ test.describe('a search result opens in the search page', () => {
     await page.waitForURL(/\/search\/.+\?q=allah$/);
     const player = page.getByRole('region', { name: 'Video player' });
     await expect(player.getByRole('button', { name: /^Pause/ }).first()).toBeAttached({ timeout: 10_000 });
-    await player.hover();
-    await player.getByRole('button', { name: 'Next' }).locator('visible=true').first().click();
+    if (isMobile) await player.getByRole('button', { name: 'Next' }).locator('visible=true').first().click();
+    else await page.keyboard.press('Shift+N'); // with a mouse a single video has no Next, as on YouTube
     await expect(page).toHaveURL(/\/videos\/.+\/[\w-]{11}$/);
     await page.goto('/history');
     await expect(page.getByRole('heading', { name: title }).first()).toBeVisible();

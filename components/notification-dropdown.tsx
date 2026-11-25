@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Bell, Settings, BellOff, EyeOff } from "lucide-react";
+import { BellIcon } from "@/components/icons/action-icons";
 import { MoreButton } from "@/components/more-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -19,7 +20,6 @@ import {
   DropdownMenuItem as SubDropdownItem,
   DropdownMenuTrigger as SubDropdownTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
@@ -179,20 +179,21 @@ export default function NotificationDropdown() {
   return (
     <DropdownMenu open={open} onOpenChange={handleOpen} closeOnScroll={false}>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full relative"
+        <button
+          type="button"
+          className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-colors active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:w-10 md:hover:bg-black/10 md:active:bg-black/20 dark:md:hover:bg-white/20"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         >
-          <Bell className="h-6 w-6" />
-          {/* Notification count badge */}
-          {unreadCount > 0 && (
-            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Button>
+          <span className="relative h-6 w-6">
+            <BellIcon className="h-6 w-6" />
+            {/* The count, YouTube's badge: 20px high with the page's colour around it, its left half over the bell */}
+            {unreadCount > 0 && (
+              <span aria-hidden="true" className={cn("absolute -top-1 left-3 box-content h-4 min-w-2 max-w-[18px] rounded-[22px] border-2 border-background bg-[#e1002d] px-1 text-center font-normal leading-4 text-white", unreadCount > 9 ? "text-[10px]" : "text-xs")}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </span>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         className="w-[calc(100vw-16px)] max-w-[480px] sm:w-[440px] md:w-[480px] p-0 py-0 overflow-hidden"

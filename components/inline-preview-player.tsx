@@ -1,6 +1,6 @@
 // components/inline-preview-player.tsx
 // The playing video of a card's inline preview (see components/inline-preview.tsx, which explains the
-// behaviour): the YouTube embed, the volume button, the time left and the seekable progress bar. Loaded only
+// behaviour): the YouTube embed, the volume and captions buttons, the time left and the seekable progress bar. Loaded only
 // when a preview starts, so pages with cards don't carry it in their first JavaScript.
 // Like YouTube's inline playback, it starts where the video was left (lib/watch-progress), saves how far it
 // gets, and adds the video to History once it has played HISTORY_AFTER_S seconds.
@@ -9,7 +9,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { VolumeIcon } from "@/components/icons/player-icons";
+import { CCIconOff, CCIconOn, VolumeIcon } from "@/components/icons/player-icons";
+import { CAPTION_NOTE_MS, captionLayout, CARD_CAPTIONS, HIDE_CAPTIONS, moveCaptionsCommands, setPreviewCaptions, showCaptionsCommands, useCaptions, usePreviewCaptions } from "@/lib/captions";
 import { cn } from "@/lib/utils";
 import { progressSaver, resumeTime } from "@/lib/watch-progress";
 import { STORYBOARD_MEDIUM, StoryboardFrame, useStoryboard } from "@/components/storyboard";
@@ -52,6 +53,26 @@ function formatTime(seconds: number) {
   return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
+// A button in the card's corner: YouTube's plain white icon, with a dark circle behind it on hover
+const CORNER_ICON = "relative h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.45)]";
+function CornerButton({ name, pressed, onClick, className, children }: { name: string; pressed?: boolean; onClick: (e: React.MouseEvent) => void; className: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={name}
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cn("group/corner pointer-events-auto absolute right-1 flex h-12 w-12 items-center justify-center text-white focus-visible:outline-none", className)}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-1 rounded-full bg-black/60 opacity-0 transition-opacity duration-100 kb:group-focus-visible/corner:opacity-100 can-hover:group-hover/corner:opacity-100"
+      />
+      {children}
+    </button>
+  );
+}
+
 export default function PreviewLayer({
   videoId,
   title,
@@ -83,6 +104,7 @@ export default function PreviewLayer({
   // Where the video was left last time (watched before): the preview goes on from there
   const [startAt] = useState(() => resumeTime(videoId));
   const [saver] = useState(() => progressSaver(videoId, startAt));
+  const width = Math.min(100, (findVideo(videoId)?.ratio ?? 16 / 9) * 56.25);
   const [muted, setMuted] = useState(initialMuted);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(startAt ?? 0);
@@ -211,6 +233,34 @@ export default function PreviewLayer({
     onMutedChange(next);
   };
 
+  // ── Captions ── as on YouTube: on until switched off, for all cards
+  const { choice, available } = useCaptions(videoId);
+  const captions = usePreviewCaptions() && choice !== null;
+  useEffect(() => {
+    const frame = iframeRef.current;
+    const box = frame?.parentElement;
+    if (!playing || !frame || !box) return;
+    const send = (func: string, args: unknown[]) => frame.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), ORIGIN);
+    if (!captions || !choice) return send(...HIDE_CAPTIONS);
+    // (YouTube's note isn't in its own cards: out of sight while it may be there)
+    let far = true;
+    const layout = () => captionLayout(frame, box, { ratio: findVideo(videoId)?.ratio, style: CARD_CAPTIONS[mode], far, rollup: choice.track.auto });
+    const show = () => {
+      const at = layout();
+      [...showCaptionsCommands(choice, at), ...moveCaptionsCommands(frame, at)].forEach((c) => send(...c));
+    };
+    show();
+    // Again once YouTube's captions part has loaded (a translation only once more: YouTube fetches it each time)
+    const timers = (choice.to ? [1200] : [700, 2500]).map((ms) => setTimeout(show, ms));
+    timers.push(setTimeout(() => { far = false; moveCaptionsCommands(frame, layout()).forEach((c) => send(...c)); }, CAPTION_NOTE_MS));
+    return () => timers.forEach(clearTimeout);
+  }, [playing, captions, choice, mode, videoId]);
+  const toggleCaptions = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPreviewCaptions(!captions);
+  };
+
   // ── Progress bar ──
   const mouse = mode === "mouse";
   const bar = BAR[mode];
@@ -260,7 +310,7 @@ export default function PreviewLayer({
   return (
     <div className="pointer-events-none absolute inset-0 z-[1]" data-preview={videoId}>
       {/* The video, cut to the thumbnail's shape; the progress line is drawn inside it */}
-      <div className={cn("absolute inset-0 overflow-hidden", rounded)}>
+      <div className={cn("absolute inset-0 overflow-hidden", rounded, playing && width < 100 && "bg-black")}>
         <iframe
           ref={iframeRef}
           src={`${ORIGIN}/embed/${videoId}?autoplay=1${startAt ? `&start=${Math.floor(startAt)}` : ""}&mute=${initialMuted ? 1 : 0}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&cc_load_policy=0&enablejsapi=1`}
@@ -268,8 +318,9 @@ export default function PreviewLayer({
           allow="autoplay; encrypted-media; picture-in-picture"
           tabIndex={-1}
           aria-hidden="true"
-          className={cn("absolute left-0 w-full border-0 transition-opacity duration-200", playing ? "opacity-100" : "opacity-0")}
-          style={{ top: -CROP, height: `calc(100% + ${CROP * 2}px)` }}
+          className={cn("absolute border-0 transition-opacity duration-200", playing ? "opacity-100" : "opacity-0")}
+          // No wider than the video (narrower than 16:9), or the crop would cut into it
+          style={{ top: -CROP, height: `calc(100% + ${CROP * 2}px)`, left: `${50 - width / 2}%`, width: `${width}%` }}
         />
         {playing && (
           <>
@@ -313,19 +364,15 @@ export default function PreviewLayer({
 
       {playing && (
         <>
-          {/* Volume, top right: YouTube's plain white icon, with a dark circle behind it on hover */}
-          <button
-            type="button"
-            aria-label={muted ? "Unmute" : "Mute"}
-            onClick={toggleMute}
-            className="group/volume pointer-events-auto absolute right-1 top-1 flex h-12 w-12 items-center justify-center text-white focus-visible:outline-none"
-          >
-            <span
-              aria-hidden="true"
-              className="absolute inset-1 rounded-full bg-black/60 opacity-0 transition-opacity duration-100 kb:group-focus-visible/volume:opacity-100 can-hover:group-hover/volume:opacity-100"
-            />
-            <VolumeIcon level={muted ? "off" : "on"} className="relative h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.45)]" />
-          </button>
+          {/* Top right, as YouTube's: volume and, under it, captions */}
+          <CornerButton name={muted ? "Unmute" : "Mute"} onClick={toggleMute} className="top-1">
+            <VolumeIcon level={muted ? "off" : "on"} className={CORNER_ICON} />
+          </CornerButton>
+          {available && (
+            <CornerButton name={captions ? "Subtitles/CC turned on" : "Subtitles/CC turned off"} pressed={captions} onClick={toggleCaptions} className="top-[52px]">
+              {captions ? <CCIconOn className={CORNER_ICON} /> : <CCIconOff className={cn("fill-current", CORNER_ICON)} />}
+            </CornerButton>
+          )}
 
           {/* Time left (hidden while the bar shows the time being picked) */}
           {duration > 0 && !lifted && dragAt === null && (

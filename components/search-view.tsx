@@ -28,6 +28,7 @@ import { WatchView } from "@/components/watch-view";
 import { isVideoPath, searchVideoPath } from "@/lib/video-url";
 import { warmYouTube } from "@/lib/warm-youtube";
 import { InlinePreview } from "@/components/inline-preview";
+import { searchIn } from "@/lib/search-match";
 
 // ── Static data ──────────────────────────────────────────────────────────────
 
@@ -50,22 +51,17 @@ type SearchFilters = { langs: string[]; cats: string[]; scholars: string[]; chan
 const channelIds = (names: string[], map: Map<string, string>) => names.map((n) => map.get(n)).filter((id): id is string => !!id);
 
 function search(query: string, f: SearchFilters): VideoItem[] {
-  const term = query.trim().toLowerCase();
   const scholars = channelIds(f.scholars, scholarNameToChannelId);
   const channels = channelIds(f.channels, channelNameToId);
-  return videoData.filter(
+  const listed = videoData.filter(
     (v) =>
-      (!term ||
-        v.title.toLowerCase().includes(term) ||
-        v.channel.toLowerCase().includes(term) ||
-        v.description.toLowerCase().includes(term) ||
-        // Most titles are in Bangla, so also match the English category ("quran", "dua", …)
-        (v.category ?? "").toLowerCase().includes(term)) &&
       (!f.langs.length || f.langs.includes(v.language)) &&
       (!f.cats.length || f.cats.includes(v.category)) &&
       (!f.scholars.length || scholars.includes(v.channelId)) &&
       (!f.channels.length || channels.includes(v.channelId))
   );
+  // Most titles are in Bangla, so also match the English category ("quran", "dua", …)
+  return searchIn(listed, query, (v) => ({ main: [v.title, v.channel, v.category ?? ""], more: v.description }));
 }
 
 // ── Results ───────────────────────────────────────────────────────────────────
@@ -241,10 +237,10 @@ function SearchPageContent({ onOpen }: { onOpen: (href: string) => void }) {
             type="button"
             onClick={openMobileModal}
             aria-label={query ? `Change the search: ${query}` : "Search videos, scholars, channels"}
-            className={cn("flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-muted pl-3 pr-4 text-left text-base transition-colors active:bg-accent", !query && "text-muted-foreground")}
+            className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-muted pl-4 pr-3 text-left text-base transition-colors active:bg-accent"
           >
-            <Search className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="truncate">{query || "Search videos, scholars, channels"}</span>
+            <span className={cn("min-w-0 flex-1 truncate", !query && "text-muted-foreground")}>{query || "Search Deeni.tube"}</span>
+            <Search className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
           </button>
           {hasSearched && (
             <button type="button" onClick={openMobileModal} className={cn(filterButton, filtersOn ? CHIP_ON : CHIP_OFF)}>

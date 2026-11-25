@@ -14,7 +14,8 @@ import { SaveIcon, ShareIcon } from "@/components/icons/action-icons";
 import { useDontRecommend } from "@/hooks/useDontRecommend";
 import { useWatchLater } from "@/hooks/useWatchLater";
 import { openReport, openShare } from "@/lib/dialogs";
-import { mediaPath } from "@/lib/media-lookup";
+import { youtubeThumb } from "@/lib/media-lookup";
+import { sharePath } from "@/lib/share-path";
 import { openSaveCard } from "@/lib/save-card";
 import { cn } from "@/lib/utils";
 
@@ -74,7 +75,7 @@ export function MediaMenu({ media, scope, onNotInterested, extra = [], inWatchLa
           },
         ]),
     { id: "playlist", label: "Save to playlist", icon: SaveIcon, opens: true, onSelect: () => openSaveCard({ id: media.id, title: media.title, channel: media.channel }) },
-    { id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(mediaPath(media)) },
+    { id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(sharePath(media), media.title, youtubeThumb(media.videoId)) },
   ];
   if (scope === "suggested") {
     const more: MenuAction[] = [];

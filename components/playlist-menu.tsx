@@ -47,7 +47,7 @@ export function PlaylistMenu({ playlist, readOnly = false, playHref, onPlay, onD
         router.push(playHref);
       },
     });
-  if (playlist.isPublic) actions.push({ id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(`/playlists/${playlist.slug}/${playlist.id}`) });
+  if (playlist.isPublic) actions.push({ id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(`/playlists/${playlist.slug}/${playlist.id}`, playlist.name) });
   if (own) {
     actions.push({ id: "edit", label: "Edit playlist", icon: Pencil, opens: true, divider: actions.length > 0, onSelect: () => setEditing(true) });
     actions.push({ id: "delete", label: "Delete playlist", icon: Trash2, opens: true, danger: true, onSelect: () => setDeleting(true) });

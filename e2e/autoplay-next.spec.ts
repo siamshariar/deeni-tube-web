@@ -252,9 +252,8 @@ test.describe('Full screen', () => {
     await expect.poll(playing(page, V3), { timeout: 10_000 }).toBe(true);
     expect(await inFull()).toBe(true);
     expect(await fills()).toEqual([0, 0, width, height]);
-    // …also with Next
-    await page.mouse.move(400, 300);
-    await player(page).getByRole('button', { name: 'Next', exact: true }).click();
+    // …also with Shift+N (a single video has no Next button with a mouse, as on YouTube)
+    await page.keyboard.press('Shift+N');
     await expect.poll(playing(page, V4), { timeout: 10_000 }).toBe(true);
     expect(await inFull()).toBe(true);
 

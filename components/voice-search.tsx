@@ -1,224 +1,99 @@
 // components/voice-search.tsx
-// Voice search, as on YouTube: the mic button opens a dialog that listens (red pulsing mic), shows the words
-// as they are recognised, and searches when the speaker stops. Uses the browser's Web Speech API (Chrome,
-// Edge, Safari); other browsers get a "not supported" message. The recognition language (English or
-// Bangla) is remembered per device in localStorage ('deeni-voice-lang').
+// Voice search's card, as on YouTube (measured): over the search box at the top of the page (592x440, 8px down), on phones a
+// page of its own; a red microphone with a ring that spreads while it listens, the words as they are recognised, then the
+// search. One for the whole app (in app/layout.tsx); opened with openVoice (lib/voice.ts, which does the listening).
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Mic, X } from "lucide-react";
+import { X } from "lucide-react";
+import { MicIcon } from "@/components/icons/action-icons";
+import { closeVoice, pressVoice, setVoiceLang, useVoice, VOICE_LANGUAGES, watchMicrophone, type VoiceProblem } from "@/lib/voice";
 import { cn } from "@/lib/utils";
 
-// TypeScript's DOM types only include the result types of the Web Speech API
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  maxAlternatives: number;
-  onresult: ((e: { resultIndex: number; results: SpeechRecognitionResultList }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
-
-function recognitionCtor(): SpeechRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-const LANGUAGES = [
-  { code: "en-US", label: "English" },
-  { code: "bn-BD", label: "বাংলা" },
-];
-const LANG_KEY = "deeni-voice-lang";
-
-function initialLang() {
-  try {
-    const saved = localStorage.getItem(LANG_KEY);
-    if (saved && LANGUAGES.some((l) => l.code === saved)) return saved;
-  } catch {}
-  return typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("bn") ? "bn-BD" : "en-US";
-}
-
-type Problem = "no-speech" | "denied" | "no-mic" | "network" | "error" | "unsupported";
-
-const PROBLEMS: Record<Problem, { title: string; hint: string }> = {
-  "no-speech": { title: "Didn't hear that. Try again.", hint: "Tap the microphone and speak" },
-  denied: { title: "Permission to use the microphone is blocked", hint: "Allow the microphone for this site from your browser's address bar, then try again" },
-  "no-mic": { title: "No microphone found", hint: "Check your microphone and try again" },
-  network: { title: "Voice search needs an internet connection", hint: "Check your connection and try again" },
-  error: { title: "Voice search didn't work", hint: "Tap the microphone to try again" },
+const MESSAGES: Record<VoiceProblem | "asking", { title: string; hint?: string }> = {
+  asking: { title: "Waiting for permission", hint: "Allow microphone access to search with your voice" },
+  "no-speech": { title: "Didn't hear that. Try again." },
+  denied: { title: "Search with your voice", hint: "To search by voice, go to your browser settings and allow access to microphone" },
+  "no-mic": { title: "No microphone found", hint: "Connect a microphone, or turn it on in your device's sound settings, then try again" },
+  network: { title: "You're offline", hint: "Check your connection, then try again" },
+  error: { title: "Voice search didn't work" },
   unsupported: { title: "Voice search isn't supported in this browser", hint: "Try Chrome, Edge or Safari" },
 };
 
-function problemFor(error: string): Problem {
-  if (error === "not-allowed" || error === "service-not-allowed") return "denied";
-  if (error === "audio-capture") return "no-mic";
-  if (error === "network") return "network";
-  if (error === "no-speech" || error === "aborted") return "no-speech";
-  return "error";
-}
-
-export function VoiceSearchDialog({
-  open,
-  onOpenChange,
-  onResult,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /** Called with the recognised text; the caller searches and closes the dialog */
-  onResult: (text: string) => void;
-}) {
+export default function VoiceSearch() {
+  const { open, status, text, lang } = useVoice();
+  // Not over another page (the phone's Back)
+  const pathname = usePathname();
+  useEffect(() => closeVoice, [pathname]);
+  useEffect(watchMicrophone, []);
+  const listening = status === "listening";
+  const supported = status !== "unsupported";
+  const failed = !listening && status !== "asking";
+  const message = status === "listening" ? null : MESSAGES[status];
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) closeVoice(); }}>
       <DialogPrimitive.Portal>
         {/* z-[70]: also above the full-screen phone search (z-60) */}
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[70] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[70] bg-black/30 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
-          className="fixed left-1/2 top-1/2 z-[70] w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-background text-foreground shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          className="yt-scrollbar fixed inset-0 z-[70] overflow-y-auto bg-background text-foreground outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 max-md:pl-[var(--sal)] max-md:pr-[var(--sar)] md:inset-auto md:left-[calc(50%-296px)] md:top-2 md:h-[440px] md:max-h-[calc(100dvh-16px)] md:w-[592px] md:shadow-[0_16px_24px_2px_rgba(0,0,0,0.14),0_6px_30px_5px_rgba(0,0,0,0.12),0_8px_10px_-5px_rgba(0,0,0,0.4)] dark:bg-[#212121]"
         >
-          {/* Mounted per opening, so every opening starts a fresh listening session */}
-          <VoiceSearchSession onResult={onResult} />
+          <div className="relative flex min-h-full flex-col p-7 md:p-0 md:pl-8 low:!p-4 low:!pl-8">
+            <DialogPrimitive.Title className="sr-only">Search with your voice</DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <button type="button" aria-label="Close" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-accent active:bg-accent md:absolute md:right-2 md:top-2 low:absolute low:right-2 low:top-2">
+                <X className="h-6 w-6" />
+              </button>
+            </DialogPrimitive.Close>
+
+            {/* What it heard, or what is wrong */}
+            <div className="px-2 pt-14 md:px-0 md:pr-14 md:pt-12 low:!px-0 low:!pr-14 low:!pt-2">
+              <p aria-live="polite" className="text-2xl leading-[30px] [overflow-wrap:anywhere] md:font-bold md:leading-8">
+                {message ? message.title : text || "Listening..."}
+              </p>
+              {message?.hint && <p className="mt-6 text-sm leading-5 text-muted-foreground low:mt-2">{message.hint}</p>}
+              {supported && (
+                <div className="mt-6 flex items-center gap-2 low:mt-3" role="group" aria-label="Voice search language">
+                  {VOICE_LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      aria-pressed={lang === l.code}
+                      onClick={() => setVoiceLang(l.code)}
+                      className={cn(
+                        "h-8 rounded-lg px-3 text-sm font-medium transition-colors",
+                        lang === l.code ? "bg-foreground text-background" : "bg-muted hover:bg-accent dark:bg-white/10 dark:hover:bg-white/20"
+                      )}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-auto flex flex-col items-center pb-2 pt-8 md:pb-10 low:!pb-0 low:!pt-2">
+              <button
+                type="button"
+                onClick={pressVoice}
+                disabled={!supported}
+                aria-label={failed ? "Try again" : "Stop listening"}
+                className={cn(
+                  "relative flex h-20 w-20 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 md:h-[68px] md:w-[68px] low:!h-14 low:!w-14",
+                  listening ? "bg-[#e1002d] text-white" : "bg-black/[0.36] hover:bg-black/[0.42] dark:bg-white/[0.36] dark:hover:bg-white/[0.42]"
+                )}
+              >
+                {listening && <span aria-hidden="true" className="absolute inset-0 animate-[voice-ring_1.5s_ease-out_infinite] rounded-full border border-black/20 motion-reduce:hidden dark:border-white/30" />}
+                <MicIcon className="relative h-12 w-12 md:h-10 md:w-10 low:!h-8 low:!w-8" />
+              </button>
+              <p className="mt-4 min-h-6 text-center text-sm leading-6 text-muted-foreground low:!mt-1">{failed && supported && status !== "denied" ? "Tap microphone to try again" : ""}</p>
+            </div>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
-  );
-}
-
-function VoiceSearchSession({ onResult }: { onResult: (text: string) => void }) {
-  const [supported] = useState(() => recognitionCtor() !== null);
-  const [lang, setLang] = useState(initialLang);
-  const [attempt, setAttempt] = useState(0);
-  const [problem, setProblem] = useState<Problem | null>(supported ? null : "unsupported");
-  const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const onResultRef = useRef(onResult);
-  useEffect(() => {
-    onResultRef.current = onResult;
-  });
-
-  useEffect(() => {
-    const Recognition = recognitionCtor();
-    if (!Recognition) return;
-    const recognition = new Recognition();
-    recognition.lang = lang;
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-    let finalText = "";
-    let failed = false;
-    recognition.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const result = e.results[i];
-        if (result.isFinal) finalText += result[0].transcript;
-        else interim += result[0].transcript;
-      }
-      setTranscript((finalText + interim).trim());
-    };
-    recognition.onerror = (e) => {
-      failed = true;
-      setProblem(problemFor(e.error));
-    };
-    recognition.onend = () => {
-      recognitionRef.current = null;
-      const text = finalText.trim();
-      if (text && !failed) onResultRef.current(text);
-      else if (!failed) setProblem("no-speech");
-    };
-    recognitionRef.current = recognition;
-    try {
-      recognition.start();
-    } catch {
-      // start() only throws if a session is already running; errors are reported through onerror
-    }
-    return () => {
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.abort();
-      recognitionRef.current = null;
-    };
-  }, [lang, attempt]);
-
-  const listening = problem === null;
-
-  const restart = () => {
-    setProblem(null);
-    setTranscript("");
-    setAttempt((n) => n + 1);
-  };
-
-  const chooseLang = (code: string) => {
-    if (code === lang) return;
-    try { localStorage.setItem(LANG_KEY, code); } catch {}
-    setLang(code);
-    setProblem(null);
-    setTranscript("");
-  };
-
-  const onMicClick = () => {
-    if (!supported) return;
-    if (listening) recognitionRef.current?.stop(); // stop now and search what was heard so far
-    else restart();
-  };
-
-  const message = problem ? PROBLEMS[problem] : null;
-
-  return (
-    <div className="flex min-h-[340px] flex-col sm:min-h-[380px]">
-      <div className="flex items-start justify-between gap-2 py-2 pl-6 pr-2">
-        <DialogPrimitive.Title className="sr-only">Search with your voice</DialogPrimitive.Title>
-        <p aria-live="polite" className="min-w-0 pt-3 text-xl leading-8 [overflow-wrap:anywhere] sm:text-2xl">
-          {message ? message.title : transcript || "Listening..."}
-        </p>
-        <DialogPrimitive.Close asChild>
-          <button type="button" aria-label="Close" className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-accent">
-            <X className="h-6 w-6" />
-          </button>
-        </DialogPrimitive.Close>
-      </div>
-
-      <div className="flex flex-1 flex-col items-center justify-end gap-4 px-6 pb-6 pt-8">
-        <button
-          type="button"
-          onClick={onMicClick}
-          disabled={!supported}
-          aria-label={listening ? "Stop listening" : "Try again"}
-          className={cn(
-            "relative flex h-16 w-16 items-center justify-center rounded-full transition-colors disabled:opacity-50 sm:h-20 sm:w-20",
-            listening ? "bg-[#ff0000] text-white" : "bg-muted text-foreground hover:bg-accent"
-          )}
-        >
-          {listening && <span aria-hidden="true" className="absolute inset-0 animate-ping rounded-full bg-[#ff0000]/40" />}
-          <Mic className="relative h-8 w-8 sm:h-9 sm:w-9" />
-        </button>
-        <p className="min-h-5 text-center text-sm text-muted-foreground">{message ? message.hint : "Speak now"}</p>
-        {supported && (
-          <div className="flex items-center gap-2" role="group" aria-label="Voice search language">
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                type="button"
-                aria-pressed={lang === l.code}
-                onClick={() => chooseLang(l.code)}
-                className={cn(
-                  "h-8 rounded-lg px-3 text-sm font-medium transition-colors",
-                  lang === l.code ? "bg-foreground text-background" : "bg-muted hover:bg-accent"
-                )}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

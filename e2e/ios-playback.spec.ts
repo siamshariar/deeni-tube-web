@@ -337,3 +337,29 @@ test.describe('iPhone: Shorts with sound', () => {
     await expectHostOver(page, 1);
   });
 });
+
+test.describe('iPhone: captions in the shared player', () => {
+  test('a video opened with a tap shows its captions, in the visible video', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('deeni-captions', JSON.stringify({ on: true })));
+    await seed(page);
+    await useFakeYouTube(page, { ios: true });
+    await page.goto('/');
+    const frame = await hostFrame(page);
+    await expect.poll(() => fake(frame)).toMatchObject({ playing: true, videoId: PLACEHOLDER });
+    await page.locator('main a[href*="XVscS6piz9A"]').locator('visible=true').first().tap();
+    await page.waitForURL(/XVscS6piz9A/);
+    type Told = { lang: string | null; box: { bottom: number; height: number } | null };
+    const told = () => frame.evaluate(() => (window as unknown as { __captions: () => Told }).__captions());
+    await expect.poll(async () => (await told()).lang, { timeout: 15_000 }).toBe('bn');
+    const box = (await page.getByRole('region', { name: 'Video player' }).boundingBox())!;
+    const iframe = page.locator('[data-player-host] iframe');
+    // 28px above the bottom (2% and 24px), as on other phones
+    await expect.poll(async () => {
+      const { box: c } = await told();
+      const f = (await iframe.boundingBox())!;
+      return c && Math.round(box.y + box.height - (f.y + c.bottom - 0.02 * c.height));
+    }, { timeout: 10_000 }).toBe(28);
+    // YouTube's own title and buttons stay cut off
+    expect(Math.round(box.y - (await iframe.boundingBox())!.y)).toBe(120);
+  });
+});

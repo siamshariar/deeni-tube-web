@@ -127,9 +127,9 @@ export default function AccountDropdown() {
           <button
             type="button"
             aria-label="Account menu"
-            className="flex h-10 w-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-12 w-12 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10 md:w-11"
           >
-            {avatar("h-8 w-8", "text-sm")}
+            {avatar("h-6 w-6 md:h-8 md:w-8", "text-xs md:text-sm")}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

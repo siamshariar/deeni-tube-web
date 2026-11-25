@@ -15,6 +15,7 @@ import { countText } from "@/lib/format";
 import { daysAgo } from "@/lib/time-ago";
 import { categoryData, videoData } from "@/lib/video-data";
 import { cn } from "@/lib/utils";
+import { filterIn } from "@/lib/search-match";
 
 const SORT_OPTIONS = [
   { label: "Default", value: "default" },
@@ -35,9 +36,7 @@ export default function CategoryVideosPage() {
   const name = category?.name ?? "";
   const all = videoData.filter((v) => v.category === name);
 
-  const query = searchQuery.trim().toLowerCase();
-  const videos = all
-    .filter((v) => !query || v.title.toLowerCase().includes(query) || v.channel.toLowerCase().includes(query))
+  const videos = filterIn(all, searchQuery, (v) => [v.title, v.channel])
     .sort((a, b) => (sort === "latest" ? daysAgo(a.timeAgo) - daysAgo(b.timeAgo) : sort === "popular" ? viewCount(b.views) - viewCount(a.views) : 0));
 
   return (

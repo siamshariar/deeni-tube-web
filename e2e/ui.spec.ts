@@ -207,6 +207,7 @@ test.describe('YouTube-style UI', () => {
         abort() {}
       }
       Object.assign(window, { SpeechRecognition: FakeRecognition, webkitSpeechRecognition: FakeRecognition });
+      navigator.mediaDevices.enumerateDevices = async () => [{ kind: 'audioinput' }] as unknown as MediaDeviceInfo[];
     });
     await page.goto('/help');
     if (isMobile) await page.getByRole('button', { name: 'Search', exact: true }).locator('visible=true').click();

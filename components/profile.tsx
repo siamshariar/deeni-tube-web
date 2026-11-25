@@ -72,7 +72,7 @@ export function ProfileHeader({ kind, name, avatar, verified, children, channelI
           <div className="mt-1 space-y-0.5 text-sm leading-5 text-muted-foreground">{children}</div>
           <div className="mt-3 flex flex-wrap items-center gap-2 max-[399px]:justify-center">
             <HomeFeedButton channelId={channelId} name={name} align="start" />
-            <Button variant="secondary" className="h-9 bg-muted pl-3 pr-4 hover:bg-accent [&_svg]:size-5" onClick={() => openShare(window.location.href)}>
+            <Button variant="secondary" className="h-9 bg-muted pl-3 pr-4 hover:bg-accent [&_svg]:size-5" onClick={() => openShare(window.location.href, name)}>
               <ShareIcon /> Share
             </Button>
             <ActionMenu

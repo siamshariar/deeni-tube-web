@@ -3,8 +3,8 @@
 // mouse, a side with more chips fades out (51–77px) and has an arrow button; with a finger the row is swiped.
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useScrollRow } from "@/hooks/use-scroll-row";
 import { cn } from "@/lib/utils";
 
 export interface Chip {
@@ -25,34 +25,11 @@ export function ChipBar({
   label: string;
   className?: string;
 }) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState({ left: false, right: false });
-
-  const measure = useCallback(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const left = el.scrollLeft > 1;
-    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-    setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
-  }, []);
-
-  useEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(measure); // also reports the first size
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [measure, chips]);
-
-  const scroll = (direction: 1 | -1) => {
-    const el = rowRef.current;
-    el?.scrollBy({ left: direction * Math.max(120, el.clientWidth - 154), behavior: "smooth" });
-  };
+  const { row: el, rowRef, more, measure, scroll } = useScrollRow(chips, (width) => Math.max(120, width - 154));
 
   const select = (id: string, button: HTMLElement) => {
     onSelect(id);
     // A chip under the faded side comes into view
-    const el = rowRef.current;
     if (!el) return;
     const left = button.offsetLeft - el.scrollLeft;
     if (left < 77) el.scrollBy({ left: left - 77, behavior: "smooth" });

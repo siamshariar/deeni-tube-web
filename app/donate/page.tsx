@@ -2,7 +2,8 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, Check, Coffee, CreditCard, Heart } from "lucide-react";
+import Link from "next/link";
+import { Calendar, Coffee, CreditCard, Heart } from "lucide-react";
 import { BOX, BOX_TITLE } from "@/components/page-layout";
 import { BulletList, DoneNote, IconCircle, TextBox, TextHero, TextPage } from "@/components/text-page";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,35 @@ const supportOptions = [
 
 export default function DonatePage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [done, setDone] = useState(false);
+  const chosen = supportOptions.find((o) => o.id === selectedOption);
 
-  const handleDonate = () => {
-    if (!selectedOption) return; // the button is disabled until one is chosen
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      setSelectedOption(null);
-    }, 2000);
+  const show = (confirmed: boolean) => {
+    setDone(confirmed);
+    if (!confirmed) setSelectedOption(null);
+    window.scrollTo(0, 0);
   };
+
+  // Confirmed: the thanks take the form's place, until the visitor goes on
+  if (done && chosen)
+    return (
+      <TextPage ownHeading title="Donate" icon={Heart} parent="/you">
+        <DoneNote icon={Heart} title="JazakAllahu khairan">
+          <p>
+            {chosen.title}, {chosen.amount}. May Allah accept it from you and reward you with good.
+          </p>
+          <p className="mt-2 text-xs leading-[18px]">This is a demo: no payment was made.</p>
+        </DoneNote>
+        <div className="flex flex-col justify-center gap-2 sm:flex-row">
+          <Button asChild className="h-10 px-6">
+            <Link href="/">Back to Home</Link>
+          </Button>
+          <Button variant="ghost" className="h-10 px-6" onClick={() => show(false)}>
+            Donate again
+          </Button>
+        </div>
+      </TextPage>
+    );
 
   return (
     <TextPage ownHeading title="Donate" icon={Heart} parent="/you">
@@ -81,15 +101,9 @@ export default function DonatePage() {
         </div>
       </section>
 
-      {showSuccess ? (
-        <DoneNote icon={Check} title="Thank you">
-          Your support means the world to us.
-        </DoneNote>
-      ) : (
-        <Button onClick={handleDonate} className="h-11 w-full text-[15px] [&_svg]:size-5" disabled={!selectedOption}>
-          <Heart /> Donate now
-        </Button>
-      )}
+      <Button onClick={() => show(true)} className="h-11 w-full text-[15px] [&_svg]:size-5" disabled={!chosen}>
+        <Heart /> {chosen ? `Donate ${chosen.amount}` : "Donate now"}
+      </Button>
     </TextPage>
   );
 }

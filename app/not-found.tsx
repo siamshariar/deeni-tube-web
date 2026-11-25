@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = { title: "Page not found" };
 
 export default function NotFound() {
   return (

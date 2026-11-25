@@ -11,6 +11,8 @@ export interface LocalStore<T> {
   subscribe: (listener: () => void) => () => void;
 }
 
+const sameKind = (a: unknown, b: unknown) => typeof a === typeof b && (a === null) === (b === null) && Array.isArray(a) === Array.isArray(b);
+
 export function createLocalStore<T>(key: string, getInitial: () => T): LocalStore<T> {
   const listeners = new Set<() => void>();
   let initial: T | undefined;
@@ -28,7 +30,9 @@ export function createLocalStore<T>(key: string, getInitial: () => T): LocalStor
     if (cachedValue !== undefined && raw === cachedRaw) return cachedValue;
     cachedRaw = raw;
     try {
-      cachedValue = raw === null ? fallback() : (JSON.parse(raw) as T);
+      const value = raw === null ? fallback() : (JSON.parse(raw) as T);
+      // Something else under this key (damaged, or an older version's) must not break every page that reads it
+      cachedValue = !sameKind(value, fallback()) ? fallback() : Array.isArray(value) ? (value.filter((v) => v !== null) as T) : value;
     } catch {
       cachedValue = fallback();
     }

@@ -4,6 +4,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { HoverRow } from "@/components/hover-tint";
+import { MovingThumbnail } from "@/components/moving-thumbnail";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, History, Trash2, X } from "lucide-react";
 import type { MenuAction } from "@/components/action-menu";
@@ -24,6 +26,7 @@ import { useHydrated } from "@/lib/local-store";
 import { mediaPath, mediaThumb } from "@/lib/media-lookup";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { filterIn } from "@/lib/search-match";
 
 type Category = "all" | "shorts" | "videos";
 
@@ -133,12 +136,8 @@ export default function HistoryPage() {
   };
 
   const filtered = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return videos.filter(
-      (v) =>
-        (category === "all" || v.type === (category === "shorts" ? "short" : "video")) &&
-        (!query || v.title.toLowerCase().includes(query) || v.channel.toLowerCase().includes(query))
-    );
+    const ofKind = videos.filter((v) => category === "all" || v.type === (category === "shorts" ? "short" : "video"));
+    return filterIn(ofKind, searchQuery, (v) => [v.title, v.channel]);
   }, [videos, searchQuery, category]);
 
   const groups = useMemo(
@@ -162,11 +161,13 @@ export default function HistoryPage() {
     const media = asMedia(video);
     const href = mediaPath(media);
     return (
-      <div key={video.id} className="group flex w-full gap-3 py-1.5 md:gap-4 md:py-2">
+      <HoverRow key={video.id} videoId={media.videoId} className="group flex w-full gap-3 py-1.5 md:gap-4 md:py-2">
+        {(hovered) => (<>
         <Link href={href} tabIndex={-1} aria-hidden="true" className={cn(ROW_THUMB, "relative aspect-video self-start overflow-hidden rounded-lg bg-muted md:w-[246px] md:rounded-xl")}>
           <Image src={video.thumbnail} alt="" fill {...imagePriorityProps(priority)} className="object-cover" />
           <DurationBadge>{video.duration}</DurationBadge>
           <WatchedBar videoId={media.videoId} />
+          <MovingThumbnail videoId={media.videoId} active={hovered} />
         </Link>
         <div className="flex min-w-0 flex-1 items-start gap-1">
           <Link href={href} className="min-w-0 flex-1">
@@ -189,7 +190,8 @@ export default function HistoryPage() {
             <MediaMenu scope="own" media={media} extra={[removeAction(video)]} />
           </div>
         </div>
-      </div>
+        </>)}
+      </HoverRow>
     );
   };
 

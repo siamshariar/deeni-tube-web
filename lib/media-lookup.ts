@@ -3,6 +3,7 @@
 // These helpers resolve either form, so a saved item is stored under one id.
 
 import { viewsText } from "@/lib/format";
+import { shortRatio } from "@/lib/short-ratios";
 import { shortsVideos, ShortVideo } from "@/lib/shorts-data";
 import { videoData, VideoItem } from "@/lib/video-data";
 import { videoPath } from "@/lib/video-url";
@@ -24,7 +25,7 @@ export function canonicalMediaId(id: string): string {
 function shortAsVideo(s: ShortVideo): VideoItem {
   return {
     id: s.id, videoId: s.videoId, title: s.title, channel: s.channel, channelId: s.channelId, channelAvatar: s.channelAvatar,
-    duration: s.duration, views: viewsText(s.views), timeAgo: s.timeAgo, description: s.description, language: "", category: "Shorts", isShort: true,
+    duration: s.duration, views: viewsText(s.views), timeAgo: s.timeAgo, description: s.description, language: "", category: "Shorts", isShort: true, ratio: shortRatio(s.videoId),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { findVideoByRoute, searchVideoPath, videoPath, videoSlug } from "@/lib/video-url";
+import { videoMeta } from "@/lib/seo";
+import { findVideoByRoute, searchVideoPath, videoSlug } from "@/lib/video-url";
 import { videoData } from "@/lib/video-data";
 
 // Pre-rendered, as the pages under /videos, so a result opens at once
@@ -11,9 +12,7 @@ export function generateStaticParams() {
 // One video, one address for search engines and shared links: the one under /videos
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const video = findVideoByRoute((await params).id);
-  return video
-    ? { title: video.title, description: video.description.slice(0, 160), alternates: { canonical: videoPath(video) } }
-    : { title: "Video not found" };
+  return video ? videoMeta(video) : { title: "Video not found" };
 }
 
 export default async function SearchVideoLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string; id: string }> }) {

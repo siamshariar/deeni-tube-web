@@ -301,3 +301,78 @@ html:not([data-sidebar-ready]) main[data-has-sidebar] {
     --toast-bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ── Theater mode (lib/theater) ────────────────────────────────────────────
+   YouTube's, measured: the player over the whole width right under the header,
+   as high as its 16:9 but at most 100vh - 169px and at least 480px; the title
+   12px under it and the side column 24px. With a mouse only. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html[data-theater] { --theater-h: max(480px, min(56.25vw, 100vh - 169px)); }
+  html[data-theater] .watch-page { position: relative; }
+  html[data-theater] .watch-top { padding-top: var(--theater-h); }
+  html[data-theater] .watch-side { margin-top: 24px; }
+  html[data-theater] .watch-frame {
+    position: absolute;
+    inset: 56px 0 auto;
+    height: var(--theater-h);
+    margin: 0;
+    background: #000;
+  }
+  html[data-theater] .watch-box {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+  /* The video itself is never wider than its shape allows, or the crop would cut into it */
+  html[data-theater] .watch-video {
+    left: 50%;
+    width: min(100%, var(--ratio) * var(--theater-h));
+    transform: translateX(-50%);
+  }
+  html[data-theater] .watch-video-tall { width: calc(1.125 * var(--theater-h)) !important; }
+  /* Only while it changes (a named element can't fill the screen over the header) */
+  html[data-theater-moving] .watch-frame { view-transition-name: player; }
+  html[data-theater-moving]::view-transition-group(*),
+  html[data-theater-moving]::view-transition-old(*),
+  html[data-theater-moving]::view-transition-new(*) { animation-duration: 0.25s; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+  html[data-theater-moving]::view-transition-old(player),
+  html[data-theater-moving]::view-transition-new(player) { width: 100%; height: 100%; object-fit: cover; }
+}
+
+/* ── Ambient mode (components/ambient-light) ───────────────────────────────
+   The glow is behind the page's content (the page itself is see-through then)
+   and, in theater mode, at the video's sides. */
+.ambient { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.ambient-box { position: absolute; inset: 0; transform: scale(1.5, 2); }
+.ambient canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+html[data-ambient="page"] .watch-frame { position: relative; }
+/* (clipped to the page: the glow must not make it longer) */
+html[data-ambient="page"] .watch-page { background: transparent; overflow: clip; }
+html[data-ambient="page"] .watch-info { --muted: 0 0% 100% / 0.1; }
+html[data-ambient="page"] .app-bar { background-color: hsl(var(--background) / var(--bar, 1)); }
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html[data-theater] .ambient { z-index: auto; overflow: hidden; }
+  html[data-theater] .ambient-box { left: 50%; right: auto; width: min(100%, var(--theater-h) * 16 / 9); transform: translateX(-50%) scale(2); }
+  html[data-ambient][data-theater] .watch-box,
+  html[data-ambient][data-theater] .watch-root { background: transparent; }
+}
+
+/* Voice search: the ring that spreads from the microphone while it listens */
+@keyframes voice-ring {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(2); opacity: 0; }
+}
+
+/* "You're offline" / "Back online" (components/connection-notice): along the bottom, above the phone's bottom nav; messages
+   stand above it. Pictures that couldn't load without a connection aren't shown broken. */
+.connection-bar { bottom: 0; }
+.connection-bar p { padding-bottom: env(safe-area-inset-bottom, 0px); }
+img[data-offline] { visibility: hidden; }
+@media (max-width: 767px) {
+  html[data-bottom-nav] .connection-bar { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  html[data-bottom-nav] .connection-bar p { padding-bottom: 0; }
+  html[data-connection] [data-sonner-toaster] { --toast-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+  html[data-connection][data-bottom-nav] [data-sonner-toaster] { --toast-bottom: calc(56px + 40px + env(safe-area-inset-bottom, 0px)); }
+}

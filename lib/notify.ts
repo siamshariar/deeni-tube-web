@@ -46,13 +46,3 @@ export function notify(message: string, options: (() => void) | MessageOptions =
     { duration: button ? WITH_ACTION_MS : SHORT_MS }
   );
 }
-
-/** Copy a link, and say so. */
-export async function copyLink(url: string) {
-  try {
-    await navigator.clipboard.writeText(url);
-    notify("Link copied to clipboard");
-  } catch {
-    notify("Couldn't copy the link");
-  }
-}

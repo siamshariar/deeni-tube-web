@@ -53,7 +53,7 @@ export default function AboutPage() {
           <div className="flex items-center justify-between py-3">
             <dt className="font-medium">Developer</dt>
             <dd>
-              <a href="https://www.deeniinfotech.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[#065fd4] dark:text-[#3ea6ff]">
+              <a href="https://www.deeniinfotech.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[#065fd4] dark:text-[#3ea6ff] -my-0.5 py-0.5">
                 Deeni Info Tech
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               </a>

@@ -57,9 +57,10 @@ test.describe('Player controls (mouse)', () => {
     const menu = region.getByRole('menu', { name: 'Settings' });
     const m = (await menu.boundingBox())!;
     expect(Math.round(box.y + box.height - (m.y + m.height))).toBe(62);
-    const captions = menu.getByRole('menuitemcheckbox', { name: 'Subtitles/CC' });
-    await captions.click();
-    await expect(captions).toHaveAttribute('aria-checked', 'true');
+    await menu.getByRole('menuitem', { name: 'Subtitles/CC Off' }).click();
+    await menu.getByRole('menuitemradio', { name: 'Bangla (auto-generated)' }).click();
+    await region.getByRole('button', { name: 'Settings' }).click();
+    await expect(menu.getByRole('menuitem', { name: 'Subtitles/CC Bangla (auto-generated)' })).toBeVisible();
     await menu.getByRole('menuitem', { name: /Playback speed/ }).click();
     await menu.getByRole('menuitemradio', { name: '1.5', exact: true }).click();
     await expect(menu).toHaveCount(0);

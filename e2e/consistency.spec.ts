@@ -154,7 +154,7 @@ const MENUS: { name: string; url: string; before?: (page: Page) => Promise<void>
   { name: "playlist's video", url: '/playlists/monzur-lectures/pl-islamic-1', button: (page) => page.locator('button[aria-label^="More actions for"]').nth(1), rows: ['watch-later', 'playlist', 'share', 'remove'] },
   { name: "channel's playlist's video", url: '/playlists/monzur-lectures/pl-islamic-1?source=channel', button: (page) => page.locator('button[aria-label^="More actions for"]').nth(1), rows: ['watch-later', 'playlist', 'share'] },
   { name: 'the video itself', url: VIDEO, button: nth(0), rows: ['not-interested', 'dont-recommend', 'report'] },
-  { name: 'Shorts', url: '/shorts', button: (page) => page.getByRole('button', { name: 'More options' }).locator('visible=true').first(), rows: ['description', 'captions', 'watch-later', 'playlist', 'share', 'dont-recommend', 'report', 'feedback'] },
+  { name: 'Shorts', url: '/shorts', button: (page) => page.getByRole('button', { name: 'More options' }).locator('visible=true').first(), rows: ['description', 'captions', 'speed', 'watch-later', 'playlist', 'share', 'dont-recommend', 'report', 'feedback'] },
 ];
 
 test.describe('Every three-dot menu', () => {
@@ -192,7 +192,7 @@ test.describe('Actions', () => {
 
   for (const [name, url, before, kind, link] of [
     ['a video', '/channels/zakir-naik', null, 'video', /\/videos\/.+\/[\w-]{11}$/],
-    ['a short', '/channels/zakir-naik', 'Shorts', 'short', /\/shorts\?v=[\w-]{11}$/],
+    ['a short', '/channels/zakir-naik', 'Shorts', 'short', /\/shorts\/[\w-]{11}$/],
     ['a search result', '/search?q=allah', null, 'video', /\/videos\/.+\/[\w-]{11}$/],
   ] as const)
     test(`${name}: Watch later, Share, Not interested and Report`, async ({ page }) => {
@@ -222,7 +222,7 @@ test.describe('Actions', () => {
       await choose(page, 'share');
       await expect(dialog(page, 'Share')).toBeVisible();
       await expect(dialog(page, 'Share').getByRole('textbox', { name: 'Link' })).toHaveValue(link);
-      await expect(dialog(page, 'Share').getByRole('button', { name: /^Share on/ })).toHaveCount(3);
+      await expect(dialog(page, 'Share').getByRole('group', { name: 'Share on' }).getByRole('button', { name: 'Share on WhatsApp' })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(dialog(page, 'Share')).toHaveCount(0);
 
@@ -365,7 +365,7 @@ test.describe('Actions', () => {
     const more = page.getByRole('button', { name: 'More options' }).locator('visible=true').first();
     await openMenu(page, more);
     await choose(page, 'share');
-    await expect(dialog(page, 'Share').getByRole('textbox', { name: 'Link' })).toHaveValue(/\/shorts\?v=MBxDbbkk0gQ$/);
+    await expect(dialog(page, 'Share').getByRole('textbox', { name: 'Link' })).toHaveValue(/\/shorts\/MBxDbbkk0gQ$/);
     await page.keyboard.press('Escape');
     await openMenu(page, more);
     await choose(page, 'report');
@@ -384,8 +384,10 @@ test.describe('Actions', () => {
     await openMenu(page, more);
     await expect(page.locator('[data-action="captions"]')).toContainText('Off');
     await choose(page, 'captions');
+    await dialog(page, 'Captions').getByRole('radio', { name: 'Bangla (auto-generated)' }).click();
+    await expect(dialog(page, 'Captions')).toHaveCount(0);
     await openMenu(page, more);
-    await expect(page.locator('[data-action="captions"]')).toContainText('On');
+    await expect(page.locator('[data-action="captions"]')).toContainText('Bangla');
     await choose(page, 'description');
     await expect(page.getByText('Description', { exact: true }).locator('visible=true').first()).toBeVisible();
   });

@@ -2,30 +2,10 @@
 "use client"
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useSyncExternalStore, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { imagePriorityProps } from "@/lib/image-priority"
-import {
-  ChevronUp,
-  ChevronDown,
-  Heart,
-  MessageCircle,
-      Flag,
-  Volume2,
-  VolumeX,
-  Pause,
-  Play,
-  List,
-  MessageSquare,
-  X,
-  ThumbsUp,
-  ThumbsDown,
-  Send,
-  Eye,
-  Clock,
-  UserX,
-  ArrowLeft,
-} from "lucide-react"
+import { ChevronUp, ChevronDown, Heart, Flag, Volume2, VolumeX, Pause, Play, List, MessageSquare, X, ThumbsUp, ThumbsDown, Send, Eye, Clock, UserX, ArrowLeft, Check, Gauge } from "lucide-react"
 import { ActionMenu } from "@/components/action-menu"
 import { Drawer, DrawerContent, DrawerTitleBar } from "@/components/ui/drawer"
 import { SaveIcon, ShareIcon } from "@/components/icons/action-icons"
@@ -33,12 +13,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MoreVertIcon } from "@/components/icons/more-vert-icon"
 import { CCIconOff, CCIconOn, FullscreenIcon } from "@/components/icons/player-icons"
+import { ResponsiveDialog } from "@/components/responsive-dialog"
+import { savedSound, saveSound } from "@/lib/player-prefs"
+import { CaptionsDialog } from "@/components/captions-dialog"
+import { HIDE_CAPTIONS, languageName, moveCaptionsCommands, reportedCaptions, setCaptionsOn, shortCaptionLayout, showCaptionsCommands, useCaptions, type ReportedCaptions } from "@/lib/captions"
 
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { DescriptionText, hashtagHref } from "@/components/description-text"
 import { openFeedback, openReport, openShare } from "@/lib/dialogs"
-import { notify } from "@/lib/notify";
+import { notify } from "@/lib/notify"
+import { onBackOnline } from "@/lib/connection";
 import { openSaveCard } from "@/lib/save-card"
 import { useBack } from "@/hooks/use-back"
 import { useDontRecommend } from "@/hooks/useDontRecommend"
@@ -48,9 +33,10 @@ import { savedItem } from "@/hooks/useSavedList"
 import { historyEntryForShort } from "@/lib/history-entry"
 import { replacedShorts, shortsVideos as shortsData } from "@/lib/shorts-data"
 import { youtubeThumb } from "@/lib/media-lookup"
+import { shortRatio } from "@/lib/short-ratios"
 import { useLikedVideos } from "@/hooks/useLikedVideos"
 import { useWatchLater } from "@/hooks/useWatchLater"
-import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, revealHost, setHostCropped, setHostVisible } from "@/lib/player-host"
+import { allowHostSound, armHost, attachHost, detachHost, hostCommand, hostFrame, hostInfo, hostLoad, hostReady, hostShowing, hostSoundAllowed, hostWanted, revealHost, setHostVisible } from "@/lib/player-host"
 
 import type { CommentReply, VideoComment } from "@/lib/types"
 
@@ -110,7 +96,7 @@ function saveComments(data: Record<string, VideoComment[]>) {
 
 function loadIds(key: string): string[] {
   if (typeof window === 'undefined') return []
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : [] } catch { return [] }
+  try { const ids = JSON.parse(localStorage.getItem(key) || "[]"); return Array.isArray(ids) ? ids : [] } catch { return [] }
 }
 
 function saveIds(key: string, ids: string[]) {
@@ -418,12 +404,15 @@ function CommentItem({ comment, onLikeComment, onDislikeComment, onReplyComment,
 
 function ShortsPageContent() {
   const searchParams = useSearchParams()
+  // The short the address is about: /shorts/<id>, or /shorts?v=<id>
+  const { id: pathId } = useParams<{ id?: string }>()
+  const addressed = searchParams.get("v") ?? pathId ?? null
   const back = useBack("/")
   const containerRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
   // A link to a short (/shorts?v=ID) starts right on it: only its player loads, with no jump from the first
   // short (this content renders on the client, inside Suspense, so the search params are known here)
-  const [initialIndex] = useState(() => Math.max(0, shortIndex(searchParams.get("v"))))
+  const [initialIndex] = useState(() => Math.max(0, shortIndex(addressed)))
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   // Media queries (not window.innerWidth) so server and first client render match
   const isDesktopViewport = useMediaQuery("(min-width: 768px)")
@@ -436,12 +425,11 @@ function ShortsPageContent() {
   const { isLiked: isLikedShort, like, unlike } = useLikedVideos()
   const { toggleWatchLater, isInWatchLater } = useWatchLater()
   const [showVolumeSlider, setShowVolumeSlider] = useState(false)
-  const [volume, setVolume] = useState(75)
+  const [volume, setVolume] = useState(100)
   const [, setIsFullscreen] = useState(false)
   const dontRecommend = useDontRecommend()
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
   const [isScrolling, setIsScrolling] = useState(false)
-  const [captionsEnabled, setCaptionsEnabled] = useState(false)
   const [activePanel, setActivePanel] = useState<PanelType>(null)
   // What the sheet still shows while it slides away
   const [lastPanel, setLastPanel] = useState<PanelType>(null)
@@ -462,7 +450,7 @@ function ShortsPageContent() {
   const boxRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const hostTokenRef = useRef(0)
   // The ?v= value already shown (later changes, e.g. from a notification, scroll to the new short)
-  const shownVideoParamRef = useRef(searchParams.get("v"))
+  const shownVideoParamRef = useRef(addressed)
   // Set while a keyboard/arrow-button scroll is animating towards this index
   const scrollTargetRef = useRef<number | null>(null)
   const [videoCurrentTime, setVideoCurrentTime] = useState(0)
@@ -477,7 +465,6 @@ function ShortsPageContent() {
   const [isSeeking, setIsSeeking] = useState(false)
   const isMutedRef = useRef(isMuted)
   const volumeRef = useRef(volume)
-  const captionsRef = useRef(false)
   // Player bookkeeping per <iframe> element (a short's player is recreated when it scrolls back into range)
   const readyPlayersRef = useRef(new WeakSet<HTMLIFrameElement>())   // answered the 'listening' handshake
   const primedPlayersRef = useRef(new WeakSet<HTMLIFrameElement>())  // buffered their first frames while off screen
@@ -502,7 +489,7 @@ function ShortsPageContent() {
   // The active short isn't playing (yet): the spinner; and why it can't: YouTube says it's unavailable, or it never
   // started (the message with "Try again")
   const [isSlow, setIsSlow] = useState(false)
-  const [playIssue, setPlayIssue] = useState<{ id: string; kind: "unavailable" | "stalled" } | null>(null)
+  const [playIssue, setPlayIssue] = useState<{ id: string; kind: "unavailable" | "stalled" | "offline" } | null>(null)
   // A player that got stuck is loaded again: a new <iframe> (its key), going on from where it stopped
   const [playerLoads, setPlayerLoads] = useState<Record<string, number>>({})
   const reloadedRef = useRef<{ id: string; at: number } | null>(null)
@@ -537,6 +524,11 @@ function ShortsPageContent() {
   }, [])
 
   const currentShort = shortsData[currentIndex]
+  // What each short's player says about its captions, once that part of it has loaded
+  const [captionReports, setCaptionReports] = useState<Record<string, ReportedCaptions>>({})
+  const captionReport = currentShort && captionReports[currentShort.id]
+  const { tracks: captionTracks, on: captions, choice: captionChoice, available: hasCaptions } = useCaptions(currentShort?.videoId ?? "", captionReport)
+  const [captionsOpen, setCaptionsOpen] = useState(false)
 
   useEffect(() => {
     if (!currentShort) return
@@ -561,7 +553,7 @@ function ShortsPageContent() {
 
   // A new ?v= while the page is open: go to that short
   useEffect(() => {
-    const v = searchParams.get("v")
+    const v = addressed
     if (!v || v === shownVideoParamRef.current) return
     shownVideoParamRef.current = v
     const targetIndex = shortIndex(v)
@@ -570,7 +562,7 @@ function ShortsPageContent() {
     const sectionH = (c.firstElementChild as HTMLElement)?.offsetHeight || c.clientHeight
     setCurrentIndex(targetIndex)
     c.scrollTo({ top: targetIndex * sectionH, behavior: "instant" as ScrollBehavior })
-  }, [searchParams])
+  }, [addressed])
 
   const loadCommentsForCurrentShort = () => {
     setCommentsLoading(true)
@@ -732,6 +724,13 @@ function ShortsPageContent() {
         (state === YT_PAUSED && activePlayedRef.current) ||
         (iframe && playerErrorsRef.current.has(iframe))
       ) return setIsSlow(false)
+      // No connection: say so and wait for it (loading the player now would leave the browser's error page in it)
+      if (!navigator.onLine) {
+        setIsSlow(false)
+        setIsPlaying(false)
+        setPlayIssue({ id, kind: "offline" })
+        return
+      }
       // The shared player only reports changes: take a "playing" that came before it said which video it shows
       if (iframe && iframe === hostFrame() && hostInfo().playerState === YT_PLAYING && hostShowing() === shortsData[currentIndexRef.current].videoId) return markPlaying(id, iframe)
       // In the background players may wait: go on when the page is back
@@ -767,7 +766,7 @@ function ShortsPageContent() {
     playWatchRef.current = setTimeout(check, 1000)
   }, [muteAutomatically, markPlaying, reloadPlayer])
 
-  // Start the active short's player with the current mute/volume/captions settings
+  // Start the active short's player with the current mute/volume settings
   const startPlayer = useCallback((id: string) => {
     const iframe = videoRefs.current.get(id)
     if (!iframe) return
@@ -776,7 +775,6 @@ function ShortsPageContent() {
     if (iframe === hostFrame() && !isMutedRef.current && !hostSoundAllowed()) muteAutomatically()
     ytCommand(iframe, isMutedRef.current ? "mute" : "unMute")
     ytCommand(iframe, "setVolume", [volumeRef.current])
-    if (captionsRef.current) ytCommand(iframe, "loadModule", ["captions"])
     // A player loaded again goes on from where it got stuck
     if (reloadedRef.current?.id === id && reloadedRef.current.at > 1) {
       ytCommand(iframe, "seekTo", [reloadedRef.current.at, true])
@@ -896,6 +894,11 @@ function ShortsPageContent() {
       if (iframe === hostFrame()) {
         const showing = d.info.videoData?.video_id ?? hostShowing()
         if (showing && showing !== shortsData[currentIndexRef.current]?.videoId) return
+      }
+      if (d.info.captions) {
+        const report = reportedCaptions(d.info.captions)
+        const of = id
+        setCaptionReports((all) => (all[of]?.key === report.key ? all : { ...all, [of]: report }))
       }
       const state = d.info.playerState
       if (typeof state === "number") playerStatesRef.current.set(iframe, state)
@@ -1023,14 +1026,23 @@ function ShortsPageContent() {
   }, [currentIndex, startPlayer, registerPlayer, watchPlayback, markPlaying, hosted])
 
   // (The shared player is hidden on each switch above and shown with revealHost once the short plays.)
-  // YouTube draws captions at its bottom edge, so no cropping while they're on
+  // The volume and mute the visitor set before, on a video or a short, as on YouTube
   useEffect(() => {
-    if (hosted) setHostCropped(!captionsEnabled)
-  }, [hosted, captionsEnabled])
-
+    const sound = savedSound()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read from localStorage after hydration
+    setVolume(sound.volume)
+    if (sound.muted) setIsMuted(true)
+  }, [])
+  const toggleMute = () => {
+    if (restoreSound()) return
+    const unmute = isMuted || volume === 0
+    if (unmute) allowHostSound()
+    if (unmute && volume === 0) setVolume(50)
+    setIsMuted(!unmute)
+    saveSound({ muted: !unmute, volume: volume || 50 })
+  }
   // Keep muted ref in sync and send postMessage when mute changes
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted])
-  useEffect(() => { captionsRef.current = captionsEnabled }, [captionsEnabled])
   useEffect(() => {
     const activeShort = shortsData[currentIndex]
     const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
@@ -1105,17 +1117,46 @@ function ShortsPageContent() {
     }
   }
 
-  // Captions are toggled through the YouTube player's captions module
-  const sendToActivePlayer = (func: string, args: unknown[] = []) => {
-    const activeShort = shortsData[currentIndex]
-    const iframe = activeShort ? videoRefs.current.get(activeShort.id) : null
-    ytCommand(iframe, func, args)
-  }
+  // Captions (lib/captions): drawn by YouTube, in the short's upper part
+  const playingId = startedId && startedId === currentShort?.id ? startedId : null
+  const placeCaptions = useCallback((id: string) => {
+    const frame = videoRefs.current.get(id)
+    const box = boxRefs.current.get(id)
+    if (!frame || !box) return null
+    return shortCaptionLayout(frame, box, { ratio: shortRatio(shortsData.find((s) => s.id === id)?.videoId ?? "") })
+  }, [])
+  useEffect(() => {
+    if (!playingId) return
+    const send = (commands: [string, unknown[]][]) => commands.forEach(([func, args]) => ytCommand(videoRefs.current.get(playingId), func, args))
+    if (!captions || !captionChoice) return send([HIDE_CAPTIONS])
+    const show = () => {
+      const layout = placeCaptions(playingId)
+      send([...showCaptionsCommands(captionChoice, layout), ...moveCaptionsCommands(videoRefs.current.get(playingId), layout)])
+    }
+    const place = () => send(moveCaptionsCommands(videoRefs.current.get(playingId), placeCaptions(playingId)))
+    show()
+    // Again a little later, and whenever YouTube's captions part says it has loaded (captionReport: a slow network); in
+    // their place once the title and the buttons are in theirs
+    const timers = [setTimeout(place, 600), setTimeout(show, 1200)]
+    // (not a translation, which YouTube would fetch again)
+    if (!captionChoice.to) timers.push(setTimeout(show, 3000))
+    const box = boxRefs.current.get(playingId)
+    const observer = new ResizeObserver(() => timers.push(setTimeout(place, 100), setTimeout(place, 600)))
+    if (box) observer.observe(box)
+    return () => {
+      observer.disconnect()
+      timers.forEach(clearTimeout)
+    }
+  }, [playingId, captions, captionChoice, captionReport, placeCaptions])
   const toggleCaptions = () => {
-    const next = !captionsEnabled
-    setCaptionsEnabled(next)
-    sendToActivePlayer(next ? 'loadModule' : 'unloadModule', ['captions'])
+    if (hasCaptions) setCaptionsOn(!captions)
   }
+  // Playback speed: the same for the next shorts
+  const [rate, setRate] = useState(1)
+  const [speedOpen, setSpeedOpen] = useState(false)
+  useEffect(() => {
+    if (playingId) ytCommand(videoRefs.current.get(playingId), "setPlaybackRate", [rate])
+  }, [playingId, rate])
 
   // Save = Watch Later (it holds both videos and shorts)
   const isShortSaved = (s: (typeof shortsData)[number]) => isInWatchLater(s.videoId)
@@ -1149,7 +1190,7 @@ function ShortsPageContent() {
   // "Try again" on a short that didn't play: its player is loaded again (inside this tap, so it may play with sound)
   const retryPlay = () => {
     const activeShort = shortsData[currentIndex]
-    if (!activeShort) return
+    if (!activeShort || !navigator.onLine) return
     if (!isMuted) allowHostSound()
     const iframe = videoRefs.current.get(activeShort.id)
     if (iframe) playerErrorsRef.current.delete(iframe)
@@ -1161,6 +1202,17 @@ function ShortsPageContent() {
     reloadPlayer(activeShort.id)
     watchPlayback(activeShort.id)
   }
+
+  // The connection is back: the short on screen goes on, and the others' players, which couldn't load, load again
+  const goOnRef = useRef(() => {})
+  useEffect(() => {
+    goOnRef.current = () => {
+      const broken = shortsData.filter((s, i) => i !== currentIndex && videoRefs.current.get(s.id)?.isConnected && !readyPlayersRef.current.has(videoRefs.current.get(s.id)!))
+      if (broken.length) setPlayerLoads((loads) => ({ ...loads, ...Object.fromEntries(broken.map((s) => [s.id, (loads[s.id] ?? 0) + 1])) }))
+      if (playIssue?.kind === "offline") retryPlay()
+    }
+  })
+  useEffect(() => onBackOnline(() => goOnRef.current()), [])
 
   // ---- COMMENT ACTIONS ----
   const persistComments = () => saveComments(commentsByVideo)
@@ -1358,7 +1410,9 @@ function ShortsPageContent() {
            them (Safari before 16: every iPhone 7, 6s and first SE; Chrome before 105) work it out from the
            screen, which the feed fills above the 56px nav (dvh where known, else vh, which is a little taller:
            a little more cropped, never smaller). Their old fallback was a box of the screen's shape, which showed
-           the short small with black sides until it played, then seemed to zoom in */
+           the short small with black sides until it played, then seemed to zoom in.
+           The player is 120px taller at the top and bottom than its video, which it centres: YouTube's title, logo and
+           buttons, there for a short's first seconds, are in those bands, outside the box (as on the watch pages) */
         @media (max-width: 767px) {
           .shorts-video-iframe, .shorts-poster {
             position: absolute;
@@ -1370,8 +1424,13 @@ function ShortsPageContent() {
             height: max(calc(100vh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
             height: max(calc(100dvh - 56px - env(safe-area-inset-bottom, 0px)), calc(100vw * 16 / 9));
           }
+          .shorts-video-iframe {
+            height: calc(max(100vh - 56px - env(safe-area-inset-bottom, 0px), 100vw * 16 / 9) + 240px);
+            height: calc(max(100dvh - 56px - env(safe-area-inset-bottom, 0px), 100vw * 16 / 9) + 240px);
+          }
           @media (orientation: landscape) and (max-height: 560px) {
             .shorts-video-iframe, .shorts-poster { width: 100%; height: 100%; }
+            .shorts-video-iframe { height: calc(100% + 240px); }
           }
           @supports (width: 1cqw) {
             .shorts-player-box { container-type: size; }
@@ -1379,9 +1438,10 @@ function ShortsPageContent() {
               width: max(100cqw, 100cqh * 9 / 16);
               height: max(100cqh, 100cqw * 16 / 9);
             }
+            .shorts-video-iframe { height: calc(max(100cqh, 100cqw * 16 / 9) + 240px); }
           }
         }
-        /* Desktop: iframe fills the already-9:16 container — no bars needed */
+        /* Desktop: the container is already 9:16 */
         @media (min-width: 768px) {
           .shorts-video-iframe, .shorts-poster {
             position: absolute;
@@ -1390,8 +1450,21 @@ function ShortsPageContent() {
             width: 100%;
             height: 100%;
           }
+          .shorts-video-iframe { top: -120px; height: calc(100% + 240px); }
         }
       `}</style>
+
+      <CaptionsDialog open={captionsOpen} onOpenChange={setCaptionsOpen} tracks={captionTracks} choice={captionChoice} on={captions} reported={captionReport} />
+      <ResponsiveDialog open={speedOpen} onOpenChange={setSpeedOpen} title="Playback speed" className="max-w-[320px]">
+        <div role="radiogroup" aria-label="Playback speed" className="yt-scrollbar min-h-0 overflow-y-auto pb-2">
+          {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => (
+            <button key={r} type="button" role="radio" aria-checked={rate === r} onClick={() => { setRate(r); setSpeedOpen(false) }} className="flex h-11 w-full items-center gap-4 px-4 text-left text-[15px] transition-colors hover:bg-accent active:bg-accent md:h-10 md:rounded-lg md:text-sm">
+              <Check className={cn("h-5 w-5 flex-shrink-0", rate !== r && "invisible")} />
+              {r === 1 ? "Normal" : r}
+            </button>
+          ))}
+        </div>
+      </ResponsiveDialog>
 
       {/* Up/down buttons from lg up; on narrower screens they would cover the video (swipe/keys still work) */}
       <div className={cn("hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-50 flex-col gap-4", activePanel && isSidePanel && !isRoomy && "lg:hidden")}>
@@ -1529,15 +1602,15 @@ function ShortsPageContent() {
                   )}
                   {isActive && playIssue?.id === short.id && (
                     <div role="alert" className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 px-8 low:px-2 low:gap-2 text-center text-white low:rounded-2xl md:rounded-2xl">
-                      <p className="text-base font-medium">{playIssue.kind === "unavailable" ? "This short isn't available" : "This short isn't playing"}</p>
+                      <p className="text-base font-medium">{playIssue.kind === "unavailable" ? "This short isn't available" : playIssue.kind === "offline" ? "You're offline" : "This short isn't playing"}</p>
                       <p className="max-w-xs text-sm text-white/80">
-                        {playIssue.kind === "unavailable" ? "It may have been removed from YouTube." : "Check your connection, then try again."}
+                        {playIssue.kind === "unavailable" ? "It may have been removed from YouTube." : playIssue.kind === "offline" ? "Check your connection." : "Check your connection, then try again."}
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2">
-                        {playIssue.kind === "stalled" && (
+                        {playIssue.kind !== "unavailable" && (
                           <button type="button" onClick={retryPlay} className="h-9 rounded-full bg-white px-4 text-sm font-medium text-black hover:bg-white/90 active:bg-white/80">Try again</button>
                         )}
-                        {index < shortsData.length - 1 && (
+                        {index < shortsData.length - 1 && playIssue.kind !== "offline" && (
                           <button type="button" onClick={() => scrollToVideo(index + 1)} className="h-9 rounded-full bg-white/20 px-4 text-sm font-medium text-white hover:bg-white/30 active:bg-white/30">Next short</button>
                         )}
                       </div>
@@ -1556,7 +1629,7 @@ function ShortsPageContent() {
                   )}
 
                   {/* Gradient overlays */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none low:rounded-b-2xl" />
+                  <div data-short-shade="" className={cn("absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none low:rounded-b-2xl")} />
                   <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none low:hidden" />
 
                   {/* Top controls (hover only) */}
@@ -1573,19 +1646,26 @@ function ShortsPageContent() {
                           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                         </button>
                         <div className="relative flex items-center" onMouseEnter={() => setShowVolumeSlider(true)} onMouseLeave={() => setShowVolumeSlider(false)}>
-                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={() => { if (!restoreSound()) { if (isMuted) allowHostSound(); setIsMuted(!isMuted) } }} className={cn(topButtonClass, "flex")}>
+                          <button type="button" data-mute-toggle aria-label={isMuted || volume === 0 ? "Unmute" : "Mute"} onClick={toggleMute} className={cn(topButtonClass, "flex")}>
                             {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                           </button>
                           {showVolumeSlider && (
                             <div className="hidden md:flex low:!hidden items-center rounded-full px-3 py-2 ml-1 shadow-lg" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-                              <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { setVolume(Number(e.target.value)); autoMutedRef.current = false; setAutoMuted(false); setIsMuted(false) }} className="w-20 h-1 accent-white cursor-pointer" />
+                              <input type="range" aria-label="Volume" min="0" max="100" value={isMuted ? 0 : volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); autoMutedRef.current = false; setAutoMuted(false); setIsMuted(false); saveSound({ volume: v, muted: v === 0 }) }} className="w-20 h-1 accent-white cursor-pointer" />
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 low:absolute low:left-full low:top-0 low:ml-3">
-                        <button type="button" aria-label={captionsEnabled ? "Turn off captions" : "Turn on captions"} aria-pressed={captionsEnabled} onClick={toggleCaptions} className={cn(topButtonClass, "flex")}>
-                          {captionsEnabled ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />}
+                        <button
+                          type="button"
+                          aria-label={!hasCaptions ? "Captions unavailable" : captions ? "Turn off captions" : "Turn on captions"}
+                          aria-pressed={hasCaptions ? captions : undefined}
+                          disabled={!hasCaptions}
+                          onClick={toggleCaptions}
+                          className={cn(topButtonClass, "flex [&:disabled_svg]:opacity-40")}
+                        >
+                          {captions ? <CCIconOn className="h-5 w-5" /> : <CCIconOff className="h-5 w-5" />}
                         </button>
                         <button type="button" aria-label="Full screen" onClick={toggleFullscreen} className={cn(topButtonClass, "flex")}>
                           <FullscreenIcon className="h-5 w-5" />
@@ -1594,10 +1674,11 @@ function ShortsPageContent() {
                           title="Short actions"
                           actions={[
                             { id: "description", label: "Description", icon: List, onSelect: () => openPanel("description") },
-                            { id: "captions", label: "Captions", icon: captionsEnabled ? CCIconOn : CCIconOff, value: captionsEnabled ? "On" : "Off", onSelect: toggleCaptions },
+                            ...(hasCaptions ? [{ id: "captions", label: "Captions", icon: captions ? CCIconOn : CCIconOff, value: captions && captionChoice ? captionChoice.to?.name ?? languageName(captionChoice.track.code) : "Off", opens: true, onSelect: () => setCaptionsOpen(true) }] : []),
+                            { id: "speed", label: "Playback speed", icon: Gauge, value: rate === 1 ? "Normal" : `${rate}x`, opens: true, onSelect: () => setSpeedOpen(true) },
                             { id: "watch-later", label: isShortSaved(short) ? "Remove from Watch later" : "Save to Watch later", icon: Clock, divider: true, onSelect: () => toggleSaveShort(short) },
                             { id: "playlist", label: "Save to playlist", icon: SaveIcon, opens: true, onSelect: () => openSaveCard(short) },
-                            { id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(`/shorts?v=${short.videoId}`) },
+                            { id: "share", label: "Share", icon: ShareIcon, opens: true, onSelect: () => openShare(`/shorts/${short.videoId}`, short.title, youtubeThumb(short.videoId)) },
                             { id: "dont-recommend", label: "Don't recommend channel", icon: UserX, divider: true, onSelect: () => dontRecommend(short.channelId, short.channel) },
                             { id: "report", label: "Report", icon: Flag, opens: true, onSelect: () => openReport("short", short.title) },
                             { id: "feedback", label: "Send feedback", icon: MessageSquare, opens: true, onSelect: openFeedback },
@@ -1618,7 +1699,7 @@ function ShortsPageContent() {
                       type="button"
                       data-mute-toggle
                       onClick={(e) => { e.stopPropagation(); restoreSound() }}
-                      className="absolute left-1/2 top-16 z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium low:top-2 low:px-3 low:text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/75"
+                      className="absolute left-1/2 top-[136px] z-30 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-black/60 px-4 py-2 text-sm font-medium low:top-2 low:px-3 low:text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/75"
                     >
                       <VolumeX className="h-5 w-5" />
                       <span className="md:hidden">Tap to unmute</span>
@@ -1628,7 +1709,7 @@ function ShortsPageContent() {
 
                   {/* Bottom info (phones: the title ends 19px above the bottom, 16px above the progress bar, on every size, as on
                       YouTube's mobile site) */}
-                  <div className={`absolute bottom-[19px] md:bottom-6 low:!bottom-3 left-4 right-20 lg:right-4 low:left-3 low:!right-3 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+                  <div data-short-info="" className={cn(`absolute bottom-[19px] md:bottom-6 low:!bottom-3 left-4 right-20 lg:right-4 low:left-3 low:!right-3 z-20 transition-all duration-500 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)] ${isActive && !isScrolling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`)}>
                     <div className="flex items-center gap-2.5 mb-2 low:gap-2 low:mb-1">
                       <Avatar className="h-9 w-9 flex-shrink-0 low:h-7 low:w-7">
                         <AvatarImage src={short.channelAvatar} />
@@ -1723,7 +1804,7 @@ function ShortsPageContent() {
                   })()}
                 </div>
                 {/* Actions: over the video on phones/tablets, beside it on wider screens (as on YouTube) */}
-                <div className={cn(
+                <div data-short-actions="" className={cn(
                   // Phones/tablets: ends 27px above the bottom, as on YouTube; the gaps follow the screen's height (see actionCircleClass)
                   "absolute right-3 bottom-[27px] z-20 flex flex-col items-center gap-[clamp(6px,2.2svh,20px)] transition-all duration-500",
                   "lg:static lg:z-auto lg:flex-shrink-0 lg:gap-4 lg:mb-1",
@@ -1735,11 +1816,14 @@ function ShortsPageContent() {
                     <span className={actionCircleClass}><Heart className={cn("h-6 w-6", liked && "text-red-500 fill-red-500")} /></span>
                     <span className={actionLabelClass}>{short.likes}</span>
                   </button>
+                  {/* Comments: switched off for now. To bring it back, uncomment this, import MessageCircle from lucide-react again
+                      and take `.skip` off "Shorts comments" in e2e/screen-sizes.spec.ts
                   <button type="button" aria-label={`Comments, ${short.comments}`} onClick={() => openPanel("comments")} className="flex flex-col items-center gap-1 group">
                     <span className={actionCircleClass}><MessageCircle className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>{short.comments}</span>
                   </button>
-                  <button type="button" onClick={() => openShare(`/shorts?v=${short.videoId}`)} className="flex flex-col items-center gap-1 group">
+                  */}
+                  <button type="button" onClick={() => openShare(`/shorts/${short.videoId}`, short.title, youtubeThumb(short.videoId))} className="flex flex-col items-center gap-1 group">
                     <span className={actionCircleClass}><ShareIcon className="h-6 w-6" /></span>
                     <span className={actionLabelClass}>Share</span>
                   </button>

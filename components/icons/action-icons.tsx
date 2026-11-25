@@ -20,3 +20,23 @@ export function SaveIcon({ filled, className }: { filled?: boolean; className?: 
     </svg>
   );
 }
+
+/** A bell in YouTube's shape. */
+export function BellIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M16 19a4 4 0 11-8 0H4.765C3.21 19 2.25 17.304 3.05 15.97l1.806-3.01A1 1 0 005 12.446V8a7 7 0 0114 0v4.446c0 .181.05.36.142.515l1.807 3.01c.8 1.333-.161 3.029-1.716 3.029H16ZM12 3a5 5 0 00-5 5v4.446a3 3 0 01-.428 1.543L4.765 17h14.468l-1.805-3.01A3 3 0 0117 12.445V8a5 5 0 00-5-5Zm-2 16a2 2 0 104 0h-4Z" />
+    </svg>
+  );
+}
+
+/** A microphone in YouTube's shape: wide, with a short arc under it (lucide's is narrower, with long sides). */
+export function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <rect x="8" y="2" width="8" height="13" rx="4" />
+      <path d="M5 14.2a7.5 7.5 0 0 0 14 0" />
+      <path d="M12 19v3" />
+    </svg>
+  );
+}

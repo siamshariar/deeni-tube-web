@@ -1,14 +1,15 @@
 "use client";
 
+import { loadRecentSearches, saveRecentSearches } from "@/lib/recent-searches";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, History, Mic } from "lucide-react";
+import { Search, X, History } from "lucide-react";
+import { MicIcon } from "@/components/icons/action-icons";
 import { MultiSelect } from "@/components/multi-select";
 import { BackButton } from "@/components/page-bar";
 import { CHIP, CHIP_OFF, CHIP_ON } from "@/components/page-layout";
-import { SearchField } from "@/components/search-field";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
-import { VoiceSearchDialog } from "@/components/voice-search";
+import { openVoice } from "@/lib/voice";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { videoData } from "@/lib/video-data";
@@ -24,21 +25,6 @@ const categoryOptions = Array.from(new Set(videoData.map(v => v.category).filter
 const scholarOptions  = scholarData.map(s => s.name);
 const channelOptions  = channelData.map((c: ChannelItem) => c.name);
 
-// ── localStorage ──────────────────────────────────────────────────────────────
-
-function loadRecent(): string[] {
-  try {
-    const raw = localStorage.getItem("recentSearches");
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === "string") : [];
-  } catch { return []; }
-}
-
-function saveRecent(list: string[]) {
-  try { localStorage.setItem("recentSearches", JSON.stringify(list)); } catch {}
-}
-
 // ── Global mobile search modal ────────────────────────────────────────────────
 // Always mounted in the layout. Opens via: window.dispatchEvent(new CustomEvent("open-search-modal"))
 // After Search is pressed: navigates to /search?q=...&filters...
@@ -48,7 +34,6 @@ export default function MobileSearchModal() {
 
   const [isOpen, setIsOpen]                     = useState(false);
   const [query, setQuery]                       = useState("");
-  const [voiceOpen, setVoiceOpen]               = useState(false);
   const [activeLangs, setActiveLangs]           = useState<string[]>(() => getDefaultSearchLangs());
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedScholars, setSelectedScholars] = useState<string[]>([]);
@@ -67,7 +52,7 @@ export default function MobileSearchModal() {
       if (urlQ) setQuery(urlQ);
       setActiveLangs(parseSearchLangs(/^\/search(\/|$)/.test(window.location.pathname) ? params.get("lang") : null));
 
-      setRecentList(loadRecent());
+      setRecentList(loadRecentSearches());
       setIsOpen(true);
       setTimeout(() => inputRef.current?.focus(), 80);
     };
@@ -98,13 +83,15 @@ export default function MobileSearchModal() {
     if (!term) return;
     setRecentList(prev => {
       const updated = [term, ...prev.filter(s => s !== term)].slice(0, 8);
-      saveRecent(updated);
+      saveRecentSearches(updated);
       return updated;
     });
   };
 
   const removeFromRecent = (s: string) =>
-    setRecentList(prev => { const u = prev.filter(x => x !== s); saveRecent(u); return u; });
+    setRecentList(prev => { const u = prev.filter(x => x !== s); saveRecentSearches(u); return u; });
+
+  const shownRecent = recentList.filter((s) => s.toLowerCase().includes(query.trim().toLowerCase()));
 
   const handleSearch = () => {
     const term = query.trim();
@@ -144,54 +131,59 @@ export default function MobileSearchModal() {
     // Above the phone's keyboard, so the Search button isn't behind it
     <div className="md:hidden safe-x fixed inset-0 z-[60] bg-background flex flex-col" style={{ paddingBottom: keyboard }}>
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex h-14 flex-shrink-0 items-center gap-1 border-b pl-0.5 pr-2">
+      {/* ── The bar, YouTube's: back, the box with its search button, the microphone (gone while there's text) ── */}
+      <div className="flex h-14 flex-shrink-0 items-center gap-1 pl-0.5 pr-2">
         <BackButton label="Close search" onClick={close} />
-        <span className="flex-1 text-base font-medium leading-6">Search</span>
-        {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
-          <Button variant="ghost" className="h-9 px-3" onClick={resetFilters}>
-            Clear filters
-          </Button>
-        )}
-      </div>
-
-      {/* ── Search input ────────────────────────────────────────────── */}
-      <div className="flex flex-shrink-0 items-center gap-2 px-3 py-3">
-        <SearchField
-          inputRef={inputRef}
-          value={query}
-          onChange={setQuery}
-          onEnter={() => { if (query.trim() || hasActiveFilters) handleSearch(); }}
-          label="Search videos, scholars, channels"
-          className="flex-1"
-        />
-        <button
-          type="button"
-          aria-label="Search with your voice"
-          onClick={() => setVoiceOpen(true)}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted transition-colors active:bg-accent"
+        <form
+          role="search"
+          onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+          className="flex h-10 min-w-0 flex-1 items-center rounded-full bg-muted pl-4"
         >
-          <Mic className="h-6 w-6" />
-        </button>
-        <VoiceSearchDialog
-          open={voiceOpen}
-          onOpenChange={setVoiceOpen}
-          onResult={(text) => { setVoiceOpen(false); handleRecentTap(text); }}
-        />
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            aria-label="Search videos, scholars, channels"
+            placeholder="Search Deeni.tube"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-full min-w-0 flex-1 text-ellipsis bg-transparent text-base outline-none placeholder:text-muted-foreground"
+          />
+          {query && (
+            <button type="button" aria-label="Clear search" onClick={() => { setQuery(""); inputRef.current?.focus(); }} className="flex h-10 w-9 flex-shrink-0 items-center justify-center">
+              <X className="h-5 w-5" />
+            </button>
+          )}
+          <button type="submit" aria-label="Search" disabled={!query.trim() && !hasActiveFilters} className="flex h-10 w-11 flex-shrink-0 items-center justify-center rounded-r-full pr-1">
+            <Search className="h-6 w-6" />
+          </button>
+        </form>
+        {!query && (
+          <button
+            type="button"
+            aria-label="Search with your voice"
+            onClick={() => openVoice(handleRecentTap)}
+            className="ml-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-muted transition-colors active:bg-accent"
+          >
+            <MicIcon className="h-6 w-6" />
+          </button>
+        )}
       </div>
 
       {/* ── Scrollable filter body ───────────────────────────────────── */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {/* Recent searches — only when query is empty */}
-        {!query && recentList.length > 0 && (
+        {/* Recent searches, narrowed by what is typed */}
+        {shownRecent.length > 0 && (
           <div className="border-b pb-2">
             <div className="flex items-center justify-between pl-3 pr-2">
               <span className="text-sm font-medium">Recent searches</span>
-              <Button variant="ghost" className="h-9 px-3" onClick={() => { setRecentList([]); saveRecent([]); }}>
+              <Button variant="ghost" className="h-9 px-3" onClick={() => { setRecentList([]); saveRecentSearches([]); }}>
                 Clear all
               </Button>
             </div>
-            {recentList.map((s) => (
+            {shownRecent.map((s) => (
               <div key={s} className="flex items-center pr-1">
                 <button type="button" onClick={() => handleRecentTap(s)} className="flex min-h-11 min-w-0 flex-1 items-center gap-4 px-3 text-left transition-colors active:bg-accent">
                   <History className="h-5 w-5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -208,7 +200,14 @@ export default function MobileSearchModal() {
         {/* ── Filter sections ────────────────────────────────────────── */}
         <div className="space-y-6 px-3 py-5">
           <div>
-            <p className="mb-2 text-sm font-medium">Language</p>
+            <div className="mb-2 flex min-h-9 items-center justify-between">
+              <p className="text-sm font-medium">Language</p>
+              {(hasActiveFilters || !isDefaultSearchLangs(activeLangs)) && (
+                <Button variant="ghost" className="-mr-1 h-9 px-3" onClick={resetFilters}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               {LANGUAGES.map((lang) => (
                 <button key={lang.code} type="button" aria-pressed={activeLangs.includes(lang.code)} onClick={() => toggleLang(lang.code)} className={cn(CHIP, activeLangs.includes(lang.code) ? CHIP_ON : CHIP_OFF)}>

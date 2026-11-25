@@ -1,5 +1,6 @@
 "use client";
 
+import { isShortsPath } from "@/lib/share-path";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -42,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Shorts is a fixed, full-screen feed with its own offsets: no padding or minimum height here,
   // so the page behind it is never taller than the screen (and can't scroll or bounce on phones)
-  const isShorts = pathname === "/shorts";
+  const isShorts = isShortsPath(pathname);
 
   return (
     <main

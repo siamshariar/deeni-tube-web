@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { channelData, subscribersText } from "@/lib/channel-data";
 import { SortDropdown } from "@/components/sort-dropdown";
 import { useFeedPreferences } from "@/hooks/useFeedPreferences";
+import { filterIn } from "@/lib/search-match";
 
 const SORT_OPTIONS = [
   { label: "Default", value: "default" },
@@ -43,10 +44,7 @@ export default function ChannelsPage() {
     setOnlyHidden(false);
   };
 
-  const query = searchQuery.trim().toLowerCase();
-  const channels = channelData
-    .filter((ch) => (showingHidden ? !followedChannels.includes(ch.id) : languages.selected.includes(ch.language)))
-    .filter((ch) => !query || ch.name.toLowerCase().includes(query))
+  const channels = filterIn(channelData.filter((ch) => (showingHidden ? !followedChannels.includes(ch.id) : languages.selected.includes(ch.language))), searchQuery, (ch) => [ch.name])
     .sort((a, b) => (sort === "name-asc" ? a.name.localeCompare(b.name) : sort === "name-desc" ? b.name.localeCompare(a.name) : sort === "subscribers" ? b.subscribers - a.subscribers : 0));
 
   const total = channelData.length;

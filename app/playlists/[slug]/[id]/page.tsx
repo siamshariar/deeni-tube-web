@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { YouTubePlayer } from "@/components/youtube-player";
+import { AmbientLight } from "@/components/ambient-light";
 import { PLAYER_BOX, PLAYER_FRAME, WATCH_COLUMNS, WATCH_PAGE, WATCH_PRIMARY, WATCH_SECONDARY } from "@/components/watch-layout";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { VideoItem } from "@/lib/video-data";
@@ -337,6 +338,7 @@ export default function PlaylistDetailPage() {
   const currentVideo = videos.find((v) => v.id === currentVideoId) ?? videos[0];
   const currentIndex = currentVideo ? videos.findIndex((v) => v.id === currentVideo.id) : -1;
   const nextVideo = currentIndex >= 0 ? videos[currentIndex + 1] : undefined;
+  const previousVideo = currentIndex > 0 ? videos[currentIndex - 1] : undefined;
   // The player moves on to the next video at the end when Autoplay (the switch in the playlist panel, also in
   // the player) is on; otherwise it shows its end screen with Replay and "Up next"
   const player = currentVideo ? (
@@ -345,6 +347,10 @@ export default function PlaylistDetailPage() {
       videoId={currentVideo.videoId}
       title={currentVideo.title}
       tall={currentVideo.isShort}
+      ratio={currentVideo.ratio}
+      playlist
+      previous={previousVideo?.videoId}
+      onPrevious={previousVideo ? () => setCurrentVideoId(previousVideo.id) : undefined}
       autoplay={autoPlay}
       onAutoplayChange={setAutoPlay}
       onNext={nextVideo ? () => setCurrentVideoId(nextVideo.id) : undefined}
@@ -567,7 +573,7 @@ export default function PlaylistDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-14">
+    <div className="watch-page min-h-screen bg-background pt-14">
       <PageBar title={playlist.name} parent="/playlists" />
 
       {/* Mobile: full-width video (edge-to-edge) */}
@@ -584,7 +590,10 @@ export default function PlaylistDetailPage() {
             <div className={WATCH_PRIMARY}>
               {/* Desktop video player: always exactly 16:9, so no black bars at the sides */}
               {!isMobile && (
-                <div className={PLAYER_BOX}>{player}</div>
+                <div className={PLAYER_FRAME}>
+                  {currentVideo && <AmbientLight key={currentVideo.id} videoId={currentVideo.videoId} />}
+                  <div className={PLAYER_BOX}>{player}</div>
+                </div>
               )}
 
               {currentVideo && (
