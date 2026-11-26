@@ -13,6 +13,7 @@ import { onAmbientTime, useAmbient } from "@/lib/ambient";
 import { youtubeThumb } from "@/lib/media-lookup";
 import { frameAt, storyboardOf, type Storyboard } from "@/lib/storyboard";
 import { THEATER_SCREENS, useTheater } from "@/lib/theater";
+import { THEME_COLORS } from "@/lib/theme-colors";
 
 const [W, H] = [110, 75];
 const FRAME = { x: 15, y: 15, w: 80, h: 45 };
@@ -69,7 +70,9 @@ export function AmbientLight({ videoId }: { videoId: string }) {
     const top = topRef.current?.getContext("2d");
     if (!active || !base || !top) return;
     const topEl = top.canvas;
-    const background = theater ? "#000" : getComputedStyle(document.body).backgroundColor;
+    // Outside theater mode it only shows in the dark theme: that theme's page colour. Not read from the page: when the
+    // theme changes this runs before the page has its new colours, and the glow covered the page in the old (white) one.
+    const background = theater ? "#000" : THEME_COLORS.dark;
     // Safari's canvas can't blur: the canvas itself is blurred instead
     const blurs = "filter" in CanvasRenderingContext2D.prototype;
     const fill = (c: CanvasRenderingContext2D) => {

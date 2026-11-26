@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import type { Metadata, Viewport } from "next";
 import { Roboto } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { THEME_COLORS, themeColorScript } from "@/lib/theme-colors";
 import AppHeader from "@/components/app-header";
 import DesktopSidebar from "@/components/desktop-sidebar";
 import MobileNav from "@/components/mobile-nav";
@@ -44,8 +45,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
   ],
 };
 
@@ -92,6 +93,8 @@ export default function RootLayout({
         />
       </head>
       <body className={`${roboto.variable} font-sans antialiased`}>
+        {/* The browser's bar in the theme chosen here, before first paint (lib/theme-colors; the head's meta tags are there by now) */}
+        <script dangerouslySetInnerHTML={{ __html: themeColorScript }} />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

@@ -164,7 +164,7 @@ The most complex file (~1800 lines), entirely `"use client"`. Key mechanics:
 
 ### Theming
 
-CSS custom properties defined in `app/globals.css` for all colour tokens (`--background`, `--foreground`, `--primary`, etc.), using a YouTube-like neutral palette (see "UI conventions"). Tailwind uses these via `hsl(var(--...))` mappings in `tailwind.config.ts`. Dark mode is toggled via the `class` strategy (`next-themes`).
+CSS custom properties defined in `app/globals.css` for all colour tokens (`--background`, `--foreground`, `--primary`, etc.), using a YouTube-like neutral palette (see "UI conventions"). Tailwind uses these via `hsl(var(--...))` mappings in `tailwind.config.ts`. Dark mode is toggled via the `class` strategy (`next-themes`). Switching it takes effect on the page at once, without a reload: nothing may read the page's colours in an effect that runs when the theme changes (next-themes gives the page its new colours after the children's effects), so use `THEME_COLORS` (`lib/theme-colors.ts`). The phone's browser bar (`theme-color`) follows the theme chosen in the app, not only the phone's setting (`components/theme-provider.tsx`, and a script at the start of `<body>` before first paint).
 
 ### Page layout (the same on every screen)
 

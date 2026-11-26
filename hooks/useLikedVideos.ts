@@ -13,7 +13,8 @@ function seed(): SavedVideo[] {
   const videoIds = extendedPlaylists.find((p) => p.id === "pl-liked-videos")?.videoIds ?? [];
   const ids = [...videoIds, ...shortsVideos.slice(2, 6).map((s) => s.id)];
   return ids
-    .map((id, i) => savedItem(id, now - i * 3_600_000))
+    // A minute older than Watch later's, so the two keep their order on /playlists (the seed is made again on each load)
+    .map((id, i) => savedItem(id, now - 60_000 - i * 3_600_000))
     .filter((v): v is SavedVideo => v !== undefined);
 }
 

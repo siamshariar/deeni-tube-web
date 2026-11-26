@@ -116,6 +116,37 @@ test.describe('Ambient mode', () => {
     await expect(page.locator(`${PLAYER} iframe`)).toHaveCSS('opacity', '1', { timeout: 15_000 });
     await expect(page.locator('.ambient')).toHaveCount(0);
   });
+
+  test('switching the theme on the page: the whole page takes it at once', async ({ page }) => {
+    // The glow used to be filled with the page's colour from before the switch: dark mode stayed white under it
+    await open(page, 'light');
+    await away(page);
+    const theme = (t: string) => page.evaluate((t) => { localStorage.setItem('theme', t); window.dispatchEvent(new StorageEvent('storage', { key: 'theme', newValue: t })); }, t);
+    await theme('dark');
+    await expect(page.locator('.ambient')).toHaveCount(1);
+    // Inside the glow's box, away from the frame; and outside it
+    for (const [x, y] of [[500, 885], [5, 885], [1430, 885]]) await expect.poll(async () => Math.max(...(await colour(page, x, y)))).toBeLessThan(40);
+    await theme('light');
+    await expect(page.locator('.ambient')).toHaveCount(0);
+    await expect.poll(() => colour(page, 500, 885)).toEqual([255, 255, 255]);
+  });
+});
+
+test("the phone's bar has the theme chosen here", async ({ page }) => {
+  // The viewport's theme-color only follows the phone's own setting
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(() => { if (!sessionStorage.getItem('t')) { sessionStorage.setItem('t', '1'); localStorage.setItem('theme', 'dark'); } });
+  await page.goto('/donate');
+  const bar = () => page.evaluate(() => [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')].find((m) => !m.media || matchMedia(m.media).matches)?.content);
+  await expect.poll(bar).toBe('#0f0f0f');
+  // Switched as from another tab; before the page is ready (hydrated) nothing listens, so until it takes
+  await expect.poll(async () => {
+    await page.evaluate(() => { localStorage.setItem('theme', 'light'); window.dispatchEvent(new StorageEvent('storage', { key: 'theme', newValue: 'light' })); });
+    return bar();
+  }).toBe('#ffffff');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.reload();
+  await expect.poll(bar).toBe('#ffffff');
 });
 
 test('phones have none', async ({ page, isMobile }) => {
